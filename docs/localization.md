@@ -18,11 +18,13 @@ bitchat/
 - `Infoplist.xcstrings`: System-provided dialog strings sourced from Info.plist keys (e.g., Bluetooth permission descriptions). iOS reads these directly from the String Catalog when presenting system alerts; they must live here to localize permission prompts and other OS-driven UI.
 
 Why both exist:
+
 - App UI and system prompts are sourced differently by iOS. Keeping UI text in `Localizable.xcstrings` and permission strings in `Infoplist.xcstrings` matches Apple’s expectations so both your screens and the OS dialogs appear localized.
 
 ## Supported Languages (29 Total)
 
 ### Major World Languages (18)
+
 - **English (en)** - Base language
 - **Spanish (es)** - 500M+ speakers  
 - **Chinese Simplified (zh-Hans)** - 918M speakers
@@ -43,6 +45,7 @@ Why both exist:
 - **Bengali (bn)** - 300M speakers
 
 ### Regional & Cultural Languages (11)  
+
 - **Egyptian Arabic (arz)** - 100M speakers
 - **Filipino (fil)** - 45M speakers
 - **Tagalog (tl)** - 45M speakers  
@@ -60,6 +63,7 @@ Why both exist:
 ### Adding New Localizable Strings
 
 1. **Add to Localizable.xcstrings** using Xcode String Catalog editor:
+
    ```swift
    // ❌ Wrong
    Button("Save") { ... }
@@ -69,9 +73,11 @@ Why both exist:
    ```
 
 2. **Sync all languages and comments:**
+
    ```bash
    just sync-all [--dry-run]
    ```
+
    - Ensures 29-language parity and fills gaps with English
    - Auto-adds concise developer comments for any keys missing context
    - Marks any auto-filled non-English entries as `needs_review` to indicate translation is pending
@@ -82,7 +88,7 @@ Why both exist:
 
 Use hierarchical naming with dots for organization:
 
-```
+```text
 nav.people              # Navigation elements
 common.save             # Common actions  
 actions.mention         # Message actions
@@ -96,9 +102,11 @@ location.teleport      # Location-specific features
 ## Scripts & Tooling
 
 ### Main Sync Script
+
 ```bash
 just sync-all [--dry-run]
 ```
+
 - Syncs both Localizable.xcstrings AND Infoplist.xcstrings
 - Ensures all 29 languages have complete coverage
 - Fills missing keys with English values for translation
@@ -106,6 +114,7 @@ just sync-all [--dry-run]
 - Flags non-English entries copied from English as `needs_review`
 
 ### Simulator Locale Helper
+
 ```bash
 # Use the only booted Simulator
 just set-locale --lang fr --region FR --restart
@@ -119,41 +128,49 @@ just set-locale --lang zh-Hans --region CN --device <UDID> --launch com.your.bun
 # Auto-boot an available iPhone if none booted
 just set-locale --lang de --boot --restart
 ```
+
 - Auto-detects the single booted Simulator if `--device` is omitted.
 - Writes device-wide AppleLanguages and AppleLocale; `--restart` reboots to apply system-wide.
 - `--launch` starts an app with `-AppleLanguages`/`-AppleLocale` arguments for fast spot checks.
- - `--boot` selects and boots the first available iPhone device if no single booted device is found.
+- `--boot` selects and boots the first available iPhone device if no single booted device is found.
 
 ### Other Commands
+
 - `just sync-comments [--dry-run]` — Add missing comments
 - `just locale-report` — Coverage report
 - Pre-commit hook: `just install-pre-commit`
 
 ### Build-Time Validation
+
 ```bash
 just validate-localization
 ```
+
 - Prevents hardcoded strings in commits
 - Validates .xcstrings file integrity
 - Checks language parity across all 29 languages
 - Confirms every key has a developer comment for translator context
 
 ### Pre-Commit Hook (Optional)
+
 ```bash
 # Enable validation
 just install-pre-commit
 chmod +x .git/hooks/pre-commit
 ```
+
 What it enforces:
+
 - No hardcoded UI strings in Swift files
 - Valid `.xcstrings` JSON and 29-language parity
 - Every key has a concise developer comment
 
 Behavior:
+
 - If comments are missing, the hook attempts to auto-add them using
   `just sync-comments`, then asks you to review and
   stage the changes.
- - Note: There is no separate polishing step; `add_missing_comments.py` is the
+- Note: There is no separate polishing step; `add_missing_comments.py` is the
    sole source of comment generation.
 
 ## Testing
@@ -161,6 +178,7 @@ Behavior:
 ### Comprehensive Test Coverage
 
 **LocalizationTests.swift** - Real value testing:
+
 - `testCriticalUIStringsAreLocalized()` - Validates top 5 UI strings × 3 major languages
 - `testTechnicalTermsNotTranslated()` - Ensures #mesh, BitChat, Nostr preserved
 - `testMajorLanguagesProperlyTranslated()` - Verifies native translations vs English fallbacks
@@ -168,6 +186,7 @@ Behavior:
 - `testLocalizationFallbackWorks()` - Tests graceful degradation
 
 **UI Tests:**
+
 - App launch validation across languages
 - Accessibility compliance testing
 - Navigation flow validation
@@ -180,12 +199,14 @@ xcodebuild test -scheme "bitchat (iOS)" -destination 'platform=iOS Simulator,nam
 ## Translation Guidelines
 
 ### Cultural Adaptation
+
 - **Preserve technical terms**: Keep "#mesh", "/msg", "BitChat", "Nostr" untranslated
 - **Cultural context**: Consider local communication patterns
 - **RTL languages**: Arabic and Urdu require right-to-left consideration
 - **CJK languages**: Chinese variants and Japanese need proper character sets
 
 ### Quality Standards
+
 - **Professional translations**: Not literal word-for-word conversion
 - **Context comments**: Provided in .xcstrings for ambiguous terms
 - **Consistency**: Same terms across related features
@@ -194,6 +215,7 @@ xcodebuild test -scheme "bitchat (iOS)" -destination 'platform=iOS Simulator,nam
 ## Technical Details
 
 ### Modern .xcstrings Benefits
+
 - **Single file management** vs multiple .strings files
 - **Native Xcode integration** with String Catalog editor
 - **Better version control** and merge handling
@@ -201,19 +223,23 @@ xcodebuild test -scheme "bitchat (iOS)" -destination 'platform=iOS Simulator,nam
 - **Translation progress** visibility in Xcode
 
 ### Language Fallback Chain
+
 1. User's preferred language (e.g., `zh-HK`)
 2. Language family fallback (e.g., `zh-Hans`)
 3. English base (`en`)
 4. Key name as last resort
 
 ### Right-to-Left (RTL) Support
+
 Languages: Arabic (`ar`, `arz`), Urdu (`ur`), Punjabi (`pnb`)
+
 - Text alignment automatically handled by SwiftUI
 - UI layouts adapt automatically to RTL reading direction
 
 ## Troubleshooting
 
 ### Build Issues
+
 ```bash
 # Regenerate project after .xcstrings changes
 xcodegen generate
@@ -223,6 +249,7 @@ just validate-localization
 ```
 
 ### Missing Translations
+
 ```bash
 # Sync all languages to ensure parity
 just sync-all [--dry-run]
@@ -232,6 +259,7 @@ just sync-all [--dry-run]
 ```
 
 ### Adding New Languages
+
 1. Add language code to `scripts/localization/tools/helper_sync_xcstrings.py`
 2. Run sync script to populate with English placeholders  
 3. Translate values in both .xcstrings files
@@ -240,21 +268,25 @@ just sync-all [--dry-run]
 ## Quality Assurance
 
 ### Other Commands
+
 - `just sync-comments [--dry-run]` — Comments only
 - `just locale-report` — Coverage and missing report
 - Pre-commit hook: `just install-pre-commit`
 
 ### Build-Time Validation
+
 - Automatic detection of hardcoded UI strings
 - .xcstrings file integrity validation
 - Language parity enforcement across all 29 languages
 
 ### Runtime Testing
+
 - Comprehensive unit test coverage
 - UI interaction testing across languages
 - Permission dialog localization validation
 
 ### Manual Testing Checklist
+
 - [ ] Test in iOS Simulator with different languages
 - [ ] Verify RTL languages display correctly (Arabic, Urdu)  
 - [ ] Check CJK languages render properly (Chinese, Japanese)
@@ -264,6 +296,7 @@ just sync-all [--dry-run]
 ## Contributing
 
 When adding localized strings:
+
 1. **Use semantic key names** with dot hierarchy
 2. **Add context comments** for translators in String Catalog
 3. **Preserve technical terms** - don't translate brand/protocol names
