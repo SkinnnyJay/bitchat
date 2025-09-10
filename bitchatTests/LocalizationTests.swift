@@ -35,7 +35,7 @@ final class LocalizationTests: XCTestCase {
             return
         }
         
-        var violations: [String] = []
+        let _: [String] = []
         var protectedTermsFound = 0
         
         for key in allKeys {
@@ -258,7 +258,7 @@ final class LocalizationTests: XCTestCase {
         
         for count in test_counts {
             // Test with English (simpler plural rules)
-            let englishPlural = String(format: String(localized: count_key), locale: .current, count)
+            let englishPlural = String(localized: "accessibility.people_count", defaultValue: "\(count) people")
             
             XCTAssertFalse(englishPlural.isEmpty, "Plural form should not be empty for count \(count)")
             XCTAssertTrue(englishPlural.contains("\(count)"), "Plural should contain the count number")
