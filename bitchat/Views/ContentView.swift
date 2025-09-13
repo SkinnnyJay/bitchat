@@ -1200,7 +1200,7 @@ struct ContentView: View {
                         .fixedSize(horizontal: true, vertical: false)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Location notes for this place")
+                    .accessibilityLabel(String(localized: "accessibility.location_notes"))
                 }
 
                 HStack(spacing: 4) {
@@ -1255,15 +1255,15 @@ struct ContentView: View {
                                     .frame(width: 32, height: 32)
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel("Close")
+                            .accessibilityLabel(String(localized: "accessibility.close"))
                         }
                         .frame(height: 44)
                         .padding(.horizontal, 12)
                         .background(backgroundColor.opacity(0.95))
-                        Text("location unavailable")
+                        Text(String(localized: "location.unavailable"))
                             .font(.system(size: 14, design: .monospaced))
                             .foregroundColor(secondaryTextColor)
-                        Button("enable location") {
+                        Button(String(localized: "location.enable_action")) {
                             LocationChannelManager.shared.enableLocationChannels()
                             LocationChannelManager.shared.refreshChannels()
                         }

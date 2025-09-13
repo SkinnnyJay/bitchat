@@ -350,8 +350,9 @@ struct LocationChannelsSheet: View {
     private func meshTitleWithCount() -> String {
         // Count currently connected mesh peers (excluding self)
         let meshCount = meshCount()
-        let noun = meshCount == 1 ? "person" : "people"
-        return "mesh [\(meshCount) \(noun)]"
+        //let noun = meshCount == 1 ? "person" : "people"
+        //return "mesh [\(meshCount) \(noun)]"
+        return String.localizedStringWithFormat(String(localized: "location.mesh_with_count"), meshCount)
     }
 
     private func meshCount() -> Int {
@@ -366,15 +367,15 @@ struct LocationChannelsSheet: View {
     private func geohashTitleWithCount(for channel: GeohashChannel) -> String {
         // Main list: keep level labels (block/neighborhood/city/province/region)
         let count = viewModel.geohashParticipantCount(for: channel.geohash)
-        let noun = count == 1 ? "person" : "people"
-        return "\(channel.level.displayName.lowercased()) [\(count) \(noun)]"
+        return String.localizedStringWithFormat(String(localized: "location.geohash_with_count"), channel.level.displayName.lowercased(), count)
     }
 
     private func geohashHashTitleWithCount(_ geohash: String) -> String {
         // Bookmarked list: show the #geohash as the main label
         let count = viewModel.geohashParticipantCount(for: geohash)
-        let noun = count == 1 ? "person" : "people"
-        return "#\(geohash) [\(count) \(noun)]"
+        //let noun = count == 1 ? "person" : "people"
+        //return "#\(geohash) [\(count) \(noun)]"
+        return String.localizedStringWithFormat(String(localized: "location.geohash_hash_with_count"), geohash, count)
     }
 
     private func validateGeohash(_ s: String) -> Bool {
