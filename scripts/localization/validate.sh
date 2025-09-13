@@ -32,7 +32,7 @@ build() {
   # Validate catalogs
   python3 - << 'PY'
 import json,sys
-for p in ('bitchat/Localizable.xcstrings','bitchat/Infoplist.xcstrings'):
+for p in ('bitchat/Localizable.xcstrings','bitchat/InfoPlist.xcstrings'):
   try:
     d=json.load(open(p,'r',encoding='utf-8'))
     strings=d.get('strings',{})

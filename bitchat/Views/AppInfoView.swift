@@ -19,32 +19,32 @@ struct AppInfoView: View {
     // MARK: - Constants
     private enum Strings {
         static let appName = "bitchat"
-        static let tagline = "sidegroupchat"
+        static let tagline = String(localized: "appinfo.tagline")
         
         enum Features {
-            static let title = "FEATURES"
-            static let offlineComm = ("wifi.slash", "offline communication", "works without internet using Bluetooth low energy")
-            static let encryption = ("lock.shield", "end-to-end encryption", "private messages encrypted with noise protocol")
-            static let extendedRange = ("antenna.radiowaves.left.and.right", "extended range", "messages relay through peers, going the distance")
-            static let mentions = ("at", "mentions", "use @nickname to notify specific people")
-            static let favorites = ("star.fill", "favorites", "get notified when your favorite people join")
-            static let geohash = ("number", "local channels", "geohash channels to chat with people in nearby regions over decentralized anonymous relays")
+            static let title = String(localized: "appinfo.features.title")
+            static let offlineComm = ("wifi.slash", String(localized: "appinfo.feature.offline_comm"), String(localized: "appinfo.feature.offline_comm_desc"))
+            static let encryption = ("lock.shield", String(localized: "appinfo.feature.encryption"), String(localized: "appinfo.feature.encryption_desc"))
+            static let extendedRange = ("antenna.radiowaves.left.and.right", String(localized: "appinfo.feature.extended_range"), String(localized: "appinfo.feature.extended_range_desc"))
+            static let mentions = ("at", String(localized: "appinfo.feature.mentions"), String(localized: "appinfo.feature.mentions_desc"))
+            static let favorites = ("star.fill", String(localized: "appinfo.feature.favorites"), String(localized: "appinfo.feature.favorites_desc"))
+            static let geohash = ("number", String(localized: "appinfo.feature.geohash"), String(localized: "appinfo.feature.geohash_desc"))
         }
         
         enum Privacy {
-            static let title = "PRIVACY"
-            static let noTracking = ("eye.slash", "no tracking", "no servers, accounts, or data collection")
-            static let ephemeral = ("shuffle", "ephemeral identity", "new peer ID generated regularly")
-            static let panic = ("hand.raised.fill", "panic mode", "triple-tap logo to instantly clear all data")
+            static let title = String(localized: "appinfo.privacy.title")
+            static let noTracking = ("eye.slash", String(localized: "appinfo.privacy.no_tracking"), String(localized: "appinfo.privacy.no_tracking_desc"))
+            static let ephemeral = ("shuffle", String(localized: "appinfo.privacy.ephemeral"), String(localized: "appinfo.privacy.ephemeral_desc"))
+            static let panic = ("hand.raised.fill", String(localized: "appinfo.privacy.panic"), String(localized: "appinfo.privacy.panic_desc"))
         }
         
         enum HowToUse {
-            static let title = "HOW TO USE"
+            static let title = String(localized: "appinfo.howtouse.title")
         }
         
         enum Warning {
-            static let title = "WARNING"
-            static let message = "private message security has not yet been fully audited. do not use for critical situations until this warning disappears."
+            static let title = String(localized: "appinfo.warning.title")
+            static let message = String(localized: "appinfo.warning.message")
         }
     }
     

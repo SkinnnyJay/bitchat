@@ -10,6 +10,12 @@
             "value": "bitchat uses Bluetooth to create a secure mesh network for chatting with nearby users."
           }
         },
+        "it": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses Bluetooth to create a secure mesh network for chatting with nearby users."
+          }
+        },
         "arz": {
           "stringUnit": {
             "state": "needs_review",
@@ -65,6 +71,12 @@
           }
         },
         "id": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses Bluetooth to create a secure mesh network for chatting with nearby users."
+          }
+        },
+        "it": {
           "stringUnit": {
             "state": "needs_review",
             "value": "bitchat uses Bluetooth to create a secure mesh network for chatting with nearby users."
@@ -249,6 +261,12 @@
             "value": "bitchat uses Bluetooth to discover and connect with other bitchat users nearby."
           }
         },
+        "it": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses Bluetooth to discover and connect with other bitchat users nearby."
+          }
+        },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
@@ -423,6 +441,12 @@
           }
         },
         "id": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Take photos or video to share in chat."
+          }
+        },
+        "it": {
           "stringUnit": {
             "state": "needs_review",
             "value": "Take photos or video to share in chat."
@@ -607,6 +631,12 @@
             "value": "Find and connect to devices on your local network."
           }
         },
+        "it": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Find and connect to devices on your local network."
+          }
+        },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
@@ -781,6 +811,12 @@
           }
         },
         "id": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Show nearby channels and location-based features."
+          }
+        },
+        "it": {
           "stringUnit": {
             "state": "needs_review",
             "value": "Show nearby channels and location-based features."
@@ -965,6 +1001,12 @@
             "value": "Record audio messages."
           }
         },
+        "it": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Record audio messages."
+          }
+        },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
@@ -1144,6 +1186,12 @@
             "value": "Save images or videos from chat to your library."
           }
         },
+        "it": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Save images or videos from chat to your library."
+          }
+        },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
@@ -1318,6 +1366,12 @@
           }
         },
         "id": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Choose photos or videos to share."
+          }
+        },
+        "it": {
           "stringUnit": {
             "state": "needs_review",
             "value": "Choose photos or videos to share."

@@ -14,14 +14,14 @@ DRY=false
 add_comments() {
   local args=""; [[ "$DRY" == true ]] && args="--dry-run"
   python3 scripts/localization/tools/helper_add_missing_comments.py bitchat/Localizable.xcstrings $args
-  python3 scripts/localization/tools/helper_add_missing_comments.py bitchat/Infoplist.xcstrings $args
+  python3 scripts/localization/tools/helper_add_missing_comments.py bitchat/InfoPlist.xcstrings $args
 }
 
 add_values() {
   local args=""; [[ "$DRY" == true ]] && args="--dry-run"
   # Force-fill all locales with English values
   python3 scripts/localization/tools/helper_fill_with_english.py bitchat/Localizable.xcstrings $args
-  python3 scripts/localization/tools/helper_fill_with_english.py bitchat/Infoplist.xcstrings $args
+  python3 scripts/localization/tools/helper_fill_with_english.py bitchat/InfoPlist.xcstrings $args
 }
 
 case "$cmd" in

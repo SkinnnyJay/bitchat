@@ -6,7 +6,7 @@
 #   ./scripts/localization/export.sh help
 #   ./scripts/localization/export.sh all [--locales all|en,es,...] [--dry-run]
 #
-# Outputs to: scripts/localization/tmp/localizable/<locale>.csv and tmp/infoplist/<locale>.csv
+# Outputs to: scripts/localization/tmp/localizable/<locale>.csv and tmp/infoPlist/<locale>.csv
 
 set -euo pipefail
 cmd=${1:-help}; shift || true
@@ -39,14 +39,14 @@ PY
   else
     IFS=',' read -ra TARGETS <<< "$LOCALES"
   fi
-  mkdir -p scripts/localization/tmp/localizable scripts/localization/tmp/infoplist
+  mkdir -p scripts/localization/tmp/localizable scripts/localization/tmp/infoPlist
   for loc in "${TARGETS[@]}"; do
     echo "📤 Exporting $loc (localizable)"
     python3 scripts/localization/tools/helper_export_csv.py bitchat/Localizable.xcstrings "$loc"
-    echo "📤 Exporting $loc (infoplist)"
-    python3 scripts/localization/tools/helper_export_csv.py bitchat/Infoplist.xcstrings "$loc"
+    echo "📤 Exporting $loc (infoPlist)"
+    python3 scripts/localization/tools/helper_export_csv.py bitchat/InfoPlist.xcstrings "$loc"
   done
-  echo "✅ Export complete. CSVs in scripts/localization/tmp/{localizable,infoplist}/<locale>.csv"
+  echo "✅ Export complete. CSVs in scripts/localization/tmp/{localizable,infoPlist}/<locale>.csv"
 }
 
 case "$cmd" in

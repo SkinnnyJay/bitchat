@@ -122,7 +122,7 @@ ensure_comments_or_fail() {
 
 # Check comments for both catalogs
 ensure_comments_or_fail "bitchat/Localizable.xcstrings"
-ensure_comments_or_fail "bitchat/Infoplist.xcstrings"
+ensure_comments_or_fail "bitchat/InfoPlist.xcstrings"
 
 # Check if localization keys need sync
 if command -v python3 >/dev/null 2>&1 && [[ -f "scripts/localization/tools/helper_sync_xcstrings.py" ]]; then

@@ -7,7 +7,7 @@ BitChat supports comprehensive internationalization with **29 languages**, follo
 ```
 bitchat/
 ├── Localizable.xcstrings    # App UI strings (146 keys × 29 languages = 4,234 entries)
-└── Infoplist.xcstrings      # System permissions (2 keys × 29 languages = 58 entries)
+└── InfoPlist.xcstrings      # System permissions (2 keys × 29 languages = 58 entries)
 ```
 
 **Total: 4,292 localization entries with zero legacy files.**
@@ -15,11 +15,11 @@ bitchat/
 ## Catalogs: App UI vs System Prompts
 
 - `Localizable.xcstrings`: Application UI strings used throughout the app via `String(localized:)` and SwiftUI. Supports plurals and variations, and carries developer comments for translator context.
-- `Infoplist.xcstrings`: System-provided dialog strings sourced from Info.plist keys (e.g., Bluetooth permission descriptions). iOS reads these directly from the String Catalog when presenting system alerts; they must live here to localize permission prompts and other OS-driven UI.
+- `InfoPlist.xcstrings`: System-provided dialog strings sourced from Info.plist keys (e.g., Bluetooth permission descriptions). iOS reads these directly from the String Catalog when presenting system alerts; they must live here to localize permission prompts and other OS-driven UI.
 
 Why both exist:
 
-- App UI and system prompts are sourced differently by iOS. Keeping UI text in `Localizable.xcstrings` and permission strings in `Infoplist.xcstrings` matches Apple’s expectations so both your screens and the OS dialogs appear localized.
+- App UI and system prompts are sourced differently by iOS. Keeping UI text in `Localizable.xcstrings` and permission strings in `InfoPlist.xcstrings` matches Apple’s expectations so both your screens and the OS dialogs appear localized.
 
 ## Supported Languages (29 Total)
 
@@ -107,7 +107,7 @@ location.teleport      # Location-specific features
 just sync-all [--dry-run]
 ```
 
-- Syncs both Localizable.xcstrings AND Infoplist.xcstrings
+- Syncs both Localizable.xcstrings AND InfoPlist.xcstrings
 - Ensures all 29 languages have complete coverage
 - Fills missing keys with English values for translation
 - Adds concise developer comments where missing

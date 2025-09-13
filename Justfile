@@ -163,9 +163,9 @@ export-csv *args:
 
 # Import per-locale CSV back into a catalog. Examples:
 #   just import-csv-localizable en --file scripts/localization/tmp/localizable/en-translated.csv
-#   just import-csv-infoplist en --file scripts/localization/tmp/infoplist/en-translated.csv
+#   just import-csv-infoPlist en --file scripts/localization/tmp/infoPlist/en-translated.csv
 import-csv-localizable LOCALE *args:
     @./scripts/localization/import.sh localizable {{LOCALE}} {{args}}
 
-import-csv-infoplist LOCALE *args:
-    @./scripts/localization/import.sh infoplist {{LOCALE}} {{args}}
+import-csv-infoPlist LOCALE *args:
+    @./scripts/localization/import.sh infoPlist {{LOCALE}} {{args}}

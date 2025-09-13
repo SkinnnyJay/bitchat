@@ -9,12 +9,12 @@
 # - Preparing for professional translation services
 #
 # Usage:
-#   ./scripts/localization/reset.sh [--dry-run] [--localizable-only] [--infoplist-only]
+#   ./scripts/localization/reset.sh [--dry-run] [--localizable-only] [--infoPlist-only]
 #
 # Options:
 #   --dry-run        Show what would be changed without making changes
 #   --localizable-only   Reset only Localizable.xcstrings (app UI)
-#   --infoplist-only     Reset only Infoplist.xcstrings (system permissions)
+#   --infoPlist-only     Reset only InfoPlist.xcstrings (system permissions)
 #   --help               Show this help message
 
 set -e
@@ -30,17 +30,17 @@ for arg in "$@"; do
       DRY_RUN=true ;;
     --localizable-only)
       LOCALIZABLE_ONLY=true ;;
-    --infoplist-only)  
+    --infoPlist-only)  
       INFOPLIST_ONLY=true ;;
     -h|--help)
-      echo "Usage: $0 [--dry-run] [--localizable-only] [--infoplist-only]"
+      echo "Usage: $0 [--dry-run] [--localizable-only] [--infoPlist-only]"
       echo ""
       echo "Reset all localization values to English and mark as needs translation"
       echo ""
       echo "Options:"
       echo "  --dry-run           Show changes without applying them"
       echo "  --localizable-only  Reset only app UI strings"
-      echo "  --infoplist-only    Reset only system permission strings"
+      echo "  --infoPlist-only    Reset only system permission strings"
       echo "  --help              Show this help"
       exit 0 ;;
     *)
@@ -66,10 +66,10 @@ if [[ "$LOCALIZABLE_ONLY" == true ]]; then
     FILES_TO_RESET=("bitchat/Localizable.xcstrings")
     echo "📱 Resetting: App UI strings only"
 elif [[ "$INFOPLIST_ONLY" == true ]]; then
-    FILES_TO_RESET=("bitchat/Infoplist.xcstrings") 
+    FILES_TO_RESET=("bitchat/InfoPlist.xcstrings") 
     echo "📋 Resetting: System permission strings only"
 else
-    FILES_TO_RESET=("bitchat/Localizable.xcstrings" "bitchat/Infoplist.xcstrings")
+    FILES_TO_RESET=("bitchat/Localizable.xcstrings" "bitchat/InfoPlist.xcstrings")
     echo "🔄 Resetting: Both app UI and system permission strings"
 fi
 

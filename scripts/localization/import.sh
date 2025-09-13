@@ -5,7 +5,7 @@
 # Usage:
 #   ./scripts/localization/import.sh help
 #   ./scripts/localization/import.sh localizable <locale> [--file path] [--dry-run]
-#   ./scripts/localization/import.sh infoplist  <locale> [--file path] [--dry-run]
+#   ./scripts/localization/import.sh infoPlist  <locale> [--file path] [--dry-run]
 
 set -euo pipefail
 cmd=${1:-help}; shift || true
@@ -24,8 +24,8 @@ catalog_import() {
   done
   local CATFILE="bitchat/Localizable.xcstrings"
   local DIR="scripts/localization/tmp/localizable"
-  if [[ "$CAT" == "infoplist" ]]; then
-    CATFILE="bitchat/Infoplist.xcstrings"; DIR="scripts/localization/tmp/infoplist"
+  if [[ "$CAT" == "infoPlist" ]]; then
+    CATFILE="bitchat/InfoPlist.xcstrings"; DIR="scripts/localization/tmp/infoPlist"
   fi
   if [[ -z "$FILE" ]]; then
     FILE="$DIR/${LOC}-translated.csv"
@@ -39,6 +39,6 @@ catalog_import() {
 case "$cmd" in
   help|-h|--help) sed -n '1,80p' "$0" | sed -n '1,40p';;
   localizable) catalog_import localizable "$@";;
-  infoplist)  catalog_import infoplist  "$@";;
+  infoPlist)  catalog_import infoPlist  "$@";;
   *) echo "Unknown command: $cmd"; exit 2;;
 esac

@@ -15,12 +15,12 @@ sync_all() {
   local args=""; [[ "$DRY" == true ]] && args="--check"
   echo "📱 Syncing Localizable.xcstrings...${DRY:+ (dry-run)}"
   python3 scripts/localization/tools/helper_sync_xcstrings.py bitchat/Localizable.xcstrings $args
-  echo "📋 Syncing Infoplist.xcstrings...${DRY:+ (dry-run)}"
-  python3 scripts/localization/tools/helper_sync_xcstrings.py bitchat/Infoplist.xcstrings $args
+  echo "📋 Syncing InfoPlist.xcstrings...${DRY:+ (dry-run)}"
+  python3 scripts/localization/tools/helper_sync_xcstrings.py bitchat/InfoPlist.xcstrings $args
   echo "📝 Ensuring developer comments...${DRY:+ (dry-run)}"
   local addargs=""; [[ "$DRY" == true ]] && addargs="--dry-run"
   python3 scripts/localization/tools/helper_add_missing_comments.py bitchat/Localizable.xcstrings $addargs
-  python3 scripts/localization/tools/helper_add_missing_comments.py bitchat/Infoplist.xcstrings $addargs
+  python3 scripts/localization/tools/helper_add_missing_comments.py bitchat/InfoPlist.xcstrings $addargs
   echo "✅ Sync complete${DRY:+ (dry-run)}."
 }
 

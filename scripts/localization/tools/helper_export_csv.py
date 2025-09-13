@@ -78,7 +78,7 @@ def main(argv):
     if len(argv) != 3:
         print('Usage: helper_export_csv.py <path-to-.xcstrings> <locale>')
         return 2
-    return export_catalog(Path(argv[1]), Path(argv[0]).parent.parent / 'tmp' / ('localizable' if argv[1].endswith('Localizable.xcstrings') else 'infoplist'), argv[2])
+    return export_catalog(Path(argv[1]), Path(argv[0]).parent.parent / 'tmp' / ('localizable' if argv[1].endswith('Localizable.xcstrings') else 'infoPlist'), argv[2])
 
 
 if __name__ == '__main__':
@@ -93,6 +93,6 @@ if __name__ == '__main__':
     if p.name.lower().startswith('localizable'):
         out_dir = out_root / 'localizable'
     else:
-        out_dir = out_root / 'infoplist'
+        out_dir = out_root / 'infoPlist'
     raise SystemExit(export_catalog(p, out_dir, loc))
 

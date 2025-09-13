@@ -7,15 +7,15 @@
 #
 # Copies:
 #   tmp/localizable/<loc>.csv    -> tmp/localizable/<loc>-translated.csv
-#   tmp/infoplist/<loc>.csv     -> tmp/infoplist/<loc>-translated.csv
+#   tmp/infoPlist/<loc>.csv     -> tmp/infoPlist/<loc>-translated.csv
 
 set -euo pipefail
 
 ROOT="scripts/localization/tmp"
-mkdir -p "$ROOT/localizable" "$ROOT/infoplist"
+mkdir -p "$ROOT/localizable" "$ROOT/infoPlist"
 
 count=0
-for f in "$ROOT/localizable"/*.csv "$ROOT/infoplist"/*.csv; do
+for f in "$ROOT/localizable"/*.csv "$ROOT/infoPlist"/*.csv; do
   [[ -f "$f" ]] || continue
   dir=$(dirname "$f")
   base=$(basename "$f")

@@ -22,7 +22,10 @@ final class LocalizationTests: XCTestCase {
         "Nostr", "Lightning", "Cashu", "Bluetooth",
         
         // Technical Terms (precise meaning required)
-        "Geohash", "QR", "mesh", "UUID", "JSON"
+        "Geohash", "QR", "mesh", "UUID", "JSON",
+        
+        // New technical terms from our additions
+        "Tor", "recipient", "sidegroupchat"
     ]
     
     /// Comprehensive reserved word protection across all localization content
@@ -205,7 +208,17 @@ final class LocalizationTests: XCTestCase {
             "system.failed_send_location",
             "system.user_blocked_generic", 
             "system.not_in_location_channel",
-            "system.screenshot_taken"
+            "system.screenshot_taken",
+            // New Tor status messages
+            "system.tor_starting",
+            "system.tor_started", 
+            "system.tor_waiting",
+            "system.tor_bypass_enabled",
+            "system.tor_restarting",
+            "system.tor_restarted",
+            // New favoriting actions
+            "system.favorited",
+            "system.unfavorited"
         ]
         
         let testLanguages = ["en", "es", "zh-Hans", "ar", "fr"]
@@ -224,6 +237,101 @@ final class LocalizationTests: XCTestCase {
         print("✅ Validated system message localization across \(testLanguages.count) languages")
     }
     
+    // MARK: - Error Message Validation (User-Facing Errors)
+    
+    func testErrorMessageLocalization() {
+        let errorMessageKeys = [
+            "error.unknown_recipient",
+            "error.user_blocked",
+            "error.cannot_message_self", 
+            "error.send_error",
+            "error.peer_not_reachable",
+            "delivery.recipient"
+        ]
+        
+        let testLanguages = ["en", "es", "zh-Hans", "ar", "fr", "de", "ja", "ru"]
+        
+        for key in errorMessageKeys {
+            for locale in testLanguages {
+                let value = NSLocalizedString(key, comment: "")
+                
+                // Error messages must be clear and concise
+                XCTAssertFalse(value.isEmpty, "Error message \(key) empty in \(locale)")
+                XCTAssertNotEqual(value, key, "Error message \(key) not localized in \(locale)")
+                XCTAssertGreaterThan(value.count, 5, "Error message too short: \(key) in \(locale)")
+                XCTAssertLessThan(value.count, 100, "Error message too long: \(key) in \(locale)")
+                
+                // Error messages should not contain technical jargon
+                XCTAssertFalse(value.contains("UUID") || value.contains("JSON") || value.contains("API"),
+                              "Error message \(key) contains technical jargon in \(locale)")
+            }
+        }
+        
+        print("✅ Validated error message localization across \(testLanguages.count) languages")
+    }
+    
+    // MARK: - App Info Screen Validation (User Education)
+    
+    func testAppInfoScreenLocalization() {
+        let appInfoKeys = [
+            "appinfo.tagline",
+            "appinfo.features.title",
+            "appinfo.privacy.title", 
+            "appinfo.howtouse.title",
+            "appinfo.warning.title",
+            "appinfo.warning.message",
+            // Feature descriptions
+            "appinfo.feature.offline_comm",
+            "appinfo.feature.offline_comm_desc",
+            "appinfo.feature.encryption",
+            "appinfo.feature.encryption_desc",
+            "appinfo.feature.extended_range",
+            "appinfo.feature.extended_range_desc",
+            "appinfo.feature.mentions",
+            "appinfo.feature.mentions_desc",
+            "appinfo.feature.favorites",
+            "appinfo.feature.favorites_desc",
+            "appinfo.feature.geohash",
+            "appinfo.feature.geohash_desc",
+            // Privacy features
+            "appinfo.privacy.no_tracking",
+            "appinfo.privacy.no_tracking_desc",
+            "appinfo.privacy.ephemeral",
+            "appinfo.privacy.ephemeral_desc",
+            "appinfo.privacy.panic",
+            "appinfo.privacy.panic_desc"
+        ]
+        
+        let testLanguages = ["en", "es", "zh-Hans", "ar", "fr", "de", "ja", "ru"]
+        
+        for key in appInfoKeys {
+            for locale in testLanguages {
+                let value = NSLocalizedString(key, comment: "")
+                
+                // App info content must be educational and clear
+                XCTAssertFalse(value.isEmpty, "App info \(key) empty in \(locale)")
+                XCTAssertNotEqual(value, key, "App info \(key) not localized in \(locale)")
+                
+                // Different length requirements for titles vs descriptions
+                if key.contains("_desc") {
+                    // Descriptions should be longer and more detailed
+                    XCTAssertGreaterThan(value.count, 15, "App info description too short: \(key) in \(locale)")
+                    XCTAssertLessThan(value.count, 200, "App info description too long: \(key) in \(locale)")
+                } else if key.contains(".title") {
+                    // Titles should be concise
+                    XCTAssertGreaterThan(value.count, 2, "App info title too short: \(key) in \(locale)")
+                    XCTAssertLessThan(value.count, 50, "App info title too long: \(key) in \(locale)")
+                } else {
+                    // General content
+                    XCTAssertGreaterThan(value.count, 3, "App info content too short: \(key) in \(locale)")
+                    XCTAssertLessThan(value.count, 150, "App info content too long: \(key) in \(locale)")
+                }
+            }
+        }
+        
+        print("✅ Validated app info screen localization across \(testLanguages.count) languages")
+    }
+    
     // MARK: - InfoPlist Bluetooth Permission Validation (App Store Critical)
     
     func testBluetoothPermissionCompliance() {
@@ -232,7 +340,7 @@ final class LocalizationTests: XCTestCase {
         
         for key in permissionKeys {
             for locale in majorLanguages {
-                let permission = NSLocalizedString(key, tableName: "Infoplist", comment: "")
+                let permission = NSLocalizedString(key, tableName: "InfoPlist", comment: "")
                 
                 // App Store compliance requirements
                 XCTAssertFalse(permission.isEmpty, "Bluetooth permission \(key) empty for \(locale)")
@@ -307,7 +415,10 @@ final class LocalizationTests: XCTestCase {
         let sampleKeys = [
             "nav.people", "actions.block", "common.close", "placeholder.type_message",
             "alert.bluetooth_required", "location.title", "fp.title", "verify.scan_to_verify",
-            "system.failed_send_location", "accessibility.send_message"
+            "system.failed_send_location", "accessibility.send_message",
+            // New keys we added
+            "system.tor_starting", "error.unknown_recipient", "appinfo.tagline",
+            "appinfo.feature.encryption", "delivery.recipient"
         ]
         
         // Verify these keys exist (basic sanity check)
