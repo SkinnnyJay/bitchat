@@ -76,12 +76,6 @@
             "value": "bitchat uses Bluetooth to create a secure mesh network for chatting with nearby users."
           }
         },
-        "it": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "bitchat uses Bluetooth to create a secure mesh network for chatting with nearby users."
-          }
-        },
         "ja": {
           "stringUnit": {
             "state": "needs_review",
@@ -378,186 +372,186 @@
       }
     },
     "NSCameraUsageDescription": {
-      "comment": "Permission description for camera access to capture photos or video",
+      "comment": "Permission description for camera access to scan QR codes",
       "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "arz": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "bn": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "fil": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "ha": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "mr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "pcm": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "pnb": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
-          }
-        },
-        "sw": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Take photos or video to share in chat."
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
           }
         },
         "ta": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Take photos or video to share in chat."
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "ha": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
           }
         },
         "te": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Take photos or video to share in chat."
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
           }
         },
-        "tl": {
+        "mr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Take photos or video to share in chat."
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
           }
         },
-        "tr": {
+        "ar": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Take photos or video to share in chat."
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
           }
         },
-        "ur": {
+        "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Take photos or video to share in chat."
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Take photos or video to share in chat."
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
           }
         },
-        "yue": {
+        "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Take photos or video to share in chat."
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "sw": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
           }
         },
         "zh-HK": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Take photos or video to share in chat."
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
           }
         },
-        "zh-Hans": {
+        "pcm": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Take photos or video to share in chat."
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "pnb": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "tl": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "yue": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "fil": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "arz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "ur": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Take photos or video to share in chat."
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses the camera to scan QR codes to verify peers."
           }
         }
       }
@@ -748,186 +742,186 @@
       }
     },
     "NSLocationWhenInUseUsageDescription": {
-      "comment": "Permission description for using location while app is in use",
+      "comment": "Permission description for using location to compute local geohash channels",
       "localizations": {
-        "ar": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "arz": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "bn": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "fil": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "ha": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "mr": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "pcm": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "pnb": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "pt": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
-          }
-        },
-        "sw": {
-          "stringUnit": {
-            "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
           }
         },
         "ta": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "ha": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
           }
         },
         "te": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
           }
         },
-        "tl": {
+        "mr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
           }
         },
-        "tr": {
+        "ar": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
           }
         },
-        "ur": {
+        "de": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
           }
         },
-        "yue": {
+        "fr": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "sw": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
           }
         },
         "zh-HK": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
           }
         },
-        "zh-Hans": {
+        "pcm": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "pnb": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "tl": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "yue": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "fil": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "arz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "ur": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "needs_review",
-            "value": "Show nearby channels and location-based features."
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat uses your approximate location to compute local geohash channels for optional public chats. Exact GPS is never shared."
           }
         }
       }
@@ -1483,6 +1477,191 @@
           "stringUnit": {
             "state": "needs_review",
             "value": "Choose photos or videos to share."
+          }
+        }
+      }
+    },
+    "CFBundleDisplayName": {
+      "comment": "App display name shown on home screen",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bitchat"
+          }
+        },
+        "ta": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "ha": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "te": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "mr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "sw": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "bn": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "pcm": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "pt": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "pnb": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "tl": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "yue": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "fil": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "arz": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "ur": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "bitchat"
           }
         }
       }

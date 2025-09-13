@@ -1,10 +1,10 @@
 # Localization Guide
 
-BitChat supports comprehensive internationalization with **29 languages**, following Apple's modern best practices using the `.xcstrings` format.
+BitChat supports comprehensive internationalization with **30N languages**, following Apple's modern best practices using the `.xcstrings` format.
 
 ## File Structure (Modern 2024 Apple Approach)
 
-```
+```text
 bitchat/
 ├── Localizable.xcstrings    # App UI strings (146 keys × 29 languages = 4,234 entries)
 └── InfoPlist.xcstrings      # System permissions (2 keys × 29 languages = 58 entries)
@@ -21,7 +21,7 @@ Why both exist:
 
 - App UI and system prompts are sourced differently by iOS. Keeping UI text in `Localizable.xcstrings` and permission strings in `InfoPlist.xcstrings` matches Apple’s expectations so both your screens and the OS dialogs appear localized.
 
-## Supported Languages (29 Total)
+## Supported Languages (30 Total)
 
 ### Major World Languages (18)
 
@@ -267,7 +267,7 @@ just sync-all [--dry-run]
 
 ## Quality Assurance
 
-### Other Commands
+## Other Commands
 
 - `just sync-comments [--dry-run]` — Comments only
 - `just locale-report` — Coverage and missing report

@@ -123,13 +123,16 @@ struct QRScanView: View {
             TextEditor(text: $input)
                 .frame(height: 100)
                 .border(Color.gray.opacity(0.4))
-            Button(String(localized: "verify.validate")) {
+            Button(action: {
                 if let qr = VerificationService.shared.verifyScannedQR(input) {
                     let ok = viewModel.beginQRVerification(with: qr)
                     result = ok ? String.localizedStringWithFormat(String(localized: "verify.requested_for"), qr.nickname) : String(localized: "verify.could_not_find_peer")
                 } else {
                     result = String(localized: "verify.invalid_or_expired_qr")
                 }
+            }) {
+                Text(String(localized: "verify.validate"))
+                    .accessibilityLabel(String(localized: "accessibility.button.validate"))
             }
             .buttonStyle(.bordered)
             #endif

@@ -72,9 +72,10 @@ targets:
       - target: bitchatShareExtension
         embed: true
       - package: P256K
-      - framework: Frameworks/tor-nolzma.xcframework
-        embed: true
-        codeSign: true
+      # Tor framework excluded for iOS Simulator compatibility
+      # - framework: Frameworks/tor-nolzma.xcframework
+      #   embed: true
+      #   codeSign: true
       - sdk: libz.tbd
         
   bitchat_macOS:

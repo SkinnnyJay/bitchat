@@ -35,6 +35,7 @@ struct FingerprintView: View {
                 Button(action: { dismiss() }) {
                     Image(systemName: "xmark")
                         .font(.system(size: 14, weight: .semibold))
+                        .accessibilityLabel(String(localized: "accessibility.close"))
                 }
                 .foregroundColor(textColor)
             }
@@ -104,13 +105,16 @@ struct FingerprintView: View {
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(8)
                             .contextMenu {
-                                Button(String(localized: "common.copy")) {
+                                Button(action: {
                                     #if os(iOS)
                                     UIPasteboard.general.string = fingerprint
                                     #else
                                     NSPasteboard.general.clearContents()
                                     NSPasteboard.general.setString(fingerprint, forType: .string)
                                     #endif
+                                }) {
+                                    Text(String(localized: "common.copy"))
+                                        .accessibilityLabel(String(localized: "accessibility.button.copy"))
                                 }
                             }
                     } else {
@@ -139,13 +143,16 @@ struct FingerprintView: View {
                         .background(Color.gray.opacity(0.1))
                         .cornerRadius(8)
                         .contextMenu {
-                            Button(String(localized: "common.copy")) {
+                            Button(action: {
                                 #if os(iOS)
                                 UIPasteboard.general.string = myFingerprint
                                 #else
                                 NSPasteboard.general.clearContents()
                                 NSPasteboard.general.setString(myFingerprint, forType: .string)
                                 #endif
+                            }) {
+                                Text(String(localized: "common.copy"))
+                                    .accessibilityLabel(String(localized: "accessibility.button.copy"))
                             }
                         }
                 }

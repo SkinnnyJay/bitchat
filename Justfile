@@ -52,7 +52,7 @@ generate: patch-for-macos
 # Build the macOS app
 build: check generate
     @echo "Building BitChat for macOS..."
-    @xcodebuild -project bitchat.xcodeproj -scheme "bitchat (macOS)" -configuration Debug CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS="" build
+    @xcodebuild -project bitchat.xcodeproj -scheme "bitchat (macOS)" -configuration Debug -derivedDataPath ./.derived_data CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS="" build
 
 # Run the macOS app
 run: build
@@ -63,6 +63,7 @@ run: build
 clean: restore
     @echo "Cleaning build artifacts..."
     @rm -rf ~/Library/Developer/Xcode/DerivedData/bitchat-* 2>/dev/null || true
+    @rm -rf ./.derived_data 2>/dev/null || true
     @# Only remove the generated project if we have a backup, otherwise use git
     @if [ -f bitchat.xcodeproj/project.pbxproj.backup ]; then \
         rm -rf bitchat.xcodeproj; \
@@ -77,7 +78,7 @@ dev-run: check
     @echo "Quick development build..."
     @if [ ! -f project.yml.backup ]; then just patch-for-macos; fi
     @xcodegen generate
-    @xcodebuild -project bitchat.xcodeproj -scheme "bitchat (macOS)" -configuration Debug CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS="" build
+    @xcodebuild -project bitchat.xcodeproj -scheme "bitchat (macOS)" -configuration Debug -derivedDataPath ./.derived_data CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGN_ENTITLEMENTS="" build
     @find ~/Library/Developer/Xcode/DerivedData -name "bitchat.app" -path "*/Debug/*" -not -path "*/Index.noindex/*" | head -1 | xargs -I {} open "{}"
 
 # Show app info
@@ -111,7 +112,7 @@ nuke:
     @rm -f bitchat.xcodeproj/project.pbxproj.backup 2>/dev/null || true
     @rm -f bitchat/Info.plist.backup 2>/dev/null || true
     @# Restore iOS-specific files if they were moved
-    @if [ -f bitchat/LaunchScreen.storyboard.ios ]; then mv bitchat/LaunchScreen.storyboard.ios bitchat/LaunchScreen.storyboard; fi
+    @if [ -f bitchat/LaunchScreen.storyboard ]; then mv bitchat/LaunchScreen.storyboard bitchat/LaunchScreen.storyboard; fi
     @git checkout -- project.yml bitchat.xcodeproj/project.pbxproj bitchat/Info.plist 2>/dev/null || echo "⚠️  Not a git repo or no changes to restore"
     @echo "✅ Nuclear clean complete"
 

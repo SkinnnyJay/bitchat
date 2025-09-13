@@ -98,8 +98,10 @@ struct GeohashPeopleList: View {
                             let blocked = viewModel.isGeohashUserBlocked(pubkeyHexLowercased: person.id)
                             if blocked {
                                 Button(String(localized: "geohash.unblock")) { viewModel.unblockGeohashUser(pubkeyHexLowercased: person.id, displayName: person.displayName) }
+                                    .accessibilityLabel(String(localized: "accessibility.button.unblock"))
                             } else {
                                 Button(String(localized: "geohash.block")) { viewModel.blockGeohashUser(pubkeyHexLowercased: person.id, displayName: person.displayName) }
+                                    .accessibilityLabel(String(localized: "accessibility.button.block"))
                             }
                         }
                     }

@@ -47,26 +47,31 @@ struct MeshPeerList: View {
                             Image(systemName: "person.fill")
                                 .font(.system(size: 10))
                                 .foregroundColor(baseColor)
+                                .accessibilityLabel(String(localized: "accessibility.current_user"))
                         } else if peer.isConnected {
                             // Mesh-connected peer: radio icon
                             Image(systemName: "antenna.radiowaves.left.and.right")
                                 .font(.system(size: 10))
                                 .foregroundColor(baseColor)
+                                .accessibilityLabel(String(localized: "accessibility.connected_mesh"))
                         } else if peer.isReachable {
                             // Mesh-reachable (relayed): point.3 icon
                             Image(systemName: "point.3.filled.connected.trianglepath.dotted")
                                 .font(.system(size: 10))
                                 .foregroundColor(baseColor)
+                                .accessibilityLabel(String(localized: "accessibility.reachable_mesh"))
                         } else if peer.isMutualFavorite {
                             // Mutual favorite reachable via Nostr: globe icon (purple)
                             Image(systemName: "globe")
                                 .font(.system(size: 10))
                                 .foregroundColor(.purple)
+                                .accessibilityLabel(String(localized: "accessibility.available_nostr"))
                         } else {
                             // Fallback icon for others (dimmed)
                             Image(systemName: "person")
                                 .font(.system(size: 10))
                                 .foregroundColor(secondaryTextColor)
+                                .accessibilityLabel(String(localized: "accessibility.offline_user"))
                         }
 
                         let displayName = isMe ? viewModel.nickname : peer.nickname
@@ -88,6 +93,7 @@ struct MeshPeerList: View {
                                 .font(.system(size: 10))
                                 .foregroundColor(.red)
                                 .help(String(localized: "status.blocked"))
+                                .accessibilityLabel(String(localized: "accessibility.blocked_user"))
                         }
 
                         if !isMe {
@@ -104,6 +110,7 @@ struct MeshPeerList: View {
                                     Image(systemName: "checkmark.seal.fill")
                                         .font(.system(size: 10))
                                         .foregroundColor(baseColor)
+                                        .accessibilityLabel(String(localized: "accessibility.verified_user"))
                                 } else if let icon = item.enc.icon {
                                     // Fallback to whatever status says (likely lock if we had a past session)
                                     Image(systemName: icon)
@@ -121,6 +128,7 @@ struct MeshPeerList: View {
                                 .font(.system(size: 10))
                                 .foregroundColor(.orange)
                                 .help(String(localized: "status.new_messages"))
+                                .accessibilityLabel(String(localized: "accessibility.unread_messages"))
                         }
 
                         if !isMe {
@@ -128,6 +136,7 @@ struct MeshPeerList: View {
                                 Image(systemName: (peer.favoriteStatus?.isFavorite ?? false) ? "star.fill" : "star")
                                     .font(.system(size: 12))
                                     .foregroundColor((peer.favoriteStatus?.isFavorite ?? false) ? .yellow : secondaryTextColor)
+                                    .accessibilityLabel((peer.favoriteStatus?.isFavorite ?? false) ? String(localized: "accessibility.remove_favorite") : String(localized: "accessibility.add_favorite"))
                             }
                             .buttonStyle(.plain)
                         }

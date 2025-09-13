@@ -43,6 +43,7 @@ struct LocationChannelsSheet: View {
                                 .font(.system(size: 12, design: .monospaced))
                                 .foregroundColor(.secondary)
                             Button(String(localized: "common.open_settings")) { openSystemLocationSettings() }
+                            .accessibilityLabel(String(localized: "accessibility.button.open_settings"))
                             .buttonStyle(.plain)
                         }
                     case LocationChannelManager.PermissionState.authorized:
@@ -60,6 +61,7 @@ struct LocationChannelsSheet: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(String(localized: "nav.close")) { isPresented = false }
+                        .accessibilityLabel(String(localized: "accessibility.button.close"))
                         .font(.system(size: 14, design: .monospaced))
                         .accessibilityIdentifier("location-sheet-close")
                 }
@@ -68,6 +70,7 @@ struct LocationChannelsSheet: View {
             .toolbar {
                 ToolbarItem(placement: .automatic) {
                     Button(String(localized: "nav.close")) { isPresented = false }
+                        .accessibilityLabel(String(localized: "accessibility.button.close"))
                         .font(.system(size: 14, design: .monospaced))
                         .accessibilityIdentifier("location-sheet-close")
                 }
@@ -126,6 +129,7 @@ struct LocationChannelsSheet: View {
                             Button(action: { bookmarks.toggle(channel.geohash) }) {
                                 Image(systemName: bookmarks.isBookmarked(channel.geohash) ? "bookmark.fill" : "bookmark")
                                     .font(.system(size: 14))
+                                    .accessibilityLabel(bookmarks.isBookmarked(channel.geohash) ? String(localized: "accessibility.remove_bookmark") : String(localized: "accessibility.add_bookmark"))
                             }
                             .buttonStyle(.plain)
                             .padding(.leading, 8)
@@ -176,7 +180,7 @@ struct LocationChannelsSheet: View {
                     let isValid = validateGeohash(normalized)
                     Button(action: {
                         let gh = normalized
-                        guard isValid else { customError = "invalid geohash"; return }
+                        guard isValid else { customError = String(localized: "error.invalid_geohash"); return }
                         let level = levelForLength(gh.count)
                         let ch = GeohashChannel(level: level, geohash: gh)
                         // Mark this selection as a manual teleport
@@ -189,6 +193,7 @@ struct LocationChannelsSheet: View {
                                 .font(.system(size: 14, design: .monospaced))
                             Image(systemName: "face.dashed")
                                 .font(.system(size: 14))
+                                .accessibilityLabel(String(localized: "accessibility.teleport"))
                         }
                     }
                     .buttonStyle(.plain)

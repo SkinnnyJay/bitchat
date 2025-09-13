@@ -110,6 +110,7 @@ For detailed protocol documentation, see the [Technical Whitepaper](WHITEPAPER.m
    ```
 
 3. Open the generated project:
+
    ```bash
    open bitchat.xcodeproj
    ```
