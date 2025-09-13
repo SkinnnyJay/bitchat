@@ -293,6 +293,26 @@ just sync-all [--dry-run]
 - [ ] Validate Bluetooth permission dialogs appear in user's language
 - [ ] Ensure technical terms (#mesh, Nostr) remain consistent
 
+### iOS Simulator Localization Testing
+
+BitChat supports full localization testing on iOS Simulator:
+
+```bash
+# Set iOS Simulator system language to Japanese
+xcrun simctl spawn <device-id> defaults write NSGlobalDomain AppleLanguages -array ja-JP
+xcrun simctl spawn <device-id> defaults write NSGlobalDomain AppleLocale -string ja_JP
+
+# Restart simulator to apply changes
+xcrun simctl shutdown <device-id>
+xcrun simctl boot <device-id>
+
+# Install and launch app
+xcrun simctl install <device-id> path/to/bitchat.app
+xcrun simctl launch <device-id> chat.bitchat
+```
+
+**Note**: iOS Simulator builds automatically exclude Tor framework and use clearnet mode for development.
+
 ## Contributing
 
 When adding localized strings:
