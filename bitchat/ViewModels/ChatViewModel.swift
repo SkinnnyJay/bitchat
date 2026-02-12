@@ -5550,7 +5550,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             return
         }
         
-        let ackType = String(parts[1])
+        let ackType = String(parts[1]).uppercased()
         guard ackType == "DELIVERED" || ackType == "READ" else {
             SecureLogger.warning("⚠️ Unknown ACK type: \(ackType)", category: .session)
             return
