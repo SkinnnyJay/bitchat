@@ -434,6 +434,10 @@ final class MessageRouter {
         return claimed.toShort().id == observed.toShort().id
     }
 
+    private func normalizedWiFiIdentityKey(_ peerID: String) -> String {
+        PeerID(str: peerID).toShort().id
+    }
+
     private func recipientMatchesLocalPeerID(_ claimedRecipientID: String) -> Bool {
         let claimed = PeerID(str: claimedRecipientID)
         let local = mesh.myPeerID
@@ -508,21 +512,22 @@ final class MessageRouter {
     }
 
     private func allowInboundWiFiEvent(from senderID: String) -> Bool {
+        let normalizedSenderID = normalizedWiFiIdentityKey(senderID)
         let now = nowProvider()
         cleanupInboundWiFiSenderRate(now: now)
-        if inboundWiFiSenderEventTimestamps[senderID] == nil,
+        if inboundWiFiSenderEventTimestamps[normalizedSenderID] == nil,
            inboundWiFiSenderEventTimestamps.count >= inboundWiFiSenderRateMaxTrackedSenders {
             return false
         }
         let cutoff = now.addingTimeInterval(-inboundWiFiSenderRateWindowSeconds)
-        var events = inboundWiFiSenderEventTimestamps[senderID] ?? []
+        var events = inboundWiFiSenderEventTimestamps[normalizedSenderID] ?? []
         events.removeAll { $0 < cutoff }
         if events.count >= inboundWiFiSenderRateMaxEvents {
-            inboundWiFiSenderEventTimestamps[senderID] = events
+            inboundWiFiSenderEventTimestamps[normalizedSenderID] = events
             return false
         }
         events.append(now)
-        inboundWiFiSenderEventTimestamps[senderID] = events
+        inboundWiFiSenderEventTimestamps[normalizedSenderID] = events
         return true
     }
 
@@ -570,7 +575,7 @@ extension MessageRouter: WiFiDirectTransportDelegate {
                !envelope.messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                self.isInboundWiFiTimestampAcceptable(envelope.createdAtMs),
                envelope.content.utf8.count <= InputValidator.Limits.maxMessageLength {
-                let dedupKey = "pm:\(envelope.senderPeerID):\(envelope.messageID)"
+                let dedupKey = "pm:\(self.normalizedWiFiIdentityKey(envelope.senderPeerID)):\(envelope.messageID)"
                 guard self.shouldAcceptInboundWiFiEnvelope(dedupKey: dedupKey) else { return }
                 NotificationCenter.default.post(
                     name: .wifiDirectPrivateEnvelopeReceived,
@@ -587,7 +592,7 @@ extension MessageRouter: WiFiDirectTransportDelegate {
                self.recipientMatchesLocalPeerID(envelope.recipientPeerID),
                self.isInboundWiFiTimestampAcceptable(envelope.createdAtMs),
                !envelope.messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                let dedupKey = "ack:\(envelope.ackType.rawValue):\(envelope.senderPeerID):\(envelope.messageID)"
+                let dedupKey = "ack:\(envelope.ackType.rawValue):\(self.normalizedWiFiIdentityKey(envelope.senderPeerID)):\(envelope.messageID)"
                 guard self.shouldAcceptInboundWiFiEnvelope(dedupKey: dedupKey) else { return }
                 NotificationCenter.default.post(
                     name: .wifiDirectAckEnvelopeReceived,

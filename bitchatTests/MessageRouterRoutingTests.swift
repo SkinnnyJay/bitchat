@@ -367,6 +367,54 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testDeduplicatesIncomingWiFiPrivateEnvelopeAcrossFullAndShortSenderIDs() throws {
+        let noiseKey = Data(repeating: 0x33, count: 32)
+        let senderFull = PeerID(hexData: noiseKey)
+        let senderShort = PeerID(publicKey: noiseKey)
+
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "dedups across full/short sender IDs")
+        var count = 0
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            count += 1
+            if count == 1 {
+                expect.fulfill()
+            }
+        }
+
+        let envelopeFull = WiFiDirectPrivateEnvelope(
+            senderPeerID: senderFull.id,
+            recipientPeerID: mesh.myPeerID.id,
+            recipientNickname: "self",
+            messageID: "mid-cross-id-private",
+            content: "hello"
+        )
+        let envelopeShort = WiFiDirectPrivateEnvelope(
+            senderPeerID: senderShort.id,
+            recipientPeerID: mesh.myPeerID.id,
+            recipientNickname: "self",
+            messageID: "mid-cross-id-private",
+            content: "hello"
+        )
+        backend.simulateIncoming(try JSONEncoder().encode(envelopeFull), from: senderShort.id)
+        backend.simulateIncoming(try JSONEncoder().encode(envelopeShort), from: senderFull.id)
+
+        wait(for: [expect], timeout: 1.0)
+        NotificationCenter.default.removeObserver(token)
+        XCTAssertEqual(count, 1)
+    }
+
+    @MainActor
     func testDoesNotPostNotificationForEnvelopeTargetingDifferentPeer() throws {
         let mesh = MockTransport()
         let nostr = NostrTransport(keychain: MockKeychain())
@@ -1152,6 +1200,54 @@ final class MessageRouterRoutingTests: XCTestCase {
         let payload = try JSONEncoder().encode(envelope)
         backend.simulateIncoming(payload, from: "peer-1")
         backend.simulateIncoming(payload, from: "peer-1")
+
+        wait(for: [expect], timeout: 1.0)
+        NotificationCenter.default.removeObserver(token)
+        XCTAssertEqual(count, 1)
+    }
+
+    @MainActor
+    func testDeduplicatesIncomingWiFiAckEnvelopeAcrossFullAndShortSenderIDs() throws {
+        let noiseKey = Data(repeating: 0x77, count: 32)
+        let senderFull = PeerID(hexData: noiseKey)
+        let senderShort = PeerID(publicKey: noiseKey)
+
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "ack dedups across full/short sender IDs")
+        var count = 0
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectAckEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            count += 1
+            if count == 1 {
+                expect.fulfill()
+            }
+        }
+
+        let envelopeFull = WiFiDirectAckEnvelope(
+            ackType: .read,
+            senderPeerID: senderFull.id,
+            recipientPeerID: mesh.myPeerID.id,
+            messageID: "mid-cross-id-ack",
+            senderNickname: "peer"
+        )
+        let envelopeShort = WiFiDirectAckEnvelope(
+            ackType: .read,
+            senderPeerID: senderShort.id,
+            recipientPeerID: mesh.myPeerID.id,
+            messageID: "mid-cross-id-ack",
+            senderNickname: "peer"
+        )
+        backend.simulateIncoming(try JSONEncoder().encode(envelopeFull), from: senderShort.id)
+        backend.simulateIncoming(try JSONEncoder().encode(envelopeShort), from: senderFull.id)
 
         wait(for: [expect], timeout: 1.0)
         NotificationCenter.default.removeObserver(token)
