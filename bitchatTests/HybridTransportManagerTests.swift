@@ -397,6 +397,57 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testHybridRateLimiterCapsTrackedSenderBuckets() throws {
+        let mesh = MockTransport()
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let fixedNow = Date()
+        let manager = HybridTransportManager(meshTransport: mesh, wifiTransport: wifi, nowProvider: { fixedNow })
+        let delegate = MockDelegate()
+        manager.delegate = delegate
+
+        let senderCap = TransportConfig.messageRouterInboundWiFiSenderRateMaxTrackedSenders
+        let createdAtMs = UInt64(fixedNow.timeIntervalSince1970 * 1000)
+        for idx in 0..<senderCap {
+            let sender = "hybrid-sender-\(idx)"
+            let payloadObject: [String: Any] = [
+                "version": WiFiDirectEnvelopeVersion.current,
+                "messageType": "private",
+                "senderPeerID": sender,
+                "recipientPeerID": mesh.myPeerID.id,
+                "recipientNickname": "self",
+                "messageID": "mid-hybrid-\(idx)",
+                "content": "hello",
+                "createdAtMs": createdAtMs
+            ]
+            let payload = try JSONSerialization.data(withJSONObject: payloadObject, options: [])
+            backend.simulateIncoming(payload, from: sender)
+        }
+
+        let overflowSender = "hybrid-sender-overflow"
+        let overflowPayloadObject: [String: Any] = [
+            "version": WiFiDirectEnvelopeVersion.current,
+            "messageType": "private",
+            "senderPeerID": overflowSender,
+            "recipientPeerID": mesh.myPeerID.id,
+            "recipientNickname": "self",
+            "messageID": "mid-hybrid-overflow",
+            "content": "hello",
+            "createdAtMs": createdAtMs
+        ]
+        let overflowPayload = try JSONSerialization.data(withJSONObject: overflowPayloadObject, options: [])
+        backend.simulateIncoming(overflowPayload, from: overflowSender)
+
+        let expect = expectation(description: "hybrid sender-bucket cap settles")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(delegate.receivedEnvelopes.count, senderCap)
+    }
+
+    @MainActor
     func testRejectsInboundPrivateEnvelopeWhenPayloadExceedsMaxBytes() {
         let mesh = MockTransport()
         let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
