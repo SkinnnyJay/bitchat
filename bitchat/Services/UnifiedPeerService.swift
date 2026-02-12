@@ -595,7 +595,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     }
 
     static func shouldIncludeMeshSnapshot(_ snapshot: TransportPeerSnapshot, localPeerID: PeerID) -> Bool {
-        if snapshot.peerID == localPeerID {
+        if WiFiPeerIdentity.isEquivalent(snapshot.peerID.id, localPeerID.id) {
             return false
         }
         return snapshot.peerID.isValid

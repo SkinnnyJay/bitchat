@@ -891,6 +891,20 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertFalse(UnifiedPeerService.shouldIncludeMeshSnapshot(snapshot, localPeerID: localPeerID))
     }
 
+    func testShouldIncludeMeshSnapshotRejectsEquivalentLocalPeerIDVariant() {
+        let fullNoiseHex = String(repeating: "ab", count: 32)
+        let localPeerID = PeerID(str: fullNoiseHex).toShort()
+        let snapshot = TransportPeerSnapshot(
+            peerID: PeerID(str: fullNoiseHex),
+            nickname: "self-variant",
+            isConnected: true,
+            noisePublicKey: Data(hexString: fullNoiseHex),
+            lastSeen: Date()
+        )
+
+        XCTAssertFalse(UnifiedPeerService.shouldIncludeMeshSnapshot(snapshot, localPeerID: localPeerID))
+    }
+
     func testShouldIncludeMeshSnapshotRejectsInvalidPeerID() {
         let localPeerID = PeerID(str: "abcdef0123456789")
         let snapshot = TransportPeerSnapshot(
