@@ -469,6 +469,42 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testAcceptsPrivateEnvelopeWhenSenderUsesShortIDAndTransportUsesFullNoiseID() throws {
+        let noiseKey = Data(repeating: 0x5B, count: 32)
+        let senderFull = PeerID(hexData: noiseKey)
+        let senderShort = PeerID(publicKey: noiseKey)
+
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "accepts sender short-id over full transport identity")
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expect.fulfill()
+        }
+
+        let envelope = WiFiDirectPrivateEnvelope(
+            senderPeerID: senderShort.id,
+            recipientPeerID: mesh.myPeerID.id,
+            recipientNickname: "self",
+            messageID: "msg-sender-short-private",
+            content: "hello"
+        )
+        let payload = try JSONEncoder().encode(envelope)
+        backend.simulateIncoming(payload, from: senderFull.id)
+
+        wait(for: [expect], timeout: 1.0)
+        NotificationCenter.default.removeObserver(token)
+    }
+
+    @MainActor
     func testOutboxIsCappedPerPeerWhenNoRouteAvailable() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
@@ -927,6 +963,42 @@ final class MessageRouterRoutingTests: XCTestCase {
         )
         let payload = try JSONEncoder().encode(envelope)
         backend.simulateIncoming(payload, from: senderShort.id)
+
+        wait(for: [expect], timeout: 1.0)
+        NotificationCenter.default.removeObserver(token)
+    }
+
+    @MainActor
+    func testAcceptsAckEnvelopeWhenSenderUsesShortIDAndTransportUsesFullNoiseID() throws {
+        let noiseKey = Data(repeating: 0x6D, count: 32)
+        let senderFull = PeerID(hexData: noiseKey)
+        let senderShort = PeerID(publicKey: noiseKey)
+
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "accepts ack sender short-id over full transport identity")
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectAckEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expect.fulfill()
+        }
+
+        let envelope = WiFiDirectAckEnvelope(
+            ackType: .read,
+            senderPeerID: senderShort.id,
+            recipientPeerID: mesh.myPeerID.id,
+            messageID: "mid-sender-short-ack",
+            senderNickname: "peer"
+        )
+        let payload = try JSONEncoder().encode(envelope)
+        backend.simulateIncoming(payload, from: senderFull.id)
 
         wait(for: [expect], timeout: 1.0)
         NotificationCenter.default.removeObserver(token)
