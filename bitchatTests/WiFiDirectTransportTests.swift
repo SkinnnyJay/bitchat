@@ -402,6 +402,27 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertEqual(delegate.availability, [true, false])
     }
 
+    func testSuppressesDuplicateAvailabilityCallbacks() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let delegate = MockDelegate()
+        transport.delegate = delegate
+
+        transport.startDiscovery()
+
+        let expect = expectation(description: "duplicate availability callbacks suppressed")
+        backend.simulateAvailability(true)
+        backend.simulateAvailability(true)
+        backend.simulateAvailability(false)
+        backend.simulateAvailability(false)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(delegate.availability, [true, false])
+    }
+
     func testIgnoresStalePeerUpdatesWhenNotDiscovering() {
         let backend = MockBackend(localPeerID: "self")
         let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)

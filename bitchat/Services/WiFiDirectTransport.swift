@@ -32,6 +32,7 @@ final class WiFiDirectTransport: NSObject {
 
     private(set) var isDiscovering = false
     private let impl: WiFiDirectTransportBackend
+    private var lastPublishedAvailability: Bool?
 
     init(localPeerID: String? = nil, backend: WiFiDirectTransportBackend? = nil) {
         impl = backend ?? WiFiDirectTransportBackendImpl(localPeerID: localPeerID)
@@ -116,11 +117,15 @@ final class WiFiDirectTransport: NSObject {
             if available && !self.isDiscovering {
                 return
             }
+            if self.lastPublishedAvailability == available {
+                return
+            }
             if !available {
                 self.impl.resetState()
                 self.currentPeers = []
                 self.isDiscovering = false
             }
+            self.lastPublishedAvailability = available
             self.delegate?.wifiTransportDidChangeAvailability(available)
         }
     }
