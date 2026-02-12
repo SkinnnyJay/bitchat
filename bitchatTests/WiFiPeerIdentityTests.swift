@@ -32,6 +32,13 @@ final class WiFiPeerIdentityTests: XCTestCase {
         XCTAssertTrue(candidates.contains("peerabc000000000"))
     }
 
+    func testCandidateIDsTrimWhitespaceFromPrefixedBarePeerID() {
+        let prefixed = PeerID(str: "mesh:   peerabc000000000   ")
+        let candidates = WiFiPeerIdentity.candidateIDs(for: prefixed)
+        XCTAssertTrue(candidates.contains("mesh:peerabc000000000"))
+        XCTAssertTrue(candidates.contains("peerabc000000000"))
+    }
+
     func testCandidateIDsAreUnique() {
         let short = PeerID(str: "peerabc000000000")
         let candidates = WiFiPeerIdentity.candidateIDs(for: short)
@@ -76,6 +83,12 @@ final class WiFiPeerIdentityTests: XCTestCase {
     func testNormalizedOutboxPeerIDTrimsWhitespaceAfterPrefix() {
         let prefixed = PeerID(str: "mesh:   peerabc000000000   ")
         let normalized = WiFiPeerIdentity.normalizedOutboxPeerID(for: prefixed)
+        XCTAssertEqual(normalized, PeerID(str: "peerabc000000000"))
+    }
+
+    func testNormalizedOutboxPeerIDTrimsWhitespaceForUnprefixedPeerID() {
+        let unprefixed = PeerID(str: "   peerabc000000000   ")
+        let normalized = WiFiPeerIdentity.normalizedOutboxPeerID(for: unprefixed)
         XCTAssertEqual(normalized, PeerID(str: "peerabc000000000"))
     }
 }

@@ -1,6 +1,22 @@
 import Foundation
 
 enum WiFiPeerIdentity {
+    private static func canonicalPeerID(_ peerID: PeerID) -> PeerID {
+        if peerID.prefix != .empty {
+            let bare = peerID.bare.trimmingCharacters(in: .whitespacesAndNewlines)
+            if bare.isEmpty {
+                return peerID
+            }
+            return PeerID(str: peerID.prefix.rawValue + bare)
+        }
+
+        let trimmed = peerID.id.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return peerID
+        }
+        return PeerID(str: trimmed)
+    }
+
     static func normalizedKey(_ peerID: String) -> String {
         let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
@@ -21,19 +37,20 @@ enum WiFiPeerIdentity {
     }
 
     static func candidateIDs(for peerID: PeerID) -> [String] {
-        var candidates: [String] = [peerID.id]
-        if peerID.prefix != .empty, !peerID.bare.isEmpty {
-            candidates.append(peerID.bare)
+        let canonicalPeerID = canonicalPeerID(peerID)
+        var candidates: [String] = [canonicalPeerID.id]
+        if canonicalPeerID.prefix != .empty, !canonicalPeerID.bare.isEmpty {
+            candidates.append(canonicalPeerID.bare)
         }
 
-        let short = peerID.toShort().id
-        if short != peerID.id {
+        let short = canonicalPeerID.toShort().id
+        if short != canonicalPeerID.id {
             candidates.append(short)
         }
 
-        if let noiseKey = peerID.noiseKey {
+        if let noiseKey = canonicalPeerID.noiseKey {
             let full = noiseKey.hexEncodedString()
-            if full != peerID.id {
+            if full != canonicalPeerID.id {
                 candidates.append(full)
             }
         }
@@ -46,12 +63,13 @@ enum WiFiPeerIdentity {
     }
 
     static func normalizedOutboxPeerID(for peerID: PeerID) -> PeerID {
-        if let noiseKey = peerID.noiseKey {
+        let canonicalPeerID = canonicalPeerID(peerID)
+        if let noiseKey = canonicalPeerID.noiseKey {
             return PeerID(publicKey: noiseKey)
         }
-        if peerID.prefix != .empty {
-            return PeerID(str: peerID.bare.trimmingCharacters(in: .whitespacesAndNewlines))
+        if canonicalPeerID.prefix != .empty {
+            return PeerID(str: canonicalPeerID.bare)
         }
-        return peerID
+        return canonicalPeerID
     }
 }
