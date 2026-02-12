@@ -725,6 +725,32 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertNil(cache["peera"])
     }
 
+    func testDeduplicatedOrderKeepingMostRecentRemovesOlderDuplicates() {
+        let order = ["peera", "peerb", "peera", "peerc", "peerb"]
+
+        let deduped = UnifiedPeerService.deduplicatedOrderKeepingMostRecent(order)
+
+        XCTAssertEqual(deduped, ["peera", "peerc", "peerb"])
+    }
+
+    func testPruneFingerprintCacheDeduplicatesOrderEntries() {
+        var cache: [String: String] = [
+            "peera": String(repeating: "11", count: 32),
+            "peerb": String(repeating: "22", count: 32),
+            "peerc": String(repeating: "33", count: 32)
+        ]
+        var order = ["peera", "peerb", "peera", "peerc"]
+
+        UnifiedPeerService.pruneFingerprintCache(
+            &cache,
+            order: &order,
+            referenceIDs: ["peera", "peerb", "peerc"],
+            cap: 10
+        )
+
+        XCTAssertEqual(order, ["peerb", "peera", "peerc"])
+    }
+
     func testResolvedNoisePublicKeyPrefersSnapshotNoiseKeyWhenValid() {
         let snapshotKey = Data(repeating: 0x33, count: 32)
         let peerIDNoise = String(repeating: "ab", count: 32)

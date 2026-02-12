@@ -407,6 +407,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         if !allowedKeys.isEmpty {
             cache = cache.filter { allowedKeys.contains($0.key) }
             order = order.filter { allowedKeys.contains($0) && cache[$0] != nil }
+            order = deduplicatedOrderKeepingMostRecent(order)
         } else {
             cache.removeAll()
             order.removeAll()
@@ -417,6 +418,15 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             let evicted = order.removeFirst()
             cache.removeValue(forKey: evicted)
         }
+    }
+
+    static func deduplicatedOrderKeepingMostRecent(_ order: [String]) -> [String] {
+        var seen: Set<String> = []
+        var dedupedReversed: [String] = []
+        for key in order.reversed() where seen.insert(key).inserted {
+            dedupedReversed.append(key)
+        }
+        return dedupedReversed.reversed()
     }
 
     static func resolveFingerprintFromMesh(
