@@ -94,9 +94,10 @@ private final class MPCWiFiDirectTransportImplementation: NSObject, WiFiDirectTr
     private let serviceType = "bitchat-wifi"
     private let localPeerID: MCPeerID
     private let session: MCSession
+    private let capabilityNegotiator = WiFiDirectCapabilityNegotiator()
     private lazy var advertiser = MCNearbyServiceAdvertiser(
         peer: localPeerID,
-        discoveryInfo: nil,
+        discoveryInfo: capabilityNegotiator.discoveryInfo(),
         serviceType: serviceType
     )
     private lazy var browser = MCNearbyServiceBrowser(
@@ -218,6 +219,10 @@ extension MPCWiFiDirectTransportImplementation: MCNearbyServiceAdvertiserDelegat
 
 extension MPCWiFiDirectTransportImplementation: MCNearbyServiceBrowserDelegate {
     func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String: String]?) {
+        guard capabilityNegotiator.isPeerCompatible(discoveryInfo: info) else {
+            return
+        }
+
         let peerKey = peerID.displayName
         let now = Date()
         if let nextAllowed = nextInviteAllowedAt[peerKey], now < nextAllowed {
