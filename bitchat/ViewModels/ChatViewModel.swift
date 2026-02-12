@@ -2738,7 +2738,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
 
         Task { @MainActor in
-            guard envelope.recipientPeerID == meshService.myPeerID.id else { return }
+            guard self.isWiFiEnvelopeForCurrentPeer(envelope.recipientPeerID) else { return }
             let senderPeerID = envelope.senderPeerID
             let senderName = unifiedPeerService.getPeer(by: senderPeerID)?.nickname ?? resolveNickname(for: senderPeerID)
             let privateMentions = parseMentions(from: envelope.content)
@@ -2765,7 +2765,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
 
         Task { @MainActor in
-            guard envelope.recipientPeerID == meshService.myPeerID.id else { return }
+            guard self.isWiFiEnvelopeForCurrentPeer(envelope.recipientPeerID) else { return }
 
             switch envelope.ackType {
             case .delivered:
@@ -2793,6 +2793,16 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 didReceiveReadReceipt(receipt)
             }
         }
+    }
+
+    @MainActor
+    private func isWiFiEnvelopeForCurrentPeer(_ recipientPeerID: String) -> Bool {
+        let claimed = PeerID(str: recipientPeerID)
+        let local = meshService.myPeerID
+        if claimed == local {
+            return true
+        }
+        return claimed.toShort() == local.toShort()
     }
     
     @MainActor
