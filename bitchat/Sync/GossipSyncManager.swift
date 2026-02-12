@@ -32,6 +32,12 @@ final class GossipSyncManager {
         self.config = config
     }
 
+    static func canonicalRoutingIDHex(for peerID: PeerID) -> String? {
+        let canonical = peerID.toShort()
+        guard canonical.isShort else { return nil }
+        return canonical.bare.lowercased()
+    }
+
     func start() {
         stop()
         let timer = DispatchSource.makeTimerSource(queue: queue)
@@ -87,10 +93,13 @@ final class GossipSyncManager {
     }
 
     private func sendRequestSync() {
+        guard let senderHex = Self.canonicalRoutingIDHex(for: myPeerID),
+              let senderData = Data(hexString: senderHex),
+              senderData.count == 8 else { return }
         let payload = buildGcsPayload()
         let pkt = BitchatPacket(
             type: MessageType.requestSync.rawValue,
-            senderID: Data(hexString: myPeerID.id) ?? Data(),
+            senderID: senderData,
             recipientID: nil, // broadcast
             timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
             payload: payload,
@@ -102,18 +111,17 @@ final class GossipSyncManager {
     }
 
     private func sendRequestSync(to peerID: PeerID) {
+        guard let senderHex = Self.canonicalRoutingIDHex(for: myPeerID),
+              let senderData = Data(hexString: senderHex),
+              senderData.count == 8 else { return }
+        guard let recipientHex = Self.canonicalRoutingIDHex(for: peerID),
+              let recipientData = Data(hexString: recipientHex),
+              recipientData.count == 8 else { return }
         let payload = buildGcsPayload()
-        var recipient = Data()
-        var temp = peerID.id
-        while temp.count >= 2 && recipient.count < 8 {
-            let hexByte = String(temp.prefix(2))
-            if let b = UInt8(hexByte, radix: 16) { recipient.append(b) }
-            temp = String(temp.dropFirst(2))
-        }
         let pkt = BitchatPacket(
             type: MessageType.requestSync.rawValue,
-            senderID: Data(hexString: myPeerID.id) ?? Data(),
-            recipientID: recipient,
+            senderID: senderData,
+            recipientID: recipientData,
             timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
             payload: payload,
             signature: nil,
@@ -192,7 +200,7 @@ final class GossipSyncManager {
     }
 
     private func _removeAnnouncementForPeer(_ peerID: PeerID) {
-        let normalizedPeerID = peerID.id.lowercased()
+        guard let normalizedPeerID = Self.canonicalRoutingIDHex(for: peerID) else { return }
         _ = latestAnnouncementByPeer.removeValue(forKey: normalizedPeerID)
 
         // Remove messages from this peer

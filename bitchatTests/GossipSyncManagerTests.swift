@@ -3,6 +3,38 @@ import XCTest
 @testable import bitchat
 
 final class GossipSyncManagerTests: XCTestCase {
+    func testCanonicalRoutingIDHexNormalizesPrefixedShortPeerID() {
+        XCTAssertEqual(
+            GossipSyncManager.canonicalRoutingIDHex(for: PeerID(str: "mesh:abcdef0123456789")),
+            "abcdef0123456789"
+        )
+    }
+
+    func testCanonicalRoutingIDHexDerivesShortFromFullNoisePeerID() {
+        let fullNoisePeerID = PeerID(str: String(repeating: "ab", count: 32))
+        let expectedShort = fullNoisePeerID.toShort().bare
+
+        XCTAssertEqual(
+            GossipSyncManager.canonicalRoutingIDHex(for: fullNoisePeerID),
+            expectedShort
+        )
+    }
+
+    func testInitialSyncToPeerUsesCanonicalSenderAndRecipientRoutingIDs() {
+        let manager = GossipSyncManager(myPeerID: "mesh:abcdef0123456789")
+        let delegate = RecordingDelegate()
+        let sendExpectation = expectation(description: "initial sync sent")
+        delegate.onSend = { sendExpectation.fulfill() }
+        manager.delegate = delegate
+
+        manager.scheduleInitialSyncToPeer("mesh:1122334455667788", delaySeconds: 0.0)
+
+        wait(for: [sendExpectation], timeout: 2.0)
+
+        XCTAssertEqual(delegate.lastPacket?.senderID.hexEncodedString(), "abcdef0123456789")
+        XCTAssertEqual(delegate.lastPacket?.recipientID?.hexEncodedString(), "1122334455667788")
+    }
+
     func testConcurrentPacketIntakeAndSyncRequest() {
         let manager = GossipSyncManager(myPeerID: "0102030405060708")
         let delegate = RecordingDelegate()
