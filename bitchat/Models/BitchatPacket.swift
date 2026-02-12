@@ -37,17 +37,14 @@ struct BitchatPacket: Codable {
     init(type: UInt8, ttl: UInt8, senderID: PeerID, payload: Data) {
         self.version = 1
         self.type = type
-        // Convert hex string peer ID to binary data (8 bytes)
-        var senderData = Data()
-        var tempID = senderID.id
-        while tempID.count >= 2 {
-            let hexByte = String(tempID.prefix(2))
-            if let byte = UInt8(hexByte, radix: 16) {
-                senderData.append(byte)
-            }
-            tempID = String(tempID.dropFirst(2))
+        let canonicalSenderID = senderID.toShort()
+        if canonicalSenderID.isShort,
+           let senderData = Data(hexString: canonicalSenderID.id),
+           senderData.count == 8 {
+            self.senderID = senderData
+        } else {
+            self.senderID = Data()
         }
-        self.senderID = senderData
         self.recipientID = nil
         self.timestamp = UInt64(Date().timeIntervalSince1970 * 1000) // milliseconds
         self.payload = payload
