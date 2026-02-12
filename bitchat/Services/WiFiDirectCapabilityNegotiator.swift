@@ -1,6 +1,11 @@
 import Foundation
 
 struct WiFiDirectCapabilityNegotiator {
+    private enum Limits {
+        static let maxVersionLength = 16
+        static let maxCapabilitiesLength = 512
+    }
+
     static let currentProtocolVersion = 1
     static let requiredCapabilities: Set<String> = ["pm"]
     static let defaultCapabilities: Set<String> = ["pm", "ack"]
@@ -37,12 +42,11 @@ struct WiFiDirectCapabilityNegotiator {
             return nil
         }
         var parsed: [String: String] = [:]
-        for (key, value) in dictionary {
-            if let stringValue = value as? String {
-                parsed[key] = stringValue
-            } else if let numberValue = value as? NSNumber {
-                parsed[key] = numberValue.stringValue
-            }
+        if let version = parseStringValue(dictionary["v"], maxLength: Limits.maxVersionLength) {
+            parsed["v"] = version
+        }
+        if let capabilities = parseStringValue(dictionary["caps"], maxLength: Limits.maxCapabilitiesLength) {
+            parsed["caps"] = capabilities
         }
         return parsed.isEmpty ? nil : parsed
     }
@@ -75,5 +79,19 @@ struct WiFiDirectCapabilityNegotiator {
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
                 .filter { !$0.isEmpty }
         )
+    }
+
+    private func parseStringValue(_ value: Any?, maxLength: Int) -> String? {
+        let stringValue: String?
+        if let string = value as? String {
+            stringValue = string
+        } else if let number = value as? NSNumber {
+            stringValue = number.stringValue
+        } else {
+            stringValue = nil
+        }
+        guard let stringValue else { return nil }
+        guard !stringValue.isEmpty, stringValue.utf8.count <= maxLength else { return nil }
+        return stringValue
     }
 }

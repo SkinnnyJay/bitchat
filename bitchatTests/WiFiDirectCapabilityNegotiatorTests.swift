@@ -93,4 +93,37 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
         XCTAssertEqual(info["v"], "7")
         XCTAssertEqual(info["caps"], "pm,relay")
     }
+
+    func testParseDiscoveryInfoIgnoresUnknownFields() throws {
+        let negotiator = WiFiDirectCapabilityNegotiator()
+        let raw: [String: Any] = ["v": 1, "caps": "pm,ack", "junk": "value"]
+        let context = try JSONSerialization.data(withJSONObject: raw, options: [])
+
+        let parsed = negotiator.parseDiscoveryInfo(from: context)
+
+        XCTAssertEqual(parsed?["v"], "1")
+        XCTAssertEqual(parsed?["caps"], "pm,ack")
+        XCTAssertNil(parsed?["junk"])
+    }
+
+    func testParseDiscoveryInfoDropsOversizedCapabilitiesValue() throws {
+        let negotiator = WiFiDirectCapabilityNegotiator()
+        let oversizedCaps = String(repeating: "p", count: 1024)
+        let raw: [String: Any] = ["v": 1, "caps": oversizedCaps]
+        let context = try JSONSerialization.data(withJSONObject: raw, options: [])
+
+        let parsed = negotiator.parseDiscoveryInfo(from: context)
+
+        XCTAssertEqual(parsed?["v"], "1")
+        XCTAssertNil(parsed?["caps"])
+        XCTAssertTrue(negotiator.isPeerCompatible(discoveryInfo: parsed))
+    }
+
+    func testParseDiscoveryInfoReturnsNilWhenOnlyUnknownFieldsPresent() throws {
+        let negotiator = WiFiDirectCapabilityNegotiator()
+        let raw: [String: Any] = ["junk": "value"]
+        let context = try JSONSerialization.data(withJSONObject: raw, options: [])
+
+        XCTAssertNil(negotiator.parseDiscoveryInfo(from: context))
+    }
 }
