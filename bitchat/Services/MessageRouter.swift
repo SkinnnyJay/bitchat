@@ -172,6 +172,9 @@ final class MessageRouter {
     }
 
     func sendFavoriteNotification(to peerID: PeerID, isFavorite: Bool) {
+        if sendFavoriteNotificationViaWiFiIfAvailable(to: peerID, isFavorite: isFavorite) {
+            return
+        }
         // Route via mesh when connected; else use Nostr
         if mesh.isPeerConnected(peerID) {
             mesh.sendFavoriteNotification(to: peerID, isFavorite: isFavorite)
@@ -309,6 +312,36 @@ final class MessageRouter {
             return true
         } catch {
             SecureLogger.debug("WiFi Direct \(ackType.rawValue.uppercased()) ack route failed for \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…, falling back", category: .session)
+            return false
+        }
+    }
+
+    private func sendFavoriteNotificationViaWiFiIfAvailable(to peerID: PeerID, isFavorite: Bool) -> Bool {
+        guard let wifiTransport else { return false }
+        guard wifiTransport.isAvailable else { return false }
+        guard Set(wifiTransport.currentPeers).contains(peerID.id) else { return false }
+        if let capabilities = wifiTransport.peerCapabilities(peerID: peerID.id),
+           !capabilities.contains("pm") {
+            return false
+        }
+
+        let recipientNickname = mesh.peerNickname(peerID: peerID) ?? "user"
+        let content = isFavorite ? "[FAVORITED]" : "[UNFAVORITED]"
+        let envelope = WiFiDirectPrivateEnvelope(
+            senderPeerID: mesh.myPeerID.id,
+            recipientPeerID: peerID.id,
+            recipientNickname: recipientNickname,
+            messageID: UUID().uuidString,
+            content: content
+        )
+        guard let payload = try? JSONEncoder().encode(envelope) else { return false }
+
+        do {
+            try wifiTransport.send(payload, to: peerID.id)
+            SecureLogger.debug("Routing FAVORITE(\(isFavorite)) via WiFi Direct to \(peerID.id.prefix(8))…", category: .session)
+            return true
+        } catch {
+            SecureLogger.debug("WiFi Direct favorite route failed for \(peerID.id.prefix(8))…, falling back", category: .session)
             return false
         }
     }

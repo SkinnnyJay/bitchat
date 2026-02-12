@@ -24,6 +24,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         private(set) var sentPrivateMessages: [(content: String, peerID: PeerID, nickname: String, messageID: String)] = []
         private(set) var sentReadReceipts: [(receipt: ReadReceipt, peerID: PeerID)] = []
         private(set) var sentDeliveryAcks: [(messageID: String, peerID: PeerID)] = []
+        private(set) var sentFavoriteNotifications: [(peerID: PeerID, isFavorite: Bool)] = []
 
         func setReachable(_ peerID: PeerID, isReachable: Bool) {
             if isReachable {
@@ -77,7 +78,9 @@ final class MessageRouterRoutingTests: XCTestCase {
         func sendReadReceipt(_ receipt: ReadReceipt, to peerID: PeerID) {
             sentReadReceipts.append((receipt, peerID))
         }
-        func sendFavoriteNotification(to peerID: PeerID, isFavorite: Bool) {}
+        func sendFavoriteNotification(to peerID: PeerID, isFavorite: Bool) {
+            sentFavoriteNotifications.append((peerID, isFavorite))
+        }
         func sendBroadcastAnnounce() {}
         func sendDeliveryAck(for messageID: String, to peerID: PeerID) {
             sentDeliveryAcks.append((messageID, peerID))
@@ -631,6 +634,46 @@ final class MessageRouterRoutingTests: XCTestCase {
 
         XCTAssertEqual(backend.sentPayloads.count, 1)
         XCTAssertTrue(mesh.sentDeliveryAcks.isEmpty)
+    }
+
+    @MainActor
+    func testRoutesFavoriteNotificationViaWiFiWhenPeerIsAvailable() throws {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: false)
+        mesh.setPeerNickname("peer", for: recipient)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm", "ack"], for: recipient.id)
+
+        let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        router.sendFavoriteNotification(to: recipient, isFavorite: true)
+
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        XCTAssertTrue(mesh.sentFavoriteNotifications.isEmpty)
+        let envelope = try JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: backend.sentPayloads[0].0)
+        XCTAssertTrue(envelope.content.hasPrefix("[FAVORITED]"))
+    }
+
+    @MainActor
+    func testFallsBackToMeshFavoriteNotificationWhenWiFiUnavailable() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: true)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = false
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        router.sendFavoriteNotification(to: recipient, isFavorite: false)
+
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentFavoriteNotifications.count, 1)
+        XCTAssertEqual(mesh.sentFavoriteNotifications[0].peerID, recipient)
+        XCTAssertFalse(mesh.sentFavoriteNotifications[0].isFavorite)
     }
 
     @MainActor
