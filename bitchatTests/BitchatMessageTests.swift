@@ -103,4 +103,39 @@ final class BitchatMessageTests: XCTestCase {
 
         XCTAssertNil(BitchatMessage(payload))
     }
+
+    func testBinaryEncodingRejectsOversizedContent() {
+        let oversizedContent = String(repeating: "x", count: InputValidator.Limits.maxMessageLength + 1)
+        let message = BitchatMessage(
+            id: "mid-oversized-encode",
+            sender: "alice",
+            content: oversizedContent,
+            timestamp: Date(),
+            isRelay: false
+        )
+
+        XCTAssertNil(message.toBinaryPayload())
+    }
+
+    func testBinaryDecodeRejectsOversizedContent() {
+        let oversizedContent = String(repeating: "x", count: InputValidator.Limits.maxMessageLength + 1)
+        var payload = Data()
+        payload.append(0) // flags
+        payload.append(contentsOf: Array(repeating: UInt8(0), count: 8)) // timestamp
+
+        let id = "mid-oversized-decode"
+        payload.append(UInt8(id.utf8.count))
+        payload.append(contentsOf: id.utf8)
+
+        let sender = "alice"
+        payload.append(UInt8(sender.utf8.count))
+        payload.append(contentsOf: sender.utf8)
+
+        let contentLength = UInt16(oversizedContent.utf8.count)
+        payload.append(UInt8((contentLength >> 8) & 0xFF))
+        payload.append(UInt8(contentLength & 0xFF))
+        payload.append(contentsOf: oversizedContent.utf8)
+
+        XCTAssertNil(BitchatMessage(payload))
+    }
 }

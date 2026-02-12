@@ -153,15 +153,15 @@ extension BitchatMessage {
         }
         
         // Content
-        if let contentData = content.data(using: .utf8) {
-            let length = UInt16(min(contentData.count, 65535))
-            // Encode length as 2 bytes, big-endian
-            data.append(UInt8((length >> 8) & 0xFF))
-            data.append(UInt8(length & 0xFF))
-            data.append(contentData.prefix(Int(length)))
-        } else {
-            data.append(contentsOf: [0, 0])
+        guard let contentData = content.data(using: .utf8),
+              contentData.count <= InputValidator.Limits.maxMessageLength else {
+            return nil
         }
+        let length = UInt16(contentData.count)
+        // Encode length as 2 bytes, big-endian
+        data.append(UInt8((length >> 8) & 0xFF))
+        data.append(UInt8(length & 0xFF))
+        data.append(contentData)
         
         // Optional fields
         if let originalSender = safeOriginalSender, let origData = originalSender.data(using: .utf8) {
@@ -270,6 +270,7 @@ extension BitchatMessage {
         }
         
         let content = String(data: dataCopy[offset..<offset+contentLength], encoding: .utf8) ?? ""
+        guard content.utf8.count <= InputValidator.Limits.maxMessageLength else { return nil }
         offset += contentLength
         
         // Optional fields
