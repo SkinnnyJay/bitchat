@@ -2744,7 +2744,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                         case .read, .delivered:
                             recordSentReadReceipt(message.id)
                             if let safeMessageID = InputValidator.validateMessageID(message.id) {
-                                privateChatManager.sentReadReceipts.insert(safeMessageID)
+                                privateChatManager.markReadReceiptSent(safeMessageID)
                             }
                         default:
                             break

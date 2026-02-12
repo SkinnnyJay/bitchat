@@ -18,6 +18,7 @@ final class PrivateChatManager: ObservableObject {
     
     private var selectedPeerFingerprint: String? = nil
     var sentReadReceipts: Set<String> = []  // Made accessible for ChatViewModel
+    private var sentReadReceiptOrder: [String] = []
     
     weak var meshService: Transport?
     // Route acks/receipts via MessageRouter (chooses mesh or Nostr)
@@ -29,6 +30,7 @@ final class PrivateChatManager: ObservableObject {
 
     // Cap for messages stored per private chat
     private let privateChatCap = TransportConfig.privateChatCap
+    private let sentReadReceiptsCap = TransportConfig.uiSentReadReceiptsCap
     
     /// Start a private chat with a peer
     func startChat(with peerID: String) {
@@ -85,33 +87,60 @@ final class PrivateChatManager: ObservableObject {
         // Send read receipts for unread messages that haven't been sent yet
         if let messages = privateChats[peerID] {
             for message in messages {
-                if message.senderPeerID == peerID && !message.isRelay && !sentReadReceipts.contains(message.id) {
+                if message.senderPeerID == peerID && !message.isRelay && !hasSentReadReceipt(message.id) {
                     sendReadReceipt(for: message)
                 }
             }
         }
     }
+
+    func markReadReceiptSent(_ messageID: String) {
+        _ = prepareReadReceiptMessageID(messageID)
+    }
     
     // MARK: - Private Methods
+
+    private func hasSentReadReceipt(_ messageID: String) -> Bool {
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return false }
+        return sentReadReceipts.contains(safeMessageID)
+    }
+
+    private func prepareReadReceiptMessageID(_ messageID: String) -> String? {
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return nil }
+        guard !sentReadReceipts.contains(safeMessageID) else { return nil }
+        sentReadReceipts.insert(safeMessageID)
+        sentReadReceiptOrder.append(safeMessageID)
+        if sentReadReceiptOrder.count > sentReadReceiptsCap {
+            let overflow = sentReadReceiptOrder.count - sentReadReceiptsCap
+            for _ in 0..<overflow {
+                if let old = sentReadReceiptOrder.first {
+                    sentReadReceiptOrder.removeFirst()
+                    sentReadReceipts.remove(old)
+                }
+            }
+        }
+        return safeMessageID
+    }
     
     private func sendReadReceipt(for message: BitchatMessage) {
-        guard !sentReadReceipts.contains(message.id),
-              let senderPeerID = message.senderPeerID else {
+        guard let senderPeerID = message.senderPeerID,
+              senderPeerID.isValid,
+              let safeMessageID = prepareReadReceiptMessageID(message.id) else {
             return
         }
-        
-        sentReadReceipts.insert(message.id)
+
+        let readerNickname = InputValidator.validateNickname(meshService?.myNickname ?? "") ?? "user"
         
         // Create read receipt using the simplified method
         let receipt = ReadReceipt(
-            originalMessageID: message.id,
+            originalMessageID: safeMessageID,
             readerID: meshService?.myPeerID.id ?? "",
-            readerNickname: meshService?.myNickname ?? ""
+            readerNickname: readerNickname
         )
         
         // Route via MessageRouter to avoid handshakeRequired spam when session isn't established
         if let router = messageRouter {
-            SecureLogger.debug("PrivateChatManager: sending READ ack for \(message.id.prefix(8))… to \(senderPeerID.id.prefix(8))… via router", category: .session)
+            SecureLogger.debug("PrivateChatManager: sending READ ack for \(safeMessageID.prefix(8))… to \(senderPeerID.id.prefix(8))… via router", category: .session)
             Task { @MainActor in
                 router.sendReadReceipt(receipt, to: senderPeerID)
             }
