@@ -149,6 +149,23 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testDeinitStopsRunningHybridManager() {
+        let mesh = MockTransport()
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        var manager: HybridTransportManager? = HybridTransportManager(meshTransport: mesh, wifiTransport: wifi)
+
+        manager?.start()
+        XCTAssertEqual(mesh.startServicesCallCount, 1)
+        XCTAssertEqual(backend.startDiscoveryCallCount, 1)
+
+        manager = nil
+
+        XCTAssertEqual(mesh.stopServicesCallCount, 1)
+        XCTAssertEqual(backend.stopDiscoveryCallCount, 1)
+    }
+
+    @MainActor
     func testSendPrivateFallsBackToMeshWhenWiFiCapabilityMissing() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()

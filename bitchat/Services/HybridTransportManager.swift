@@ -150,6 +150,10 @@ final class HybridTransportManager {
         meshTransport.stopServices()
     }
 
+    deinit {
+        stop()
+    }
+
     @discardableResult
     func sendPrivate(
         _ content: String,
