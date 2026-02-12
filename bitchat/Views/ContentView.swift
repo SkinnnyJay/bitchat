@@ -1297,9 +1297,9 @@ struct ContentView: View {
     private func privateHeaderContent(for privatePeerID: String) -> some View {
         // Prefer short (mesh) ID whenever available for encryption/session status; keep stable key for display resolution only.
         let headerPeerID: String = {
-            if privatePeerID.count == 64 {
+            if let noiseKey = ChatViewModel.decodeNoisePublicKey(from: privatePeerID) {
                 // Map stable Noise key to short ID if we know it (even if not directly connected)
-                if let short = viewModel.getShortIDForNoiseKey(privatePeerID) { return short }
+                if let short = viewModel.getShortIDForNoiseKey(noiseKey.hexEncodedString()) { return short }
             }
             return privatePeerID
         }()
