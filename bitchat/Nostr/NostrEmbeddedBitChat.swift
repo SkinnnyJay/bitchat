@@ -5,8 +5,12 @@ import Foundation
 struct NostrEmbeddedBitChat {
     /// Build a `bitchat1:` base64url-encoded BitChat packet carrying a private message for Nostr DMs.
     static func encodePMForNostr(content: String, messageID: String, recipientPeerID: String, senderPeerID: String) -> String? {
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return nil }
+        guard PeerID(str: recipientPeerID).isValid else { return nil }
+        guard PeerID(str: senderPeerID).isValid else { return nil }
+        guard let senderData = Data(hexString: senderPeerID) else { return nil }
         // TLV-encode the private message
-        let pm = PrivateMessagePacket(messageID: messageID, content: content)
+        let pm = PrivateMessagePacket(messageID: safeMessageID, content: content)
         guard let tlv = pm.encode() else { return nil }
 
         // Prefix with NoisePayloadType
@@ -15,11 +19,12 @@ struct NostrEmbeddedBitChat {
 
         // Determine 8-byte recipient ID to embed
         let recipientIDHex: String = normalizeRecipientPeerID(recipientPeerID)
+        guard let recipientData = Data(hexString: recipientIDHex), recipientData.count == 8 else { return nil }
 
         let packet = BitchatPacket(
             type: MessageType.noiseEncrypted.rawValue,
-            senderID: Data(hexString: senderPeerID) ?? Data(),
-            recipientID: Data(hexString: recipientIDHex),
+            senderID: senderData,
+            recipientID: recipientData,
             timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
             payload: payload,
             signature: nil,
@@ -33,16 +38,21 @@ struct NostrEmbeddedBitChat {
     /// Build a `bitchat1:` base64url-encoded BitChat packet carrying a delivery/read ack for Nostr DMs.
     static func encodeAckForNostr(type: NoisePayloadType, messageID: String, recipientPeerID: String, senderPeerID: String) -> String? {
         guard type == .delivered || type == .readReceipt else { return nil }
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return nil }
+        guard PeerID(str: recipientPeerID).isValid else { return nil }
+        guard PeerID(str: senderPeerID).isValid else { return nil }
+        guard let senderData = Data(hexString: senderPeerID) else { return nil }
 
         var payload = Data([type.rawValue])
-        payload.append(Data(messageID.utf8))
+        payload.append(Data(safeMessageID.utf8))
 
         let recipientIDHex: String = normalizeRecipientPeerID(recipientPeerID)
+        guard let recipientData = Data(hexString: recipientIDHex), recipientData.count == 8 else { return nil }
 
         let packet = BitchatPacket(
             type: MessageType.noiseEncrypted.rawValue,
-            senderID: Data(hexString: senderPeerID) ?? Data(),
-            recipientID: Data(hexString: recipientIDHex),
+            senderID: senderData,
+            recipientID: recipientData,
             timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
             payload: payload,
             signature: nil,
@@ -56,13 +66,16 @@ struct NostrEmbeddedBitChat {
     /// Build a `bitchat1:` ACK (delivered/read) without an embedded recipient peer ID (geohash DMs).
     static func encodeAckForNostrNoRecipient(type: NoisePayloadType, messageID: String, senderPeerID: String) -> String? {
         guard type == .delivered || type == .readReceipt else { return nil }
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return nil }
+        guard PeerID(str: senderPeerID).isValid else { return nil }
+        guard let senderData = Data(hexString: senderPeerID) else { return nil }
 
         var payload = Data([type.rawValue])
-        payload.append(Data(messageID.utf8))
+        payload.append(Data(safeMessageID.utf8))
 
         let packet = BitchatPacket(
             type: MessageType.noiseEncrypted.rawValue,
-            senderID: Data(hexString: senderPeerID) ?? Data(),
+            senderID: senderData,
             recipientID: nil,
             timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
             payload: payload,
@@ -76,7 +89,10 @@ struct NostrEmbeddedBitChat {
 
     /// Build a `bitchat1:` payload without an embedded recipient peer ID (used for geohash DMs).
     static func encodePMForNostrNoRecipient(content: String, messageID: String, senderPeerID: String) -> String? {
-        let pm = PrivateMessagePacket(messageID: messageID, content: content)
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return nil }
+        guard PeerID(str: senderPeerID).isValid else { return nil }
+        guard let senderData = Data(hexString: senderPeerID) else { return nil }
+        let pm = PrivateMessagePacket(messageID: safeMessageID, content: content)
         guard let tlv = pm.encode() else { return nil }
 
         var payload = Data([NoisePayloadType.privateMessage.rawValue])
@@ -84,7 +100,7 @@ struct NostrEmbeddedBitChat {
 
         let packet = BitchatPacket(
             type: MessageType.noiseEncrypted.rawValue,
-            senderID: Data(hexString: senderPeerID) ?? Data(),
+            senderID: senderData,
             recipientID: nil,
             timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
             payload: payload,
