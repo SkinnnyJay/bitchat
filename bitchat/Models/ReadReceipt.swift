@@ -16,10 +16,11 @@ struct ReadReceipt: Codable {
     let timestamp: Date
     
     init(originalMessageID: String, readerID: String, readerNickname: String) {
-        self.originalMessageID = originalMessageID
+        self.originalMessageID = InputValidator.validateMessageID(originalMessageID) ?? UUID().uuidString
         self.receiptID = UUID().uuidString
-        self.readerID = readerID
-        self.readerNickname = readerNickname
+        let canonicalReader = PeerID(str: readerID).toShort()
+        self.readerID = canonicalReader.isShort ? canonicalReader.id : readerID
+        self.readerNickname = InputValidator.validateNickname(readerNickname) ?? "user"
         self.timestamp = Date()
     }
     
@@ -30,6 +31,105 @@ struct ReadReceipt: Codable {
         self.readerID = readerID
         self.readerNickname = readerNickname
         self.timestamp = timestamp
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case originalMessageID, receiptID, readerID, readerNickname, timestamp
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let rawOriginalMessageID = try container.decode(String.self, forKey: .originalMessageID)
+        let rawReceiptID = try container.decode(String.self, forKey: .receiptID)
+        let rawReaderID = try container.decode(String.self, forKey: .readerID)
+        let rawReaderNickname = try container.decode(String.self, forKey: .readerNickname)
+        let timestamp = try container.decode(Date.self, forKey: .timestamp)
+
+        guard let originalMessageID = InputValidator.validateMessageID(rawOriginalMessageID) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .originalMessageID,
+                in: container,
+                debugDescription: "Invalid original message ID"
+            )
+        }
+        guard let receiptID = InputValidator.validateMessageID(rawReceiptID) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .receiptID,
+                in: container,
+                debugDescription: "Invalid receipt ID"
+            )
+        }
+        let canonicalReaderID = PeerID(str: rawReaderID).toShort()
+        guard canonicalReaderID.isShort else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .readerID,
+                in: container,
+                debugDescription: "Invalid reader peer ID"
+            )
+        }
+        guard let readerNickname = InputValidator.validateNickname(rawReaderNickname) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .readerNickname,
+                in: container,
+                debugDescription: "Invalid reader nickname"
+            )
+        }
+        guard InputValidator.validateTimestamp(timestamp) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .timestamp,
+                in: container,
+                debugDescription: "Invalid timestamp"
+            )
+        }
+
+        self.init(
+            originalMessageID: originalMessageID,
+            receiptID: receiptID,
+            readerID: canonicalReaderID.id,
+            readerNickname: readerNickname,
+            timestamp: timestamp
+        )
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        guard let originalMessageID = InputValidator.validateMessageID(originalMessageID) else {
+            throw EncodingError.invalidValue(
+                originalMessageID,
+                EncodingError.Context(codingPath: [CodingKeys.originalMessageID], debugDescription: "Invalid original message ID")
+            )
+        }
+        guard let receiptID = InputValidator.validateMessageID(receiptID) else {
+            throw EncodingError.invalidValue(
+                receiptID,
+                EncodingError.Context(codingPath: [CodingKeys.receiptID], debugDescription: "Invalid receipt ID")
+            )
+        }
+        let canonicalReaderID = PeerID(str: readerID).toShort()
+        guard canonicalReaderID.isShort else {
+            throw EncodingError.invalidValue(
+                readerID,
+                EncodingError.Context(codingPath: [CodingKeys.readerID], debugDescription: "Invalid reader peer ID")
+            )
+        }
+        guard let readerNickname = InputValidator.validateNickname(readerNickname) else {
+            throw EncodingError.invalidValue(
+                readerNickname,
+                EncodingError.Context(codingPath: [CodingKeys.readerNickname], debugDescription: "Invalid reader nickname")
+            )
+        }
+        guard InputValidator.validateTimestamp(timestamp) else {
+            throw EncodingError.invalidValue(
+                timestamp,
+                EncodingError.Context(codingPath: [CodingKeys.timestamp], debugDescription: "Invalid timestamp")
+            )
+        }
+
+        try container.encode(originalMessageID, forKey: .originalMessageID)
+        try container.encode(receiptID, forKey: .receiptID)
+        try container.encode(canonicalReaderID.id, forKey: .readerID)
+        try container.encode(readerNickname, forKey: .readerNickname)
+        try container.encode(timestamp, forKey: .timestamp)
     }
     
     func encode() -> Data? {
