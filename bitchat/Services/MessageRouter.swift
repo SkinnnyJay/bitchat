@@ -291,6 +291,8 @@ final class MessageRouter {
         messageID: String,
         requirePolicyThreshold: Bool
     ) -> Bool {
+        guard !messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        guard content.utf8.count <= InputValidator.Limits.maxMessageLength else { return false }
         guard let wifiTransport else { return false }
         guard let targetPeerID = resolveWiFiPeerIdentifier(
             for: peerID,
@@ -332,6 +334,7 @@ final class MessageRouter {
         to peerID: PeerID,
         senderNickname: String?
     ) -> Bool {
+        guard !messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         guard let wifiTransport else { return false }
         guard let targetPeerID = resolveWiFiPeerIdentifier(
             for: peerID,

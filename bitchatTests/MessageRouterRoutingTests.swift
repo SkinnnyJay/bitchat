@@ -184,6 +184,33 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testFallsBackToMeshWhenWiFiPrivateMessageContentExceedsLimit() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: true)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm", "ack"], for: recipient.id)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 1),
+            wifiTransport: wifi
+        )
+
+        let oversized = String(repeating: "x", count: InputValidator.Limits.maxMessageLength + 1)
+        router.sendPrivate(oversized, to: recipient, recipientNickname: "peer", messageID: "msg-oversized-outbound")
+
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 1)
+        XCTAssertEqual(mesh.sentPrivateMessages[0].messageID, "msg-oversized-outbound")
+    }
+
+    @MainActor
     func testRoutesViaWiFiBelowThresholdWhenNoOtherRouteExists() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
@@ -1026,6 +1053,25 @@ final class MessageRouterRoutingTests: XCTestCase {
 
         XCTAssertEqual(backend.sentPayloads.count, 1)
         XCTAssertTrue(mesh.sentDeliveryAcks.isEmpty)
+    }
+
+    @MainActor
+    func testFallsBackFromWiFiDeliveryAckWhenMessageIDIsEmpty() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: true)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm", "ack"], for: recipient.id)
+
+        let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        router.sendDeliveryAck("   ", to: recipient)
+
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentDeliveryAcks.count, 1)
+        XCTAssertEqual(mesh.sentDeliveryAcks[0].messageID, "   ")
     }
 
     @MainActor
