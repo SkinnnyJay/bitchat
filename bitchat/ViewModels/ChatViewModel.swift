@@ -477,6 +477,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     // Track processed Nostr ACKs to avoid duplicate processing
     private var processedNostrAcks: Set<String> = []  // "messageId:ackType:senderPubkey" format
+    private var processedNostrAckOrder: [String] = []
+    private let maxProcessedNostrAcks = TransportConfig.uiProcessedNostrAcksCap
     // Track which GeoDM messages we've already sent a delivery ACK for (by messageID)
     private var sentGeoDeliveryAcks: Set<String> = []
     
@@ -2207,6 +2209,20 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             }
         }
     }
+
+    private func recordProcessedNostrAck(_ ackKey: String) {
+        processedNostrAcks.insert(ackKey)
+        processedNostrAckOrder.append(ackKey)
+        if processedNostrAckOrder.count > maxProcessedNostrAcks {
+            let overflow = processedNostrAckOrder.count - maxProcessedNostrAcks
+            for _ in 0..<overflow {
+                if let old = processedNostrAckOrder.first {
+                    processedNostrAckOrder.removeFirst()
+                    processedNostrAcks.remove(old)
+                }
+            }
+        }
+    }
     
     /// Sends an encrypted private message to a specific peer.
     /// - Parameters:
@@ -3296,6 +3312,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Clear read receipt tracking
         sentReadReceipts.removeAll()
         processedNostrAcks.removeAll()
+        processedNostrAckOrder.removeAll()
         
         // Clear all caches
         invalidateEncryptionCache()
@@ -5477,7 +5494,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             // Skip duplicate ACK
             return
         }
-        processedNostrAcks.insert(ackKey)
+        recordProcessedNostrAck(ackKey)
         
         SecureLogger.debug("📨 Received \(ackType) ACK for message \(messageId.prefix(16))... from \(senderPubkey.prefix(16))...", category: .session)
         
