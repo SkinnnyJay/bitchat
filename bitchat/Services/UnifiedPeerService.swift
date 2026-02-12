@@ -270,15 +270,17 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
 
     static func resolveCachedFingerprint(from cache: [String: String], peerID: String) -> String? {
         for key in lookupKeys(for: peerID) {
-            if let fingerprint = cache[key] {
-                return fingerprint
+            if let fingerprint = cache[key],
+               let canonicalFingerprint = canonicalFingerprint(fingerprint) {
+                return canonicalFingerprint
             }
         }
         let normalizedTarget = WiFiPeerIdentity.normalizedKey(peerID)
         guard !normalizedTarget.isEmpty else { return nil }
-        return cache.first { key, _ in
+        return cache.first { key, value in
+            guard canonicalFingerprint(value) != nil else { return false }
             WiFiPeerIdentity.normalizedKey(key) == normalizedTarget
-        }?.value
+        }.flatMap { canonicalFingerprint($0.value) }
     }
 
     static func cacheFingerprint(
@@ -286,12 +288,13 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         for peerID: String,
         in cache: inout [String: String]
     ) {
+        guard let canonicalFingerprint = canonicalFingerprint(fingerprint) else { return }
         for key in lookupKeys(for: peerID) {
-            cache[key] = fingerprint
+            cache[key] = canonicalFingerprint
         }
         let normalized = WiFiPeerIdentity.normalizedKey(peerID)
         if !normalized.isEmpty {
-            cache[normalized] = fingerprint
+            cache[normalized] = canonicalFingerprint
         }
     }
 
@@ -302,6 +305,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         order: inout [String],
         cap: Int
     ) {
+        guard let canonicalFingerprint = canonicalFingerprint(fingerprint) else { return }
         guard cap > 0 else {
             cache.removeAll()
             order.removeAll()
@@ -325,7 +329,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         }
 
         for key in orderedKeys {
-            cache[key] = fingerprint
+            cache[key] = canonicalFingerprint
             if let existingIndex = order.firstIndex(of: key) {
                 order.remove(at: existingIndex)
             }
@@ -402,11 +406,18 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         using resolver: (PeerID) -> String?
     ) -> String? {
         for lookupKey in lookupKeys(for: peerID) {
-            if let fingerprint = resolver(PeerID(str: lookupKey)) {
-                return fingerprint
+            if let fingerprint = resolver(PeerID(str: lookupKey)),
+               let canonicalFingerprint = canonicalFingerprint(fingerprint) {
+                return canonicalFingerprint
             }
         }
         return nil
+    }
+
+    static func canonicalFingerprint(_ fingerprint: String) -> String? {
+        let trimmed = fingerprint.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard trimmed.count == 64, Data(hexString: trimmed) != nil else { return nil }
+        return trimmed
     }
 
     static func buildPeerIndex(from peers: [BitchatPeer]) -> [String: BitchatPeer] {

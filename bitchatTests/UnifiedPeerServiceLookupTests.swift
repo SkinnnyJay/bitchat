@@ -46,38 +46,41 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
     }
 
     func testResolveCachedFingerprintMatchesEquivalentIdentifierVariants() {
-        let cache = ["abcdef0123456789": "fp-1"]
+        let fingerprint = String(repeating: "a1", count: 32)
+        let cache = ["abcdef0123456789": fingerprint]
 
         let resolved = UnifiedPeerService.resolveCachedFingerprint(
             from: cache,
             peerID: "mesh:ABCDEF0123456789"
         )
 
-        XCTAssertEqual(resolved, "fp-1")
+        XCTAssertEqual(resolved, fingerprint)
     }
 
     func testResolveCachedFingerprintFallsBackToNormalizedKeyMatch() {
-        let cache = ["mesh:abcdef0123456789": "fp-2"]
+        let fingerprint = String(repeating: "b2", count: 32)
+        let cache = ["mesh:abcdef0123456789": fingerprint]
 
         let resolved = UnifiedPeerService.resolveCachedFingerprint(
             from: cache,
             peerID: "abcdef0123456789"
         )
 
-        XCTAssertEqual(resolved, "fp-2")
+        XCTAssertEqual(resolved, fingerprint)
     }
 
     func testResolveCachedFingerprintMatchesShortQueryAgainstFullNoiseCacheKey() {
         let fullNoiseHex = String(repeating: "cd", count: 32)
         let shortID = PeerID(str: fullNoiseHex).toShort().bare
-        let cache = [fullNoiseHex: "fp-3"]
+        let fingerprint = String(repeating: "c3", count: 32)
+        let cache = [fullNoiseHex: fingerprint]
 
         let resolved = UnifiedPeerService.resolveCachedFingerprint(
             from: cache,
             peerID: shortID
         )
 
-        XCTAssertEqual(resolved, "fp-3")
+        XCTAssertEqual(resolved, fingerprint)
     }
 
     func testLookupKeysForGeoDMPeerIDDoNotIncludeBareMeshCandidate() {
@@ -545,27 +548,29 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
     func testCacheFingerprintStoresVariantAndNormalizedKeys() {
         var cache: [String: String] = [:]
 
+        let fingerprint = String(repeating: "d4", count: 32)
         UnifiedPeerService.cacheFingerprint(
-            "fp-test",
+            fingerprint,
             for: "mesh:ABCDEF0123456789",
             in: &cache
         )
 
-        XCTAssertEqual(cache["mesh:ABCDEF0123456789"], "fp-test")
-        XCTAssertEqual(cache["mesh:abcdef0123456789"], "fp-test")
-        XCTAssertEqual(cache["abcdef0123456789"], "fp-test")
+        XCTAssertEqual(cache["mesh:ABCDEF0123456789"], fingerprint)
+        XCTAssertEqual(cache["mesh:abcdef0123456789"], fingerprint)
+        XCTAssertEqual(cache["abcdef0123456789"], fingerprint)
     }
 
     func testCacheFingerprintKeepsGeoPrefixIsolation() {
         var cache: [String: String] = [:]
 
+        let fingerprint = String(repeating: "e5", count: 32)
         UnifiedPeerService.cacheFingerprint(
-            "fp-geo",
+            fingerprint,
             for: "nostr_abcdef0123456789",
             in: &cache
         )
 
-        XCTAssertEqual(cache["nostr_abcdef0123456789"], "fp-geo")
+        XCTAssertEqual(cache["nostr_abcdef0123456789"], fingerprint)
         XCTAssertNil(cache["abcdef0123456789"])
     }
 
@@ -573,26 +578,32 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         var cache: [String: String] = [:]
         var order: [String] = []
 
-        UnifiedPeerService.cacheFingerprint("fp-a", for: "peera", in: &cache, order: &order, cap: 2)
-        UnifiedPeerService.cacheFingerprint("fp-b", for: "peerb", in: &cache, order: &order, cap: 2)
-        UnifiedPeerService.cacheFingerprint("fp-c", for: "peerc", in: &cache, order: &order, cap: 2)
+        let fpA = String(repeating: "f6", count: 32)
+        let fpB = String(repeating: "07", count: 32)
+        let fpC = String(repeating: "18", count: 32)
+        UnifiedPeerService.cacheFingerprint(fpA, for: "peera", in: &cache, order: &order, cap: 2)
+        UnifiedPeerService.cacheFingerprint(fpB, for: "peerb", in: &cache, order: &order, cap: 2)
+        UnifiedPeerService.cacheFingerprint(fpC, for: "peerc", in: &cache, order: &order, cap: 2)
 
         XCTAssertEqual(order, ["peerb", "peerc"])
         XCTAssertNil(cache["peera"])
-        XCTAssertEqual(cache["peerb"], "fp-b")
-        XCTAssertEqual(cache["peerc"], "fp-c")
+        XCTAssertEqual(cache["peerb"], fpB)
+        XCTAssertEqual(cache["peerc"], fpC)
     }
 
     func testCacheFingerprintCappedRefreshesExistingKeyRecency() {
         var cache: [String: String] = [:]
         var order: [String] = []
 
-        UnifiedPeerService.cacheFingerprint("fp-a", for: "peera", in: &cache, order: &order, cap: 2)
-        UnifiedPeerService.cacheFingerprint("fp-b", for: "peerb", in: &cache, order: &order, cap: 2)
-        UnifiedPeerService.cacheFingerprint("fp-a2", for: "peera", in: &cache, order: &order, cap: 2)
+        let fpA = String(repeating: "29", count: 32)
+        let fpB = String(repeating: "3a", count: 32)
+        let fpA2 = String(repeating: "4b", count: 32)
+        UnifiedPeerService.cacheFingerprint(fpA, for: "peera", in: &cache, order: &order, cap: 2)
+        UnifiedPeerService.cacheFingerprint(fpB, for: "peerb", in: &cache, order: &order, cap: 2)
+        UnifiedPeerService.cacheFingerprint(fpA2, for: "peera", in: &cache, order: &order, cap: 2)
 
         XCTAssertEqual(order, ["peerb", "peera"])
-        XCTAssertEqual(cache["peera"], "fp-a2")
+        XCTAssertEqual(cache["peera"], fpA2)
     }
 
     func testFingerprintCacheReferenceIDsIncludePeerAndNoiseAliases() {
@@ -618,8 +629,8 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
 
     func testPruneFingerprintCacheRemovesKeysOutsideReferenceSet() {
         var cache: [String: String] = [
-            "peera": "fp-a",
-            "peerb": "fp-b"
+            "peera": String(repeating: "5c", count: 32),
+            "peerb": String(repeating: "6d", count: 32)
         ]
         var order = ["peera", "peerb"]
 
@@ -630,15 +641,15 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
             cap: 10
         )
 
-        XCTAssertEqual(cache, ["peera": "fp-a"])
+        XCTAssertEqual(cache, ["peera": String(repeating: "5c", count: 32)])
         XCTAssertEqual(order, ["peera"])
     }
 
     func testPruneFingerprintCacheHonorsCapAfterFiltering() {
         var cache: [String: String] = [
-            "peera": "fp-a",
-            "peerb": "fp-b",
-            "peerc": "fp-c"
+            "peera": String(repeating: "7e", count: 32),
+            "peerb": String(repeating: "8f", count: 32),
+            "peerc": String(repeating: "90", count: 32)
         ]
         var order = ["peera", "peerb", "peerc"]
 
@@ -712,7 +723,8 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
     }
 
     func testResolveFingerprintFromMeshChecksLookupKeyVariants() {
-        let lookup: [String: String] = ["abcdef0123456789": "fp-lookup"]
+        let fingerprint = String(repeating: "a0", count: 32)
+        let lookup: [String: String] = ["abcdef0123456789": fingerprint]
 
         let resolved = UnifiedPeerService.resolveFingerprintFromMesh(
             for: "mesh:ABCDEF0123456789"
@@ -720,7 +732,7 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
             lookup[candidate.id]
         }
 
-        XCTAssertEqual(resolved, "fp-lookup")
+        XCTAssertEqual(resolved, fingerprint)
     }
 
     func testResolveFingerprintFromMeshReturnsNilWhenNoVariantMatches() {
@@ -737,7 +749,7 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         let resolved = UnifiedPeerService.resolveFingerprintFromMesh(
             for: "nostr_abcdef0123456789"
         ) { candidate in
-            candidate.id == "abcdef0123456789" ? "fp-bare" : nil
+            candidate.id == "abcdef0123456789" ? String(repeating: "b1", count: 32) : nil
         }
 
         XCTAssertNil(resolved)
