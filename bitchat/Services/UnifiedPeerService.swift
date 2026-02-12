@@ -26,6 +26,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     
     private var peerIndex: [String: BitchatPeer] = [:]
     private var fingerprintCache: [String: String] = [:]  // peerID -> fingerprint
+    private var connectedPeerLookupKeys: Set<String> = []
     private let meshService: Transport
     private let identityManager: SecureIdentityStateManagerProtocol
     weak var messageRouter: MessageRouter?
@@ -156,6 +157,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         }
         self.peers = filtered
         self.connectedPeerIDs = Set(connected.map(\.id))
+        self.connectedPeerLookupKeys = Self.buildConnectedPeerLookupKeys(from: self.connectedPeerIDs)
         self.favorites = favoritesList
         self.mutualFavorites = mutualsList
         self.peerIndex = newIndex
@@ -256,6 +258,36 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             WiFiPeerIdentity.normalizedKey(key) == normalizedTarget
         }?.value
     }
+
+    static func buildConnectedPeerLookupKeys(from connectedPeerIDs: Set<String>) -> Set<String> {
+        var lookupKeys: Set<String> = []
+        for connectedPeerID in connectedPeerIDs {
+            for key in lookupKeys(for: connectedPeerID) {
+                lookupKeys.insert(key)
+            }
+            let normalized = WiFiPeerIdentity.normalizedKey(connectedPeerID)
+            if !normalized.isEmpty {
+                lookupKeys.insert(normalized)
+            }
+        }
+        return lookupKeys
+    }
+
+    static func isPeerOnline(
+        _ peerID: String,
+        connectedPeerIDs: Set<String>,
+        connectedPeerLookupKeys: Set<String>
+    ) -> Bool {
+        if connectedPeerIDs.contains(peerID) {
+            return true
+        }
+        for key in lookupKeys(for: peerID) where connectedPeerLookupKeys.contains(key) {
+            return true
+        }
+        let normalized = WiFiPeerIdentity.normalizedKey(peerID)
+        guard !normalized.isEmpty else { return false }
+        return connectedPeerLookupKeys.contains(normalized)
+    }
     
     /// Get peer by ID
     func getPeer(by id: String) -> BitchatPeer? {
@@ -274,10 +306,11 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     
     /// Check if peer is online
     func isOnline(_ peerID: String) -> Bool {
-        if connectedPeerIDs.contains(peerID) {
-            return true
-        }
-        return connectedPeerIDs.contains { WiFiPeerIdentity.isEquivalent($0, peerID) }
+        Self.isPeerOnline(
+            peerID,
+            connectedPeerIDs: connectedPeerIDs,
+            connectedPeerLookupKeys: connectedPeerLookupKeys
+        )
     }
     
     /// Check if peer is blocked

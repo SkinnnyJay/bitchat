@@ -123,4 +123,40 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
 
         XCTAssertEqual(resolved, peer)
     }
+
+    func testBuildConnectedPeerLookupKeysIncludesEquivalentVariants() {
+        let fullNoiseHex = String(repeating: "ab", count: 32)
+        let lookup = UnifiedPeerService.buildConnectedPeerLookupKeys(from: [fullNoiseHex])
+
+        XCTAssertTrue(lookup.contains(fullNoiseHex))
+        XCTAssertTrue(lookup.contains(PeerID(str: fullNoiseHex).toShort().bare))
+    }
+
+    func testIsPeerOnlineMatchesEquivalentShortToFullNoiseIdentifier() {
+        let fullNoiseHex = String(repeating: "ab", count: 32)
+        let connected = Set([fullNoiseHex])
+        let lookup = UnifiedPeerService.buildConnectedPeerLookupKeys(from: connected)
+        let shortID = PeerID(str: fullNoiseHex).toShort().bare
+
+        XCTAssertTrue(
+            UnifiedPeerService.isPeerOnline(
+                shortID,
+                connectedPeerIDs: connected,
+                connectedPeerLookupKeys: lookup
+            )
+        )
+    }
+
+    func testIsPeerOnlineKeepsGeoDMPrefixIsolation() {
+        let connected = Set(["abcdef0123456789"])
+        let lookup = UnifiedPeerService.buildConnectedPeerLookupKeys(from: connected)
+
+        XCTAssertFalse(
+            UnifiedPeerService.isPeerOnline(
+                "nostr_abcdef0123456789",
+                connectedPeerIDs: connected,
+                connectedPeerLookupKeys: lookup
+            )
+        )
+    }
 }
