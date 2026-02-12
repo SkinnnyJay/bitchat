@@ -115,4 +115,16 @@ final class NostrEmbeddedBitChatTests: XCTestCase {
         XCTAssertNotNil(result)
         XCTAssertTrue(result?.hasPrefix("bitchat1:") == true)
     }
+
+    func testEncodeAckForNostrNoRecipientAcceptsFullNoiseSenderPeerID() {
+        let noiseSender = String(repeating: "c3", count: 32)
+        let result = NostrEmbeddedBitChat.encodeAckForNostrNoRecipient(
+            type: .readReceipt,
+            messageID: "mid-noise-sender",
+            senderPeerID: noiseSender
+        )
+
+        XCTAssertNotNil(result)
+        XCTAssertTrue(result?.hasPrefix("bitchat1:") == true)
+    }
 }
