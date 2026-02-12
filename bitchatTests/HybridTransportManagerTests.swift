@@ -492,6 +492,35 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testRejectsInboundPrivateEnvelopeWithInvalidSenderID() throws {
+        let mesh = MockTransport()
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let manager = HybridTransportManager(meshTransport: mesh, wifiTransport: wifi)
+        let delegate = MockDelegate()
+        manager.delegate = delegate
+
+        let invalidSenderID = "invalid peer id"
+        let envelope = WiFiDirectPrivateEnvelope(
+            senderPeerID: invalidSenderID,
+            recipientPeerID: mesh.myPeerID.id,
+            recipientNickname: "self",
+            messageID: "mid-invalid-sender",
+            content: "hello"
+        )
+        let payload = try JSONEncoder().encode(envelope)
+        backend.simulateIncoming(payload, from: invalidSenderID)
+
+        let expect = expectation(description: "invalid sender envelope ignored")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertTrue(delegate.receivedEnvelopes.isEmpty)
+    }
+
+    @MainActor
     func testRejectsInboundPrivateEnvelopeWithStaleTimestamp() throws {
         let mesh = MockTransport()
         let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)

@@ -327,6 +327,8 @@ extension HybridTransportManager: WiFiDirectTransportDelegate {
             guard let envelope = try? JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: data),
                   envelope.messageType == "private",
                   envelope.version == WiFiDirectEnvelopeVersion.current,
+                  PeerID(str: envelope.senderPeerID).isValid,
+                  PeerID(str: envelope.recipientPeerID).isValid,
                   self.senderMatchesTransportPeerID(claimedSenderID: envelope.senderPeerID, transportPeerID: peerID),
                   self.recipientMatchesLocalPeerID(envelope.recipientPeerID),
                   self.isInboundTimestampAcceptable(envelope.createdAtMs),

@@ -757,6 +757,40 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testDoesNotPostNotificationForPrivateEnvelopeWithInvalidSenderID() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "should not receive private notification for invalid sender ID")
+        expect.isInverted = true
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expect.fulfill()
+        }
+
+        let invalidSenderID = "invalid peer id"
+        let envelope = WiFiDirectPrivateEnvelope(
+            senderPeerID: invalidSenderID,
+            recipientPeerID: mesh.myPeerID.id,
+            recipientNickname: "self",
+            messageID: "mid-invalid-sender-private",
+            content: "hello"
+        )
+        let payload = try JSONEncoder().encode(envelope)
+        backend.simulateIncoming(payload, from: invalidSenderID)
+
+        wait(for: [expect], timeout: 0.2)
+        NotificationCenter.default.removeObserver(token)
+    }
+
+    @MainActor
     func testAcceptsPrivateEnvelopeWhenSenderUsesFullNoiseIDAndTransportUsesShortID() throws {
         let noiseKey = Data(repeating: 0x7A, count: 32)
         let senderFull = PeerID(hexData: noiseKey)
@@ -1856,6 +1890,40 @@ final class MessageRouterRoutingTests: XCTestCase {
         )
         let payload = try JSONEncoder().encode(envelope)
         backend.simulateIncoming(payload, from: "actual-peer")
+
+        wait(for: [expect], timeout: 0.2)
+        NotificationCenter.default.removeObserver(token)
+    }
+
+    @MainActor
+    func testDoesNotPostNotificationForAckEnvelopeWithInvalidSenderID() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "should not receive ack for invalid sender ID")
+        expect.isInverted = true
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectAckEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expect.fulfill()
+        }
+
+        let invalidSenderID = "invalid peer id"
+        let envelope = WiFiDirectAckEnvelope(
+            ackType: .read,
+            senderPeerID: invalidSenderID,
+            recipientPeerID: mesh.myPeerID.id,
+            messageID: "mid-invalid-sender-ack",
+            senderNickname: "peer"
+        )
+        let payload = try JSONEncoder().encode(envelope)
+        backend.simulateIncoming(payload, from: invalidSenderID)
 
         wait(for: [expect], timeout: 0.2)
         NotificationCenter.default.removeObserver(token)
