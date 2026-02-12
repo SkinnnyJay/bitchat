@@ -29,4 +29,14 @@ final class WiFiPeerIdentityTests: XCTestCase {
         let candidates = WiFiPeerIdentity.candidateIDs(for: short)
         XCTAssertEqual(Set(candidates).count, candidates.count)
     }
+
+    func testCandidateIDsForFullNoiseKeyIncludeFullAndShortForms() {
+        let noiseKey = Data(repeating: 0x63, count: 32)
+        let full = PeerID(hexData: noiseKey)
+        let short = PeerID(publicKey: noiseKey)
+        let candidates = WiFiPeerIdentity.candidateIDs(for: full)
+
+        XCTAssertTrue(candidates.contains(full.id))
+        XCTAssertTrue(candidates.contains(short.id))
+    }
 }
