@@ -1,6 +1,10 @@
 import Foundation
 
 enum WiFiPeerIdentity {
+    private static func shouldPreservePrefix(_ prefix: PeerID.Prefix) -> Bool {
+        prefix == .geoDM || prefix == .geoChat
+    }
+
     private static func canonicalPeerID(_ peerID: PeerID) -> PeerID {
         if peerID.prefix != .empty {
             let bare = peerID.bare.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -25,6 +29,9 @@ enum WiFiPeerIdentity {
             return PeerID(publicKey: noiseKey).id.lowercased()
         }
         if canonical.prefix != .empty {
+            if shouldPreservePrefix(canonical.prefix) {
+                return canonical.id.lowercased()
+            }
             return canonical.bare.lowercased()
         }
         return canonical.id.lowercased()
@@ -40,19 +47,24 @@ enum WiFiPeerIdentity {
     static func candidateIDs(for peerID: PeerID) -> [String] {
         let canonicalPeerID = canonicalPeerID(peerID)
         var candidates: [String] = [canonicalPeerID.id]
-        if canonicalPeerID.prefix != .empty, !canonicalPeerID.bare.isEmpty {
+        let preservePrefix = shouldPreservePrefix(canonicalPeerID.prefix)
+        if canonicalPeerID.prefix != .empty,
+           !preservePrefix,
+           !canonicalPeerID.bare.isEmpty {
             candidates.append(canonicalPeerID.bare)
         }
 
-        let short = canonicalPeerID.toShort().id
-        if short != canonicalPeerID.id {
-            candidates.append(short)
-        }
+        if !preservePrefix {
+            let short = canonicalPeerID.toShort().id
+            if short != canonicalPeerID.id {
+                candidates.append(short)
+            }
 
-        if let noiseKey = canonicalPeerID.noiseKey {
-            let full = noiseKey.hexEncodedString()
-            if full != canonicalPeerID.id {
-                candidates.append(full)
+            if let noiseKey = canonicalPeerID.noiseKey {
+                let full = noiseKey.hexEncodedString()
+                if full != canonicalPeerID.id {
+                    candidates.append(full)
+                }
             }
         }
 
@@ -69,6 +81,9 @@ enum WiFiPeerIdentity {
 
     static func normalizedOutboxPeerID(for peerID: PeerID) -> PeerID {
         let canonicalPeerID = canonicalPeerID(peerID)
+        if shouldPreservePrefix(canonicalPeerID.prefix) {
+            return canonicalPeerID
+        }
         if let noiseKey = canonicalPeerID.noiseKey {
             return PeerID(publicKey: noiseKey)
         }

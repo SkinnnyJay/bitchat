@@ -100,6 +100,17 @@ final class WiFiPeerIdentityTests: XCTestCase {
         XCTAssertTrue(WiFiPeerIdentity.isEquivalent("ABCDEF0123456789", "abcdef0123456789"))
     }
 
+    func testNormalizedKeyPreservesGeoDMPrefix() {
+        XCTAssertEqual(
+            WiFiPeerIdentity.normalizedKey("NOSTR_ABCDEF0123456789"),
+            "nostr_abcdef0123456789"
+        )
+    }
+
+    func testIsEquivalentDoesNotMixGeoDMPrefixWithBareMeshID() {
+        XCTAssertFalse(WiFiPeerIdentity.isEquivalent("nostr_abcdef0123456789", "abcdef0123456789"))
+    }
+
     func testIsEquivalentRejectsEmptyOrWhitespacePeerIDs() {
         XCTAssertFalse(WiFiPeerIdentity.isEquivalent("", "peerabc000000000"))
         XCTAssertFalse(WiFiPeerIdentity.isEquivalent("peerabc000000000", ""))
@@ -130,5 +141,19 @@ final class WiFiPeerIdentityTests: XCTestCase {
         let unprefixed = PeerID(str: "   peerabc000000000   ")
         let normalized = WiFiPeerIdentity.normalizedOutboxPeerID(for: unprefixed)
         XCTAssertEqual(normalized, PeerID(str: "peerabc000000000"))
+    }
+
+    func testCandidateIDsForGeoDMPeerIDDoNotIncludeBareVariant() {
+        let geoDM = PeerID(str: "nostr_abcdef0123456789")
+        let candidates = WiFiPeerIdentity.candidateIDs(for: geoDM)
+
+        XCTAssertEqual(candidates, ["nostr_abcdef0123456789"])
+    }
+
+    func testNormalizedOutboxPeerIDPreservesGeoDMPrefix() {
+        let geoDM = PeerID(str: "nostr_abcdef0123456789")
+        let normalized = WiFiPeerIdentity.normalizedOutboxPeerID(for: geoDM)
+
+        XCTAssertEqual(normalized, geoDM)
     }
 }
