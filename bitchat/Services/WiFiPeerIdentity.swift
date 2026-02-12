@@ -2,7 +2,9 @@ import Foundation
 
 enum WiFiPeerIdentity {
     static func normalizedKey(_ peerID: String) -> String {
-        PeerID(str: peerID).toShort().id
+        let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        return PeerID(str: trimmed).toShort().id
     }
 
     static func isEquivalent(_ lhs: String, _ rhs: String) -> Bool {

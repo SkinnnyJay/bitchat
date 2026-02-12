@@ -9,6 +9,14 @@ final class WiFiPeerIdentityTests: XCTestCase {
         XCTAssertEqual(WiFiPeerIdentity.normalizedKey(full), short)
     }
 
+    func testNormalizedKeyTrimsWhitespace() {
+        XCTAssertEqual(
+            WiFiPeerIdentity.normalizedKey("  peerabc000000000  "),
+            "peerabc000000000"
+        )
+        XCTAssertEqual(WiFiPeerIdentity.normalizedKey("   "), "")
+    }
+
     func testIsEquivalentMatchesFullAndShortNoiseIDs() {
         let noiseKey = Data(repeating: 0x22, count: 32)
         let full = PeerID(hexData: noiseKey).id
