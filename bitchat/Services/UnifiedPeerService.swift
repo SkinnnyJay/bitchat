@@ -104,7 +104,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         for peer in dedupedMeshPeers {
             if peer.isConnected { connected.insert(peer.peerID) }
             addedPeerIDs.insert(peer.peerID)
-            if let fingerprint = Self.fingerprintFromPeer(peer) {
+            if let fingerprint = Self.resolvedFingerprintForPeer(peer) {
                 Self.cacheFingerprint(
                     fingerprint,
                     for: peer.peerID.id,
@@ -668,6 +668,16 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return peer.noisePublicKey.sha256Fingerprint()
     }
 
+    static func resolvedFingerprintForPeer(_ peer: BitchatPeer) -> String? {
+        if let fingerprint = fingerprintFromPeer(peer) {
+            return fingerprint
+        }
+        if let noiseKey = peer.peerID.noiseKey, noiseKey.count == 32 {
+            return noiseKey.sha256Fingerprint()
+        }
+        return nil
+    }
+
     static func favoriteNoisePublicKey(for peer: BitchatPeer) -> Data? {
         if peer.noisePublicKey.count == 32 {
             return peer.noisePublicKey
@@ -886,7 +896,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         
         // Try to get from peer's public key
         if let peer = getPeer(by: peerID) {
-            if let fingerprint = Self.fingerprintFromPeer(peer) {
+            if let fingerprint = Self.resolvedFingerprintForPeer(peer) {
                 Self.cacheFingerprint(
                     fingerprint,
                     for: peerID,
