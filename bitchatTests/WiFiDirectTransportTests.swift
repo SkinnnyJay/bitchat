@@ -244,6 +244,8 @@ final class WiFiDirectTransportTests: XCTestCase {
         let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
 
         XCTAssertEqual(transport.peerCapabilities(peerID: "peer-a"), ["pm", "ack"])
+        XCTAssertEqual(transport.peerCapabilities(peerID: "  peer-a  "), ["pm", "ack"])
+        XCTAssertNil(transport.peerCapabilities(peerID: "   "))
         XCTAssertNil(transport.peerCapabilities(peerID: "missing"))
     }
 
