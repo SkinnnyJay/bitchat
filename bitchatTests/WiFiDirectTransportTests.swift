@@ -334,4 +334,25 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertEqual(backend.startDiscoveryCount, 2)
         XCTAssertEqual(delegate.availability, [true, false, true])
     }
+
+    func testIgnoresStaleAvailabilityTrueWhenNotDiscovering() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let delegate = MockDelegate()
+        transport.delegate = delegate
+
+        transport.startDiscovery()
+        transport.stopDiscovery()
+        XCTAssertFalse(transport.isDiscovering)
+        XCTAssertEqual(delegate.availability, [true, false])
+
+        let expect = expectation(description: "stale availability true ignored")
+        backend.simulateAvailability(true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(delegate.availability, [true, false])
+    }
 }
