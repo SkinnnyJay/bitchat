@@ -4476,9 +4476,16 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     ) -> Bool {
         let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
+        let parsedPeerID = PeerID(str: trimmed)
 
         if let messages = privateChats[trimmed], !messages.isEmpty {
             return true
+        }
+        if parsedPeerID.isGeoDM || parsedPeerID.isGeoChat {
+            if let messages = privateChats[trimmed.lowercased()], !messages.isEmpty {
+                return true
+            }
+            return false
         }
 
         let normalizedTarget = WiFiPeerIdentity.normalizedKey(trimmed)

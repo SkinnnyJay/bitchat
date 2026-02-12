@@ -51,4 +51,18 @@ final class ChatViewModelUnreadCleanupTests: XCTestCase {
         XCTAssertFalse(ChatViewModel.hasPrivateMessages(in: chats, for: "0011223344556677"))
         XCTAssertFalse(ChatViewModel.hasPrivateMessages(in: chats, for: ""))
     }
+
+    func testHasPrivateMessagesDoesNotCrossResolveGeoDMPeerIDToBareMeshID() {
+        let message = sampleMessage(senderPeerID: "abcdef0123456789")
+        let chats = ["abcdef0123456789": [message]]
+
+        XCTAssertFalse(ChatViewModel.hasPrivateMessages(in: chats, for: "nostr_abcdef0123456789"))
+    }
+
+    func testHasPrivateMessagesFindsGeoDMThreadCaseInsensitively() {
+        let message = sampleMessage(senderPeerID: "nostr_abcdef0123456789")
+        let chats = ["nostr_abcdef0123456789": [message]]
+
+        XCTAssertTrue(ChatViewModel.hasPrivateMessages(in: chats, for: "NOSTR_ABCDEF0123456789"))
+    }
 }
