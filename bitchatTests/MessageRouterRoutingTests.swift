@@ -230,4 +230,30 @@ final class MessageRouterRoutingTests: XCTestCase {
         wait(for: [expect], timeout: 0.2)
         NotificationCenter.default.removeObserver(token)
     }
+
+    @MainActor
+    func testOutboxIsCappedPerPeerWhenNoRouteAvailable() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = false
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 16),
+            wifiTransport: wifi
+        )
+
+        let cap = TransportConfig.messageRouterOutboxPerPeerCap
+        for idx in 0..<(cap + 25) {
+            router.sendPrivate("msg-\(idx)", to: recipient, recipientNickname: "peer", messageID: "mid-\(idx)")
+        }
+
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), cap)
+        XCTAssertTrue(mesh.sentPrivateMessages.isEmpty)
+    }
 }

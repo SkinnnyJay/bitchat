@@ -9,6 +9,7 @@ final class MessageRouter {
     private let routingPolicy: TransportRoutingPolicy
     private let wifiRoutingPolicy: WiFiDirectRoutingPolicy
     private let wifiTransport: WiFiDirectTransport?
+    private let outboxPerPeerCap: Int
     private var outbox: [PeerID: [(content: String, nickname: String, messageID: String)]] = [:] // peerID -> queued messages
 
     init(
@@ -23,6 +24,7 @@ final class MessageRouter {
         self.routingPolicy = routingPolicy
         self.wifiRoutingPolicy = wifiRoutingPolicy
         self.wifiTransport = wifiTransport ?? WiFiDirectTransport(localPeerID: mesh.myPeerID.id)
+        self.outboxPerPeerCap = TransportConfig.messageRouterOutboxPerPeerCap
         self.nostr.senderPeerID = mesh.myPeerID
         self.wifiTransport?.delegate = self
         self.wifiTransport?.startDiscovery()
@@ -79,6 +81,11 @@ final class MessageRouter {
             // Queue for later (when mesh connects or Nostr mapping appears)
             if outbox[peerID] == nil { outbox[peerID] = [] }
             outbox[peerID]?.append((content, recipientNickname, messageID))
+            if let count = outbox[peerID]?.count, count > outboxPerPeerCap {
+                let overflow = count - outboxPerPeerCap
+                outbox[peerID]?.removeFirst(overflow)
+                SecureLogger.debug("Trimmed outbox for \(peerID.id.prefix(8))… by \(overflow) entries to cap \(outboxPerPeerCap)", category: .session)
+            }
             SecureLogger.debug("Queued PM for \(peerID.id.prefix(8))… (no mesh, no Nostr mapping) id=\(messageID.prefix(8))…", category: .session)
         }
     }
@@ -204,6 +211,10 @@ final class MessageRouter {
 
     func flushAllOutbox() {
         for key in Array(outbox.keys) { flushOutbox(for: key) }
+    }
+
+    func queuedMessageCount(for peerID: PeerID) -> Int {
+        outbox[peerID]?.count ?? 0
     }
 }
 
