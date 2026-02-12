@@ -2740,7 +2740,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         Task { @MainActor in
             guard self.isWiFiEnvelopeForCurrentPeer(envelope.recipientPeerID) else { return }
             let senderPeerID = envelope.senderPeerID
-            let senderName = unifiedPeerService.getPeer(by: senderPeerID)?.nickname ?? resolveNickname(for: senderPeerID)
+            let senderName = resolveWiFiSenderDisplayName(senderPeerID) ?? resolveNickname(for: senderPeerID)
             let privateMentions = parseMentions(from: envelope.content)
             let msg = BitchatMessage(
                 id: envelope.messageID,
@@ -2770,7 +2770,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             switch envelope.ackType {
             case .delivered:
                 let senderName = InputValidator.validateNickname(envelope.senderNickname ?? "")
-                    ?? unifiedPeerService.getPeer(by: envelope.senderPeerID)?.nickname
+                    ?? resolveWiFiSenderDisplayName(envelope.senderPeerID)
                     ?? resolveNickname(for: envelope.senderPeerID)
                 if let index = messages.firstIndex(where: { $0.id == envelope.messageID }) {
                     messages[index].deliveryStatus = .delivered(to: senderName, at: Date())
@@ -2783,7 +2783,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 }
             case .read:
                 let senderName = InputValidator.validateNickname(envelope.senderNickname ?? "")
-                    ?? unifiedPeerService.getPeer(by: envelope.senderPeerID)?.nickname
+                    ?? resolveWiFiSenderDisplayName(envelope.senderPeerID)
                     ?? resolveNickname(for: envelope.senderPeerID)
                 let receipt = ReadReceipt(
                     originalMessageID: envelope.messageID,
@@ -2798,6 +2798,18 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     @MainActor
     private func isWiFiEnvelopeForCurrentPeer(_ recipientPeerID: String) -> Bool {
         WiFiPeerIdentity.isEquivalent(recipientPeerID, meshService.myPeerID.id)
+    }
+
+    @MainActor
+    private func resolveWiFiSenderDisplayName(_ senderPeerID: String) -> String? {
+        if let direct = unifiedPeerService.getPeer(by: senderPeerID)?.nickname {
+            return direct
+        }
+        let senderShortID = PeerID(str: senderPeerID).toShort().id
+        if let match = unifiedPeerService.peers.first(where: { $0.peerID.toShort().id == senderShortID }) {
+            return match.nickname
+        }
+        return nil
     }
     
     @MainActor
