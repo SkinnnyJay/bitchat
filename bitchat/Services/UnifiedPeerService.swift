@@ -100,7 +100,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             
             // Update fingerprint cache
             if let publicKey = resolvedNoisePublicKey {
-                fingerprintCache[peerID.id] = publicKey.sha256Fingerprint()
+                Self.cacheFingerprint(publicKey.sha256Fingerprint(), for: peerID.id, in: &fingerprintCache)
             }
         }
         
@@ -120,7 +120,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             addedPeerIDs.insert(peerID)
             
             // Update fingerprint cache
-            fingerprintCache[peerID.id] = favoriteKey.sha256Fingerprint()
+            Self.cacheFingerprint(favoriteKey.sha256Fingerprint(), for: peerID.id, in: &fingerprintCache)
         }
         
         // Phase 3: Sort peers
@@ -256,6 +256,20 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return cache.first { key, _ in
             WiFiPeerIdentity.normalizedKey(key) == normalizedTarget
         }?.value
+    }
+
+    static func cacheFingerprint(
+        _ fingerprint: String,
+        for peerID: String,
+        in cache: inout [String: String]
+    ) {
+        for key in lookupKeys(for: peerID) {
+            cache[key] = fingerprint
+        }
+        let normalized = WiFiPeerIdentity.normalizedKey(peerID)
+        if !normalized.isEmpty {
+            cache[normalized] = fingerprint
+        }
     }
 
     static func buildPeerIndex(from peers: [BitchatPeer]) -> [String: BitchatPeer] {
@@ -496,18 +510,14 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         
         // Try to get from mesh service
         if let fingerprint = meshService.getFingerprint(for: PeerID(str: peerID)) {
-            for key in Self.lookupKeys(for: peerID) {
-                fingerprintCache[key] = fingerprint
-            }
+            Self.cacheFingerprint(fingerprint, for: peerID, in: &fingerprintCache)
             return fingerprint
         }
         
         // Try to get from peer's public key
         if let peer = getPeer(by: peerID) {
             if let fingerprint = Self.fingerprintFromPeer(peer) {
-                for key in Self.lookupKeys(for: peerID) {
-                    fingerprintCache[key] = fingerprint
-                }
+                Self.cacheFingerprint(fingerprint, for: peerID, in: &fingerprintCache)
                 return fingerprint
             }
         }

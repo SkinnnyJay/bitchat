@@ -278,6 +278,20 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertEqual(UnifiedPeerService.fingerprintFromPeer(peer), key.sha256Fingerprint())
     }
 
+    func testCacheFingerprintStoresVariantAndNormalizedKeys() {
+        var cache: [String: String] = [:]
+
+        UnifiedPeerService.cacheFingerprint(
+            "fp-test",
+            for: "mesh:ABCDEF0123456789",
+            in: &cache
+        )
+
+        XCTAssertEqual(cache["mesh:ABCDEF0123456789"], "fp-test")
+        XCTAssertEqual(cache["mesh:abcdef0123456789"], "fp-test")
+        XCTAssertEqual(cache["abcdef0123456789"], "fp-test")
+    }
+
     func testResolvedNoisePublicKeyPrefersSnapshotNoiseKeyWhenValid() {
         let snapshotKey = Data(repeating: 0x33, count: 32)
         let peerIDNoise = String(repeating: "ab", count: 32)
