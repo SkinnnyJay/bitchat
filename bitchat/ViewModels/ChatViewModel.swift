@@ -2318,10 +2318,11 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Determine routing method and recipient nickname
-        guard let noiseKey = Data(hexString: peerID) else { return }
+        let noiseKey = Self.decodeNoisePublicKey(from: peerID)
+            ?? unifiedPeerService.getPeer(by: peerID)?.noisePublicKey
         let isConnected = meshService.isPeerConnected(PeerID(str: peerID))
         let isReachable = meshService.isPeerReachable(PeerID(str: peerID))
-        let favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: noiseKey)
+        let favoriteStatus = noiseKey.flatMap { FavoritesPersistenceService.shared.getFavoriteStatus(for: $0) }
         let isMutualFavorite = favoriteStatus?.isMutual ?? false
         let hasNostrKey = favoriteStatus?.peerNostrPublicKey != nil
         
@@ -3162,7 +3163,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Check if this peer ID exists in current nicknames
         if meshService.peerNickname(peerID: PeerID(str: peerID)) == nil {
             // Peer not found with this ID, try to find by fingerprint or nickname
-            if let oldNoiseKey = Data(hexString: peerID),
+            if let oldNoiseKey = Self.decodeNoisePublicKey(from: peerID),
                let favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: oldNoiseKey) {
                 let peerNickname = favoriteStatus.peerNickname
                 
@@ -3212,9 +3213,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         var peerNostrPubkey: String? = nil
         
         // First check if peerID is already a hex Noise key
-        if let noiseKey = Data(hexString: peerID),
+        if let noiseKey = Self.decodeNoisePublicKey(from: peerID),
            let favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: noiseKey) {
-            noiseKeyHex = peerID
+            noiseKeyHex = noiseKey.hexEncodedString()
             peerNostrPubkey = favoriteStatus.peerNostrPublicKey
         }
         // Otherwise get the Noise key from the peer info
@@ -3241,7 +3242,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     // Skip if we already sent an ACK for this message
                     if !hasSentReadReceipt(message.id) {
                         // Use stable Noise key hex if available; else fall back to peerID
-                        let recipPeer = (Data(hexString: peerID) != nil) ? peerID : (unifiedPeerService.getPeer(by: peerID)?.noisePublicKey.hexEncodedString() ?? peerID)
+                        let recipPeer = Self.decodeNoisePublicKey(from: peerID)?.hexEncodedString()
+                            ?? (unifiedPeerService.getPeer(by: peerID)?.noisePublicKey.hexEncodedString() ?? peerID)
                         let receipt = ReadReceipt(originalMessageID: message.id, readerID: meshService.myPeerID.id, readerNickname: nickname)
                         messageRouter.sendReadReceipt(receipt, to: PeerID(str: recipPeer))
                         recordSentReadReceipt(message.id)
@@ -5640,10 +5642,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Try both ephemeral ID and if that fails, get from peer service
         var noiseKey: Data? = nil
         
-        // First try as hex-encoded Noise key (64 chars)
-        if peerID.count == 64 {
-            noiseKey = Data(hexString: peerID)
-        }
+        noiseKey = Self.decodeNoisePublicKey(from: peerID)
         
         // If not a hex key, get from peer service (ephemeral ID)
         if noiseKey == nil, let peer = unifiedPeerService.getPeer(by: peerID) {
@@ -5838,7 +5837,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         var noiseKey: Data?
         
         // First check if peerID is a hex-encoded Noise key
-        if let hexKey = Data(hexString: peerID) {
+        if let hexKey = Self.decodeNoisePublicKey(from: peerID) {
             noiseKey = hexKey
         } else {
             // It's an ephemeral peer ID, get the Noise key from UnifiedPeerService

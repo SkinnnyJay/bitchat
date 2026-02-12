@@ -32,4 +32,12 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
     func testDecodeNoisePublicKeyRejectsShortRoutingPeerIDs() {
         XCTAssertNil(ChatViewModel.decodeNoisePublicKey(from: "abcdef0123456789"))
     }
+
+    func testDecodeNoisePublicKeyTrimsWhitespace() {
+        let fullNoise = String(repeating: "ab", count: 32)
+
+        let decoded = ChatViewModel.decodeNoisePublicKey(from: "  \(fullNoise)  ")
+
+        XCTAssertEqual(decoded?.hexEncodedString(), fullNoise)
+    }
 }
