@@ -31,6 +31,7 @@ enum TransportConfig {
     static let bleConnectionCandidatesMax: Int = 100
     static let blePendingWriteBufferCapBytes: Int = 1_000_000
     static let blePendingNotificationsCapCount: Int = 20
+    static let blePendingNoisePayloadsPerPeerCap: Int = 128
 
     // Nostr
     static let nostrReadAckInterval: TimeInterval = 0.35 // ~3 per second
