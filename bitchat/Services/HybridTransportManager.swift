@@ -196,6 +196,9 @@ final class HybridTransportManager {
 
     private func wifiPeerIDCandidates(for peerID: PeerID) -> [String] {
         var candidates: [String] = [peerID.id]
+        if peerID.prefix != .empty, !peerID.bare.isEmpty {
+            candidates.append(peerID.bare)
+        }
         let short = peerID.toShort().id
         if short != peerID.id {
             candidates.append(short)
@@ -206,7 +209,11 @@ final class HybridTransportManager {
                 candidates.append(full)
             }
         }
-        return candidates
+        var unique: [String] = []
+        for candidate in candidates where !unique.contains(candidate) {
+            unique.append(candidate)
+        }
+        return unique
     }
 
     private func senderMatchesTransportPeerID(claimedSenderID: String, transportPeerID: String) -> Bool {

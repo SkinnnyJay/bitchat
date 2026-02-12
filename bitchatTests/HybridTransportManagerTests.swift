@@ -172,6 +172,33 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testSendPrivateRoutesViaWiFiUsingBarePeerIDFromPrefixedRecipientID() throws {
+        let recipientBare = "peerabc000000000"
+        let recipientPrefixed = PeerID(str: "mesh:\(recipientBare)")
+        let mesh = MockTransport()
+        mesh.setReachable(recipientPrefixed, isReachable: false)
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipientBare])
+        backend.setCapabilities(["pm"], for: recipientBare)
+
+        let manager = HybridTransportManager(
+            meshTransport: mesh,
+            wifiTransport: wifi,
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 1)
+        )
+
+        let route = manager.sendPrivate("hello", to: recipientPrefixed, recipientNickname: "peer", messageID: "mid-prefixed")
+
+        XCTAssertEqual(route, .wifiDirect)
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        let envelope = try JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: backend.sentPayloads[0].0)
+        XCTAssertEqual(envelope.recipientPeerID, recipientBare)
+        XCTAssertEqual(backend.sentPayloads[0].1, recipientBare)
+        XCTAssertTrue(mesh.sentPrivateMessages.isEmpty)
+    }
+
+    @MainActor
     func testReceivesInboundPrivateEnvelopeWithNormalizedSenderAndRecipientIDs() throws {
         let localNoise = Data(repeating: 0x21, count: 32)
         let localShort = PeerID(publicKey: localNoise)
