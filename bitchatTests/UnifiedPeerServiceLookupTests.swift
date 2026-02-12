@@ -234,6 +234,17 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertTrue(shouldInclude)
     }
 
+    func testShouldIncludeFavoriteAsOfflinePeerRejectsInvalidNoiseKeyLength() {
+        let shouldInclude = UnifiedPeerService.shouldIncludeFavoriteAsOfflinePeer(
+            favoriteNoiseKey: Data(repeating: 0x11, count: 8),
+            favoriteNickname: "alice",
+            existingPeers: [],
+            addedPeerIDs: []
+        )
+
+        XCTAssertFalse(shouldInclude)
+    }
+
     func testPeerIDLookupMatchesNicknameCaseInsensitivelyAndTrimmed() {
         let peer = BitchatPeer(
             peerID: PeerID(str: "abcdef0123456789"),

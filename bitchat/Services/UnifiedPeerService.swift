@@ -322,6 +322,9 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         existingPeers: [BitchatPeer],
         addedPeerIDs: Set<PeerID>
     ) -> Bool {
+        guard favoriteNoiseKey.count == 32 else {
+            return false
+        }
         let favoritePeerID = PeerID(hexData: favoriteNoiseKey)
         if addedPeerIDs.contains(favoritePeerID) {
             return false
