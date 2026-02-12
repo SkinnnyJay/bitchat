@@ -61,6 +61,15 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
         XCTAssertFalse(parsed.contains("cap32"))
     }
 
+    func testParseCapabilitiesUsesInputOrderForTokenCountCap() {
+        let filler = (0..<32).map { "fill\($0)" }
+        let capabilityString = (filler + ["pm"]).joined(separator: ",")
+        let parsed = WiFiDirectCapabilityNegotiator.parseCapabilities(capabilityString)
+
+        XCTAssertEqual(parsed.count, 32)
+        XCTAssertFalse(parsed.contains("pm"))
+    }
+
     func testInvitationContextRoundTripsDiscoveryInfo() throws {
         let negotiator = WiFiDirectCapabilityNegotiator()
         let context = negotiator.invitationContextData()

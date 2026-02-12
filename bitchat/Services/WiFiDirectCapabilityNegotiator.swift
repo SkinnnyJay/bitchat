@@ -82,13 +82,21 @@ struct WiFiDirectCapabilityNegotiator {
     }
 
     static func parseCapabilities(_ capabilityString: String) -> Set<String> {
-        sanitizeCapabilities(
-            Set(
-                capabilityString
-                    .split(separator: ",")
-                    .map { String($0) }
-            )
-        )
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        var parsed: [String] = []
+        for token in capabilityString.split(separator: ",") {
+            let normalized = token.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard !normalized.isEmpty else { continue }
+            guard normalized.utf8.count <= Limits.maxCapabilityTokenLength else { continue }
+            guard normalized.rangeOfCharacter(from: allowed.inverted) == nil else { continue }
+            if !parsed.contains(normalized) {
+                parsed.append(normalized)
+            }
+            if parsed.count >= Limits.maxCapabilityTokenCount {
+                break
+            }
+        }
+        return Set(parsed)
     }
 
     private static func sanitizeCapabilities(_ capabilities: Set<String>) -> Set<String> {
