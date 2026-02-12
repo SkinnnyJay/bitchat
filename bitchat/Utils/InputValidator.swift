@@ -54,6 +54,7 @@ struct InputValidator {
         guard !trimmed.isEmpty else { return nil }
         // Keep IDs canonical: reject IDs that require trimming.
         guard trimmed == messageID else { return nil }
+        guard trimmed.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else { return nil }
         guard trimmed.utf8.count <= Limits.maxMessageIDLength else { return nil }
 
         let controlChars = CharacterSet.controlCharacters

@@ -16,6 +16,11 @@ final class InputValidatorTests: XCTestCase {
         XCTAssertNil(InputValidator.validateMessageID("  mid-trim  "))
     }
 
+    func testValidateMessageIDRejectsInternalWhitespace() {
+        XCTAssertNil(InputValidator.validateMessageID("mid with-space"))
+        XCTAssertNil(InputValidator.validateMessageID("mid\twith-tab"))
+    }
+
     func testValidateMessageIDRejectsOversizedIDs() {
         let oversized = String(repeating: "m", count: InputValidator.Limits.maxMessageIDLength + 1)
         XCTAssertNil(InputValidator.validateMessageID(oversized))
