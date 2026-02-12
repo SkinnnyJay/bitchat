@@ -64,15 +64,29 @@ final class WiFiDirectTransport: NSObject {
     }
 
     func didReceive(_ data: Data, from peerID: String) {
-        delegate?.wifiTransportDidReceive(data, from: peerID)
+        dispatchOnMain { [weak self] in
+            self?.delegate?.wifiTransportDidReceive(data, from: peerID)
+        }
     }
 
     func didUpdatePeers(_ peers: [String]) {
-        currentPeers = peers
+        dispatchOnMain { [weak self] in
+            self?.currentPeers = peers
+        }
     }
 
     func didChangeAvailability(_ available: Bool) {
-        delegate?.wifiTransportDidChangeAvailability(available)
+        dispatchOnMain { [weak self] in
+            self?.delegate?.wifiTransportDidChangeAvailability(available)
+        }
+    }
+
+    private func dispatchOnMain(_ block: @escaping () -> Void) {
+        if Thread.isMainThread {
+            block()
+        } else {
+            DispatchQueue.main.async(execute: block)
+        }
     }
 }
 

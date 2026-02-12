@@ -102,9 +102,15 @@ final class WiFiDirectTransportTests: XCTestCase {
         let delegate = MockDelegate()
         transport.delegate = delegate
 
+        let expect = expectation(description: "delegate receives availability, peers, and message")
         transport.startDiscovery()
         backend.simulatePeerUpdate(["peer-a", "peer-b"])
         backend.simulateReceive(Data("ping".utf8), from: "peer-a")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
 
         XCTAssertEqual(delegate.availability, [true])
         XCTAssertEqual(delegate.peerUpdates, [["peer-a", "peer-b"]])
