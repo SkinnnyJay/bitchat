@@ -580,6 +580,7 @@ final class MessageRouter {
     }
 
     private func allowInboundWiFiEvent(from senderID: String) -> Bool {
+        guard PeerID(str: senderID).isValid else { return false }
         let normalizedSenderID = normalizedWiFiIdentityKey(senderID)
         guard !normalizedSenderID.isEmpty else { return false }
         guard normalizedSenderID.utf8.count <= inboundWiFiSenderIDMaxBytes else { return false }

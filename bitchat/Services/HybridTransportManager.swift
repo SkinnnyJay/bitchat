@@ -274,6 +274,7 @@ final class HybridTransportManager {
     }
 
     private func allowInboundEvent(from senderID: String) -> Bool {
+        guard PeerID(str: senderID).isValid else { return false }
         let normalizedSenderID = normalizedIdentityKey(senderID)
         guard !normalizedSenderID.isEmpty else { return false }
         guard normalizedSenderID.utf8.count <= inboundSenderIDMaxBytes else { return false }
