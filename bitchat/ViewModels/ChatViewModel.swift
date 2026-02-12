@@ -4509,7 +4509,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
-        for key in WiFiPeerIdentity.lookupKeys(for: trimmed) {
+        for key in UnifiedPeerService.lookupKeys(for: trimmed) {
             if let nickname = peerNicknames[PeerID(str: key)],
                let safeNickname = InputValidator.validateNickname(nickname) {
                 return safeNickname
