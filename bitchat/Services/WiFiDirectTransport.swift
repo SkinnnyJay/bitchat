@@ -34,11 +34,13 @@ final class WiFiDirectTransport: NSObject {
     private(set) var isDiscovering = false
     private let impl: WiFiDirectTransportBackend
     private let maxTrackedPeers: Int
+    private let maxInboundPayloadBytes: Int
     private var lastPublishedAvailability: Bool?
 
     init(localPeerID: String? = nil, backend: WiFiDirectTransportBackend? = nil) {
         impl = backend ?? WiFiDirectTransportBackendImpl(localPeerID: localPeerID)
         maxTrackedPeers = max(1, TransportConfig.wifiDirectMaxTrackedPeers)
+        maxInboundPayloadBytes = TransportConfig.messageRouterInboundWiFiPayloadMaxBytes
         super.init()
         impl.owner = self
     }
@@ -97,6 +99,7 @@ final class WiFiDirectTransport: NSObject {
             guard let self else { return }
             guard self.isDiscovering else { return }
             guard !data.isEmpty else { return }
+            guard data.count <= self.maxInboundPayloadBytes else { return }
             let normalizedPeerID = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !normalizedPeerID.isEmpty else { return }
             self.delegate?.wifiTransportDidReceive(data, from: normalizedPeerID)

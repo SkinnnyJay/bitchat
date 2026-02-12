@@ -288,6 +288,24 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertTrue(delegate.receives.isEmpty)
     }
 
+    func testReceiveDropsOversizedPayloads() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let delegate = MockDelegate()
+        transport.delegate = delegate
+        transport.startDiscovery()
+
+        let expect = expectation(description: "oversized payload is dropped")
+        let oversized = Data(repeating: 0x41, count: TransportConfig.messageRouterInboundWiFiPayloadMaxBytes + 1)
+        backend.simulateReceive(oversized, from: "peer-a")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertTrue(delegate.receives.isEmpty)
+    }
+
     func testReceiveIgnoredWhenNotDiscovering() {
         let backend = MockBackend(localPeerID: "self")
         let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
