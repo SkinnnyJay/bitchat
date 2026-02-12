@@ -32,6 +32,20 @@ final class PrivateChatManagerTests: XCTestCase {
         XCTAssertTrue(manager.sentReadReceipts.contains("mid-\(cap + 1)"))
     }
 
+    func testReplaceSentReadReceiptsSanitizesAndCapsInput() {
+        let manager = PrivateChatManager()
+        let cap = TransportConfig.uiSentReadReceiptsCap
+        var ids = (0..<(cap + 1)).map { "mid-\($0)" }
+        ids.insert("invalid id", at: 3)
+
+        manager.replaceSentReadReceipts(with: ids)
+
+        XCTAssertEqual(manager.sentReadReceipts.count, cap)
+        XCTAssertFalse(manager.sentReadReceipts.contains("invalid id"))
+        XCTAssertFalse(manager.sentReadReceipts.contains("mid-0"))
+        XCTAssertTrue(manager.sentReadReceipts.contains("mid-\(cap)"))
+    }
+
     func testMarkAsReadSkipsInvalidSenderPeerID() {
         let manager = PrivateChatManager()
         manager.meshService = MockTransportForPrivateChatManager()
