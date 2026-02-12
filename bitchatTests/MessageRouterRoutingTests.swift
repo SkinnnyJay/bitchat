@@ -1544,6 +1544,23 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testDropsReadReceiptForInvalidRecipientPeerID() {
+        let invalidRecipient = PeerID(str: "invalid peer id with spaces")
+        let mesh = MockTransport()
+        mesh.setReachable(invalidRecipient, isReachable: true)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        let receipt = ReadReceipt(originalMessageID: "mid-read-invalid-peer", readerID: mesh.myPeerID.id, readerNickname: "me")
+        router.sendReadReceipt(receipt, to: invalidRecipient)
+
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentReadReceipts.count, 0)
+    }
+
+    @MainActor
     func testRoutesDeliveryAckViaWiFiWhenPeerIsAvailable() throws {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
@@ -1662,6 +1679,22 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testDropsDeliveryAckForInvalidRecipientPeerID() {
+        let invalidRecipient = PeerID(str: "invalid peer id with spaces")
+        let mesh = MockTransport()
+        mesh.setReachable(invalidRecipient, isReachable: true)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        router.sendDeliveryAck("mid-delivered-invalid-peer", to: invalidRecipient)
+
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentDeliveryAcks.count, 0)
+    }
+
+    @MainActor
     func testRoutesFavoriteNotificationViaWiFiWhenPeerIsAvailable() throws {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
@@ -1741,6 +1774,22 @@ final class MessageRouterRoutingTests: XCTestCase {
         XCTAssertEqual(mesh.sentFavoriteNotifications.count, 1)
         XCTAssertEqual(mesh.sentFavoriteNotifications[0].peerID, recipient)
         XCTAssertTrue(mesh.sentFavoriteNotifications[0].isFavorite)
+    }
+
+    @MainActor
+    func testDropsFavoriteNotificationForInvalidRecipientPeerID() {
+        let invalidRecipient = PeerID(str: "invalid peer id with spaces")
+        let mesh = MockTransport()
+        mesh.setReachable(invalidRecipient, isReachable: true)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        router.sendFavoriteNotification(to: invalidRecipient, isFavorite: true)
+
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentFavoriteNotifications.count, 0)
     }
 
     @MainActor

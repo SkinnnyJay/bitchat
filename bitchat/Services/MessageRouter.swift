@@ -179,6 +179,10 @@ final class MessageRouter {
     }
 
     func sendReadReceipt(_ receipt: ReadReceipt, to peerID: PeerID) {
+        guard peerID.isValid else {
+            SecureLogger.warning("Dropping READ ack for invalid peer ID", category: .session)
+            return
+        }
         guard let safeMessageID = InputValidator.validateMessageID(receipt.originalMessageID) else {
             SecureLogger.warning("Dropping READ ack with invalid message ID for \(peerID.id.prefix(8))…", category: .session)
             return
@@ -202,6 +206,10 @@ final class MessageRouter {
     }
 
     func sendDeliveryAck(_ messageID: String, to peerID: PeerID) {
+        guard peerID.isValid else {
+            SecureLogger.warning("Dropping DELIVERED ack for invalid peer ID", category: .session)
+            return
+        }
         guard let safeMessageID = InputValidator.validateMessageID(messageID) else {
             SecureLogger.warning("Dropping DELIVERED ack with invalid message ID for \(peerID.id.prefix(8))…", category: .session)
             return
@@ -223,6 +231,10 @@ final class MessageRouter {
     }
 
     func sendFavoriteNotification(to peerID: PeerID, isFavorite: Bool) {
+        guard peerID.isValid else {
+            SecureLogger.warning("Dropping favorite notification for invalid peer ID", category: .session)
+            return
+        }
         if sendFavoriteNotificationViaWiFiIfAvailable(to: peerID, isFavorite: isFavorite) {
             return
         }

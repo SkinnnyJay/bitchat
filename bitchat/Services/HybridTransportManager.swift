@@ -164,6 +164,9 @@ final class HybridTransportManager {
         recipientNickname: String,
         messageID: String
     ) -> HybridOutboundRoute {
+        guard peerID.isValid else {
+            return .dropped
+        }
         guard content.utf8.count <= InputValidator.Limits.maxMessageLength else {
             return .dropped
         }
