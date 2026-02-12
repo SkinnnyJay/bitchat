@@ -233,6 +233,22 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertEqual(delegate.receives[0].from, "peer-a")
     }
 
+    func testReceiveDropsEmptyPayloads() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let delegate = MockDelegate()
+        transport.delegate = delegate
+
+        let expect = expectation(description: "empty payload is dropped")
+        backend.simulateReceive(Data(), from: "peer-a")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertTrue(delegate.receives.isEmpty)
+    }
+
     func testSendWithoutPeersThrows() {
         let transport = WiFiDirectTransport()
         XCTAssertThrowsError(try transport.send(Data("hello".utf8)))

@@ -88,6 +88,7 @@ final class WiFiDirectTransport: NSObject {
 
     func didReceive(_ data: Data, from peerID: String) {
         dispatchOnMain { [weak self] in
+            guard !data.isEmpty else { return }
             let normalizedPeerID = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !normalizedPeerID.isEmpty else { return }
             self?.delegate?.wifiTransportDidReceive(data, from: normalizedPeerID)
