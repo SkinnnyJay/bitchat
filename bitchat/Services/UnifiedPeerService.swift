@@ -290,7 +290,8 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             for key in lookupKeys(for: peer.peerID.id) where index[key] == nil {
                 index[key] = peer
             }
-            if peer.noisePublicKey.count == 32 {
+            if !peer.peerID.isGeoDM && !peer.peerID.isGeoChat,
+               peer.noisePublicKey.count == 32 {
                 let fullNoiseID = peer.noisePublicKey.hexEncodedString()
                 for key in lookupKeys(for: fullNoiseID) where index[key] == nil {
                     index[key] = peer
