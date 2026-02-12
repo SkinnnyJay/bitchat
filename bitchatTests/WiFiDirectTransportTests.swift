@@ -199,6 +199,17 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertTrue(backend.sentPayloads.isEmpty)
     }
 
+    func testSendAcceptsPayloadAtConfiguredBoundary() throws {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let boundaryPayload = Data(repeating: 0x41, count: TransportConfig.messageRouterInboundWiFiPayloadMaxBytes)
+
+        try transport.send(boundaryPayload, to: "peer-a")
+
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        XCTAssertEqual(backend.sentPayloads[0].data.count, TransportConfig.messageRouterInboundWiFiPayloadMaxBytes)
+    }
+
     func testDelegateReceivesPeerAndMessageEvents() {
         let backend = MockBackend(localPeerID: "self")
         let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
