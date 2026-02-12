@@ -285,7 +285,10 @@ final class CommandProcessor {
         let nickname = targetName.hasPrefix("@") ? String(targetName.dropFirst()) : targetName
         
         guard let peerID = chatViewModel?.getPeerIDForNickname(nickname),
-              let noisePublicKey = Data(hexString: peerID) else {
+              let noisePublicKey = Self.resolveFavoriteNoisePublicKey(
+                from: peerID,
+                fallbackNoiseKey: chatViewModel?.getPeer(byID: peerID)?.noisePublicKey
+              ) else {
             return .error(message: "can't find peer: \(nickname)")
         }
         
@@ -309,6 +312,16 @@ final class CommandProcessor {
             
             return .success(message: "removed \(nickname) from favorites")
         }
+    }
+
+    static func resolveFavoriteNoisePublicKey(from peerID: String, fallbackNoiseKey: Data?) -> Data? {
+        if let decoded = ChatViewModel.decodeNoisePublicKey(from: peerID) {
+            return decoded
+        }
+        if let fallbackNoiseKey, fallbackNoiseKey.count == 32 {
+            return fallbackNoiseKey
+        }
+        return nil
     }
     
     private func handleHelp() -> CommandResult {

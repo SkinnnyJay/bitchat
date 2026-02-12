@@ -51,4 +51,37 @@ final class CommandProcessorTests: XCTestCase {
             XCTFail("Expected error result for usage message")
         }
     }
+
+    func testResolveFavoriteNoisePublicKeySupportsPrefixedFullNoisePeerID() {
+        let fullNoise = String(repeating: "ab", count: 32)
+
+        let resolved = CommandProcessor.resolveFavoriteNoisePublicKey(
+            from: "noise:\(fullNoise)",
+            fallbackNoiseKey: nil
+        )
+
+        XCTAssertEqual(resolved?.hexEncodedString(), fullNoise)
+    }
+
+    func testResolveFavoriteNoisePublicKeyUsesFallbackForShortPeerID() {
+        let fallbackNoise = Data(repeating: 0x11, count: 32)
+
+        let resolved = CommandProcessor.resolveFavoriteNoisePublicKey(
+            from: "abcdef0123456789",
+            fallbackNoiseKey: fallbackNoise
+        )
+
+        XCTAssertEqual(resolved, fallbackNoise)
+    }
+
+    func testResolveFavoriteNoisePublicKeyRejectsInvalidFallbackLength() {
+        let invalidFallback = Data(repeating: 0x11, count: 8)
+
+        let resolved = CommandProcessor.resolveFavoriteNoisePublicKey(
+            from: "abcdef0123456789",
+            fallbackNoiseKey: invalidFallback
+        )
+
+        XCTAssertNil(resolved)
+    }
 }
