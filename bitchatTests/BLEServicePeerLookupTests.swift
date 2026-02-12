@@ -9,6 +9,14 @@ final class BLEServicePeerLookupTests: XCTestCase {
         XCTAssertTrue(keys.contains("abcdef0123456789"))
     }
 
+    func testPeerLookupKeysIncludeLowercasedVariantsForUppercaseHexInput() {
+        let keys = BLEService.peerLookupKeys(for: PeerID(str: "mesh:ABCDEF0123456789"))
+
+        XCTAssertTrue(keys.contains("mesh:ABCDEF0123456789"))
+        XCTAssertTrue(keys.contains("mesh:abcdef0123456789"))
+        XCTAssertTrue(keys.contains("abcdef0123456789"))
+    }
+
     func testPeerLookupKeysIncludeDerivedShortForFullNoisePeerID() {
         let fullNoisePeerID = PeerID(str: String(repeating: "ab", count: 32))
         let expectedShort = fullNoisePeerID.toShort().bare

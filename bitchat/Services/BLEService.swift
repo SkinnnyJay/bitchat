@@ -493,18 +493,23 @@ final class BLEService: NSObject {
 
     static func peerLookupKeys(for peerID: PeerID) -> [String] {
         var keys: [String] = []
+        func appendUnique(_ value: String) {
+            guard !value.isEmpty else { return }
+            if !keys.contains(value) {
+                keys.append(value)
+            }
+        }
 
         for candidate in WiFiPeerIdentity.candidateIDs(for: peerID) {
             let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { continue }
-
-            if !keys.contains(trimmed) {
-                keys.append(trimmed)
-            }
+            appendUnique(trimmed)
+            appendUnique(trimmed.lowercased())
 
             let shortCandidate = PeerID(str: trimmed).toShort()
-            if shortCandidate.isShort, !keys.contains(shortCandidate.bare) {
-                keys.append(shortCandidate.bare)
+            if shortCandidate.isShort {
+                appendUnique(shortCandidate.bare)
+                appendUnique(shortCandidate.bare.lowercased())
             }
         }
 
