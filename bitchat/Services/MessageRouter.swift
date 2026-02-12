@@ -479,6 +479,14 @@ final class MessageRouter {
             merged.append(message)
             existingIDs.insert(message.messageID)
         }
+        if merged.count > outboxPerPeerCap {
+            let overflow = merged.count - outboxPerPeerCap
+            merged.removeFirst(overflow)
+            SecureLogger.debug(
+                "Trimmed migrated outbox for \(newKey.id.prefix(8))… by \(overflow) entries to cap \(outboxPerPeerCap)",
+                category: .session
+            )
+        }
         outbox[newKey] = merged
         outbox.removeValue(forKey: oldKey)
         SecureLogger.debug(
