@@ -27,6 +27,16 @@ final class AnnouncementPacketTests: XCTestCase {
         XCTAssertNil(AnnouncementPacket.decode(from: encoded))
     }
 
+    func testEncodeRejectsInvalidNickname() {
+        let packet = AnnouncementPacket(
+            nickname: "   ",
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            signingPublicKey: Data(repeating: 0x22, count: 32)
+        )
+
+        XCTAssertNil(packet.encode())
+    }
+
     func testDecodeSkipsUnknownTLVs() throws {
         var encoded = try encodedAnnouncementData(
             nickname: "alice",

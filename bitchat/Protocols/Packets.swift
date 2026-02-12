@@ -14,12 +14,13 @@ struct AnnouncementPacket {
     }
 
     func encode() -> Data? {
+        guard let safeNickname = InputValidator.validateNickname(nickname) else { return nil }
         var data = Data()
         // Reserve: TLVs for nickname (2 + n), noise key (2 + 32), signing key (2 + 32)
-        data.reserveCapacity(2 + min(nickname.count, 255) + 2 + noisePublicKey.count + 2 + signingPublicKey.count)
+        data.reserveCapacity(2 + min(safeNickname.utf8.count, 255) + 2 + noisePublicKey.count + 2 + signingPublicKey.count)
 
         // TLV for nickname
-        guard let nicknameData = nickname.data(using: .utf8), nicknameData.count <= 255 else { return nil }
+        guard let nicknameData = safeNickname.data(using: .utf8), nicknameData.count <= 255 else { return nil }
         data.append(TLVType.nickname.rawValue)
         data.append(UInt8(nicknameData.count))
         data.append(nicknameData)
