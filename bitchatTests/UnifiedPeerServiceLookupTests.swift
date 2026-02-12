@@ -292,6 +292,48 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertTrue(UnifiedPeerService.shouldPreferMeshPeer(candidate, over: existing))
     }
 
+    func testShouldPreferMeshPeerPrefersMoreRecentPeerWhenOtherSignalsEqual() {
+        let existing = BitchatPeer(
+            peerID: PeerID(str: "abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "peer",
+            lastSeen: Date(timeIntervalSince1970: 10),
+            isConnected: false,
+            isReachable: false
+        )
+        let candidate = BitchatPeer(
+            peerID: PeerID(str: "abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "peer",
+            lastSeen: Date(timeIntervalSince1970: 20),
+            isConnected: false,
+            isReachable: false
+        )
+
+        XCTAssertTrue(UnifiedPeerService.shouldPreferMeshPeer(candidate, over: existing))
+    }
+
+    func testShouldPreferMeshPeerUsesPeerIDAsDeterministicTieBreaker() {
+        let existing = BitchatPeer(
+            peerID: PeerID(str: "bbbbbbbbbbbbbbbb"),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "peer",
+            lastSeen: Date(timeIntervalSince1970: 20),
+            isConnected: false,
+            isReachable: false
+        )
+        let candidate = BitchatPeer(
+            peerID: PeerID(str: "aaaaaaaaaaaaaaaa"),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "peer",
+            lastSeen: Date(timeIntervalSince1970: 20),
+            isConnected: false,
+            isReachable: false
+        )
+
+        XCTAssertTrue(UnifiedPeerService.shouldPreferMeshPeer(candidate, over: existing))
+    }
+
     func testDeduplicateMeshPeersKeepsPreferredPeerForEquivalentKey() {
         let fullNoiseHex = String(repeating: "ab", count: 32)
         let shortID = PeerID(str: fullNoiseHex).toShort().bare
