@@ -667,6 +667,16 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         guard peer.noisePublicKey.count == 32 else { return nil }
         return peer.noisePublicKey.sha256Fingerprint()
     }
+
+    static func favoriteNoisePublicKey(for peer: BitchatPeer) -> Data? {
+        if peer.noisePublicKey.count == 32 {
+            return peer.noisePublicKey
+        }
+        if let noiseKey = peer.peerID.noiseKey, noiseKey.count == 32 {
+            return noiseKey
+        }
+        return nil
+    }
     
     /// Get peer by ID
     func getPeer(by id: String) -> BitchatPeer? {
@@ -740,6 +750,10 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             SecureLogger.warning("⚠️ Cannot toggle favorite - peer not found: \(peerID)", category: .session)
             return 
         }
+        guard let favoriteNoisePublicKey = Self.favoriteNoisePublicKey(for: peer) else {
+            SecureLogger.warning("⚠️ Cannot toggle favorite - missing valid 32-byte noise key for \(peer.peerID.id)", category: .session)
+            return
+        }
         
         let wasFavorite = peer.isFavorite
         
@@ -765,18 +779,18 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         
         if wasFavorite {
             // Remove favorite
-            favoritesService.removeFavorite(peerNoisePublicKey: peer.noisePublicKey)
+            favoritesService.removeFavorite(peerNoisePublicKey: favoriteNoisePublicKey)
         } else {
             // Get or derive peer's Nostr public key if not already known
             var peerNostrKey = peer.nostrPublicKey
             if peerNostrKey == nil {
                 // Try to get from NostrIdentityBridge association
-                peerNostrKey = NostrIdentityBridge.getNostrPublicKey(for: peer.noisePublicKey)
+                peerNostrKey = NostrIdentityBridge.getNostrPublicKey(for: favoriteNoisePublicKey)
             }
             
             // Add favorite
             favoritesService.addFavorite(
-                peerNoisePublicKey: peer.noisePublicKey,
+                peerNoisePublicKey: favoriteNoisePublicKey,
                 peerNostrPublicKey: peerNostrKey,
                 peerNickname: finalNickname
             )
@@ -825,8 +839,9 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         if identity.isBlocked {
             identity.isFavorite = false
             // Also remove from favorites service
-            if let peer = getPeer(by: peerID) {
-                favoritesService.removeFavorite(peerNoisePublicKey: peer.noisePublicKey)
+            if let peer = getPeer(by: peerID),
+               let favoriteNoisePublicKey = Self.favoriteNoisePublicKey(for: peer) {
+                favoritesService.removeFavorite(peerNoisePublicKey: favoriteNoisePublicKey)
             }
         }
         

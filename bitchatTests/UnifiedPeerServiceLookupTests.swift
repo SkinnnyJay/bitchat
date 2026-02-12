@@ -646,6 +646,43 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertEqual(resolved, "bob")
     }
 
+    func testFavoriteNoisePublicKeyUsesPeerNoiseKeyWhenValid() {
+        let expected = Data(repeating: 0x11, count: 32)
+        let peer = BitchatPeer(
+            peerID: PeerID(str: "abcdef0123456789"),
+            noisePublicKey: expected,
+            nickname: "alice"
+        )
+
+        let resolved = UnifiedPeerService.favoriteNoisePublicKey(for: peer)
+
+        XCTAssertEqual(resolved, expected)
+    }
+
+    func testFavoriteNoisePublicKeyFallsBackToPeerIDNoiseKey() {
+        let fullNoiseHex = String(repeating: "ab", count: 32)
+        let expected = Data(hexString: fullNoiseHex)
+        let peer = BitchatPeer(
+            peerID: PeerID(str: fullNoiseHex),
+            noisePublicKey: Data(),
+            nickname: "alice"
+        )
+
+        let resolved = UnifiedPeerService.favoriteNoisePublicKey(for: peer)
+
+        XCTAssertEqual(resolved, expected)
+    }
+
+    func testFavoriteNoisePublicKeyReturnsNilWhenUnavailable() {
+        let peer = BitchatPeer(
+            peerID: PeerID(str: "abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x22, count: 16),
+            nickname: "alice"
+        )
+
+        XCTAssertNil(UnifiedPeerService.favoriteNoisePublicKey(for: peer))
+    }
+
     func testPeerIDLookupMatchesNicknameCaseInsensitivelyAndTrimmed() {
         let peer = BitchatPeer(
             peerID: PeerID(str: "abcdef0123456789"),
