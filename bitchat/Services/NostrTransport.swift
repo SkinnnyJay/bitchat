@@ -15,6 +15,7 @@ final class NostrTransport: Transport {
     private var readQueue: [QueuedRead] = []
     private var isSendingReadAcks = false
     private let readAckInterval: TimeInterval = TransportConfig.nostrReadAckInterval
+    private let readAckQueueCap: Int = TransportConfig.nostrReadAckQueueCap
     private let keychain: KeychainManagerProtocol
 
     init(keychain: KeychainManagerProtocol) {
@@ -102,7 +103,19 @@ final class NostrTransport: Transport {
 
     func sendReadReceipt(_ receipt: ReadReceipt, to peerID: PeerID) {
         guard peerID.isValid else { return }
-        guard InputValidator.validateMessageID(receipt.originalMessageID) != nil else { return }
+        guard let safeMessageID = InputValidator.validateMessageID(receipt.originalMessageID) else { return }
+        if readQueue.contains(where: {
+            $0.receipt.originalMessageID == safeMessageID &&
+            WiFiPeerIdentity.isEquivalent($0.peerID.id, peerID.id)
+        }) {
+            return
+        }
+        if readQueue.count >= readAckQueueCap {
+            let overflow = readQueue.count - readAckQueueCap + 1
+            if overflow > 0 {
+                readQueue.removeFirst(min(overflow, readQueue.count))
+            }
+        }
         // Enqueue and process with throttling to avoid relay rate limits
         readQueue.append(QueuedRead(receipt: receipt, peerID: peerID))
         processReadQueueIfNeeded()
