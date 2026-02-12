@@ -165,6 +165,20 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
         }
     }
 
+    func testConfiguredCapabilitySanitizationSkipsInvalidTokensWithoutLosingLaterValidOnes() {
+        let invalids = (0..<40).map { "!!!\($0)" }
+        let defaults = Set(invalids + ["pm"])
+        let negotiator = WiFiDirectCapabilityNegotiator(
+            requiredCapabilities: [],
+            defaultCapabilities: defaults
+        )
+
+        let info = negotiator.discoveryInfo()
+        let advertised = WiFiDirectCapabilityNegotiator.parseCapabilities(info["caps"] ?? "")
+
+        XCTAssertEqual(advertised, ["pm"])
+    }
+
     func testParseDiscoveryInfoIgnoresUnknownFields() throws {
         let negotiator = WiFiDirectCapabilityNegotiator()
         let raw: [String: Any] = ["v": 1, "caps": "pm,ack", "junk": "value"]
