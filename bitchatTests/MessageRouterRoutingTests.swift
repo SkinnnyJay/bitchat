@@ -137,6 +137,30 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testRoutesViaWiFiWhenMeshIsUnreachableButWiFiPeerExists() throws {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: false)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 16),
+            wifiTransport: wifi
+        )
+
+        router.sendPrivate(String(repeating: "b", count: 64), to: recipient, recipientNickname: "peer", messageID: "msg-wifi-unreachable")
+
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        XCTAssertTrue(mesh.sentPrivateMessages.isEmpty)
+    }
+
+    @MainActor
     func testFallsBackToMeshWhenWiFiSendFails() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()

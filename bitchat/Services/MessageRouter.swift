@@ -58,10 +58,10 @@ final class MessageRouter {
     }
 
     func sendPrivate(_ content: String, to peerID: PeerID, recipientNickname: String, messageID: String) {
-        let reachableMesh = mesh.isPeerReachable(peerID)
-        if reachableMesh, routePrivateViaWiFiIfPreferred(content, to: peerID, recipientNickname: recipientNickname, messageID: messageID) {
+        if routePrivateViaWiFiIfPreferred(content, to: peerID, recipientNickname: recipientNickname, messageID: messageID) {
             return
         }
+        let reachableMesh = mesh.isPeerReachable(peerID)
         let nostrAvailable = canSendViaNostr(peerID: peerID)
         let context = TransportRoutingPolicy.Context(
             payloadBytes: content.utf8.count,
@@ -144,11 +144,10 @@ final class MessageRouter {
         var remaining: [(content: String, nickname: String, messageID: String)] = []
         // Re-evaluate route for each message as transport availability may have changed.
         for (content, nickname, messageID) in queued {
-            let reachableMesh = mesh.isPeerReachable(peerID)
-            if reachableMesh,
-               routePrivateViaWiFiIfPreferred(content, to: peerID, recipientNickname: nickname, messageID: messageID) {
+            if routePrivateViaWiFiIfPreferred(content, to: peerID, recipientNickname: nickname, messageID: messageID) {
                 continue
             }
+            let reachableMesh = mesh.isPeerReachable(peerID)
             let context = TransportRoutingPolicy.Context(
                 payloadBytes: content.utf8.count,
                 meshReachable: reachableMesh,
