@@ -97,6 +97,19 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertEqual(resolved, fingerprint)
     }
 
+    func testCanonicalFingerprintNormalizesCaseAndWhitespace() {
+        let raw = "  " + String(repeating: "Ab", count: 32) + "  "
+
+        let canonical = UnifiedPeerService.canonicalFingerprint(raw)
+
+        XCTAssertEqual(canonical, String(repeating: "ab", count: 32))
+    }
+
+    func testCanonicalFingerprintRejectsInvalidLengthOrNonHex() {
+        XCTAssertNil(UnifiedPeerService.canonicalFingerprint("abc"))
+        XCTAssertNil(UnifiedPeerService.canonicalFingerprint(String(repeating: "zz", count: 32)))
+    }
+
     func testResolveCachedFingerprintFallsBackToNormalizedKeyMatch() {
         let fingerprint = String(repeating: "b2", count: 32)
         let cache = ["mesh:abcdef0123456789": fingerprint]
@@ -644,6 +657,14 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
 
         XCTAssertEqual(order, ["peerb", "peera"])
         XCTAssertEqual(cache["peera"], fpA2)
+    }
+
+    func testCacheFingerprintIgnoresInvalidFingerprintValues() {
+        var cache: [String: String] = [:]
+
+        UnifiedPeerService.cacheFingerprint("invalid", for: "mesh:abcdef0123456789", in: &cache)
+
+        XCTAssertTrue(cache.isEmpty)
     }
 
     func testFingerprintCacheReferenceIDsIncludePeerAndNoiseAliases() {
