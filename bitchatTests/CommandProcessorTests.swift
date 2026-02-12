@@ -63,6 +63,17 @@ final class CommandProcessorTests: XCTestCase {
         XCTAssertEqual(resolved?.hexEncodedString(), fullNoise)
     }
 
+    func testResolveFavoriteNoisePublicKeySupportsMeshPrefixedFullNoisePeerID() {
+        let fullNoise = String(repeating: "cd", count: 32)
+
+        let resolved = CommandProcessor.resolveFavoriteNoisePublicKey(
+            from: "  mesh:\(fullNoise)  ",
+            fallbackNoiseKey: nil
+        )
+
+        XCTAssertEqual(resolved?.hexEncodedString(), fullNoise)
+    }
+
     func testResolveFavoriteNoisePublicKeyUsesFallbackForShortPeerID() {
         let fallbackNoise = Data(repeating: 0x11, count: 32)
 
