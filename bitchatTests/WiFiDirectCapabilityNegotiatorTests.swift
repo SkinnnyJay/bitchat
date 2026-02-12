@@ -126,8 +126,8 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
         let parsed = negotiator.parseDiscoveryInfo(from: context)
 
         XCTAssertEqual(parsed?["v"], "1")
-        XCTAssertNil(parsed?["caps"])
-        XCTAssertTrue(negotiator.isPeerCompatible(discoveryInfo: parsed))
+        XCTAssertEqual(parsed?["caps"], "__invalid__")
+        XCTAssertFalse(negotiator.isPeerCompatible(discoveryInfo: parsed))
     }
 
     func testParseDiscoveryInfoReturnsNilWhenOnlyUnknownFieldsPresent() throws {
@@ -143,7 +143,10 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
         let raw: [String: Any] = ["v": true, "caps": false]
         let context = try JSONSerialization.data(withJSONObject: raw, options: [])
 
-        XCTAssertNil(negotiator.parseDiscoveryInfo(from: context))
+        let parsed = negotiator.parseDiscoveryInfo(from: context)
+        XCTAssertEqual(parsed?["v"], "__invalid__")
+        XCTAssertEqual(parsed?["caps"], "__invalid__")
+        XCTAssertFalse(negotiator.isPeerCompatible(discoveryInfo: parsed))
     }
 
     func testParseDiscoveryInfoTrimsVersionAndCapabilitiesValues() throws {
@@ -156,5 +159,17 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
         XCTAssertEqual(parsed?["v"], "1")
         XCTAssertEqual(parsed?["caps"], "pm,ack")
         XCTAssertTrue(negotiator.isPeerCompatible(discoveryInfo: parsed))
+    }
+
+    func testParseDiscoveryInfoMarksOversizedVersionAsInvalid() throws {
+        let negotiator = WiFiDirectCapabilityNegotiator()
+        let oversizedVersion = String(repeating: "1", count: 32)
+        let raw: [String: Any] = ["v": oversizedVersion, "caps": "pm,ack"]
+        let context = try JSONSerialization.data(withJSONObject: raw, options: [])
+
+        let parsed = negotiator.parseDiscoveryInfo(from: context)
+
+        XCTAssertEqual(parsed?["v"], "__invalid__")
+        XCTAssertFalse(negotiator.isPeerCompatible(discoveryInfo: parsed))
     }
 }

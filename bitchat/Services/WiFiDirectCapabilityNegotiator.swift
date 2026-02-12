@@ -6,6 +6,7 @@ struct WiFiDirectCapabilityNegotiator {
         static let maxCapabilitiesLength = 512
         static let maxCapabilityTokenLength = 32
     }
+    private static let invalidFieldSentinel = "__invalid__"
 
     static let currentProtocolVersion = 1
     static let requiredCapabilities: Set<String> = ["pm"]
@@ -43,11 +44,13 @@ struct WiFiDirectCapabilityNegotiator {
             return nil
         }
         var parsed: [String: String] = [:]
-        if let version = parseStringValue(dictionary["v"], maxLength: Limits.maxVersionLength) {
-            parsed["v"] = version
+        if dictionary.keys.contains("v") {
+            parsed["v"] = parseStringValue(dictionary["v"], maxLength: Limits.maxVersionLength)
+                ?? Self.invalidFieldSentinel
         }
-        if let capabilities = parseStringValue(dictionary["caps"], maxLength: Limits.maxCapabilitiesLength) {
-            parsed["caps"] = capabilities
+        if dictionary.keys.contains("caps") {
+            parsed["caps"] = parseStringValue(dictionary["caps"], maxLength: Limits.maxCapabilitiesLength)
+                ?? Self.invalidFieldSentinel
         }
         return parsed.isEmpty ? nil : parsed
     }
