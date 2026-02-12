@@ -19,4 +19,9 @@ final class ChatViewModelNicknameLookupTests: XCTestCase {
     func testShouldResolveNicknameLookupRejectsBlankInput() {
         XCTAssertFalse(ChatViewModel.shouldResolveNicknameLookup(for: "   "))
     }
+
+    func testShouldResolveNicknameLookupTrimsWhitespaceBeforeClassification() {
+        XCTAssertTrue(ChatViewModel.shouldResolveNicknameLookup(for: "  mesh:abcdef0123456789  "))
+        XCTAssertFalse(ChatViewModel.shouldResolveNicknameLookup(for: "  alice  "))
+    }
 }

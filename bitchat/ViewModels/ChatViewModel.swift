@@ -4503,25 +4503,26 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     // Helper to resolve nickname for a peer ID through various sources
     @MainActor
     func resolveNickname(for peerID: String) -> String {
+        let trimmedPeerID = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
         // Guard against empty or very short peer IDs
-        guard !peerID.isEmpty else {
+        guard !trimmedPeerID.isEmpty else {
             return "unknown"
         }
         
         // Check if this might already be a nickname instead of a peer identifier
-        if !Self.shouldResolveNicknameLookup(for: peerID) {
+        if !Self.shouldResolveNicknameLookup(for: trimmedPeerID) {
             // If it's already a nickname, just return it
-            return peerID
+            return trimmedPeerID
         }
         
         // First try direct peer nicknames from mesh service
         let peerNicknames = meshService.getPeerNicknames()
-        if let nickname = peerNicknames[PeerID(str: peerID)] {
+        if let nickname = peerNicknames[PeerID(str: trimmedPeerID)] {
             return nickname
         }
         
         // Try to resolve through fingerprint and social identity
-        if let fingerprint = getFingerprint(for: peerID) {
+        if let fingerprint = getFingerprint(for: trimmedPeerID) {
             if let identity = identityManager.getSocialIdentity(for: fingerprint) {
                 // Prefer local petname if set
                 if let petname = identity.localPetname {
@@ -4534,8 +4535,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Use anonymous with shortened peer ID
         // Ensure we have at least 4 characters for the prefix
-        let prefixLength = min(4, peerID.count)
-        let prefix = String(peerID.prefix(prefixLength))
+        let prefixLength = min(4, trimmedPeerID.count)
+        let prefix = String(trimmedPeerID.prefix(prefixLength))
         
         // Avoid "anonanon" by checking if ID already starts with "anon"
         if prefix.starts(with: "anon") {
