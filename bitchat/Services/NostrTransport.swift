@@ -63,10 +63,13 @@ final class NostrTransport: Transport {
     func sendMessage(_ content: String, mentions: [String]) { /* no-op */ }
 
     func sendPrivateMessage(_ content: String, to peerID: PeerID, recipientNickname: String, messageID: String) {
+        guard peerID.isValid else { return }
+        guard content.utf8.count <= InputValidator.Limits.maxMessageLength else { return }
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return }
         Task { @MainActor in
             guard let recipientNpub = resolveRecipientNpub(for: peerID) else { return }
             guard let senderIdentity = try? NostrIdentityBridge.getCurrentNostrIdentity() else { return }
-            SecureLogger.debug("NostrTransport: preparing PM to \(recipientNpub.prefix(16))… for peerID \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
+            SecureLogger.debug("NostrTransport: preparing PM to \(recipientNpub.prefix(16))… for peerID \(peerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…", category: .session)
             // Convert recipient npub -> hex (x-only)
             let recipientHex: String
             do {
@@ -80,7 +83,7 @@ final class NostrTransport: Transport {
                 SecureLogger.error("NostrTransport: failed to decode npub -> hex: \(error)", category: .session)
                 return
             }
-            guard let embedded = NostrEmbeddedBitChat.encodePMForNostr(content: content, messageID: messageID, recipientPeerID: peerID.id, senderPeerID: senderPeerID.id) else {
+            guard let embedded = NostrEmbeddedBitChat.encodePMForNostr(content: content, messageID: safeMessageID, recipientPeerID: peerID.id, senderPeerID: senderPeerID.id) else {
                 SecureLogger.error("NostrTransport: failed to embed PM packet", category: .session)
                 return
             }
@@ -94,12 +97,15 @@ final class NostrTransport: Transport {
     }
 
     func sendReadReceipt(_ receipt: ReadReceipt, to peerID: PeerID) {
+        guard peerID.isValid else { return }
+        guard InputValidator.validateMessageID(receipt.originalMessageID) != nil else { return }
         // Enqueue and process with throttling to avoid relay rate limits
         readQueue.append(QueuedRead(receipt: receipt, peerID: peerID))
         processReadQueueIfNeeded()
     }
 
     func sendFavoriteNotification(to peerID: PeerID, isFavorite: Bool) {
+        guard peerID.isValid else { return }
         Task { @MainActor in
             guard let recipientNpub = resolveRecipientNpub(for: peerID) else { return }
             guard let senderIdentity = try? NostrIdentityBridge.getCurrentNostrIdentity() else { return }
@@ -127,17 +133,19 @@ final class NostrTransport: Transport {
 
     func sendBroadcastAnnounce() { /* no-op for Nostr */ }
     func sendDeliveryAck(for messageID: String, to peerID: PeerID) {
+        guard peerID.isValid else { return }
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return }
         Task { @MainActor in
             guard let recipientNpub = resolveRecipientNpub(for: peerID) else { return }
             guard let senderIdentity = try? NostrIdentityBridge.getCurrentNostrIdentity() else { return }
-            SecureLogger.debug("NostrTransport: preparing DELIVERED ack for id=\(messageID.prefix(8))… to \(recipientNpub.prefix(16))…", category: .session)
+            SecureLogger.debug("NostrTransport: preparing DELIVERED ack for id=\(safeMessageID.prefix(8))… to \(recipientNpub.prefix(16))…", category: .session)
             let recipientHex: String
             do {
                 let (hrp, data) = try Bech32.decode(recipientNpub)
                 guard hrp == "npub" else { return }
                 recipientHex = data.hexEncodedString()
             } catch { return }
-            guard let ack = NostrEmbeddedBitChat.encodeAckForNostr(type: .delivered, messageID: messageID, recipientPeerID: peerID.id, senderPeerID: senderPeerID.id) else {
+            guard let ack = NostrEmbeddedBitChat.encodeAckForNostr(type: .delivered, messageID: safeMessageID, recipientPeerID: peerID.id, senderPeerID: senderPeerID.id) else {
                 SecureLogger.error("NostrTransport: failed to embed DELIVERED ack", category: .session)
                 return
             }
