@@ -392,9 +392,10 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             return false
         }
 
-        if !favoriteNickname.isEmpty {
+        let sanitizedNickname = InputValidator.validateNickname(favoriteNickname)
+        if let sanitizedNickname {
             let isConnectedByNickname = existingPeers.contains {
-                $0.isConnected && $0.nickname == favoriteNickname
+                $0.isConnected && InputValidator.validateNickname($0.nickname) == sanitizedNickname
             }
             if isConnectedByNickname {
                 return false
