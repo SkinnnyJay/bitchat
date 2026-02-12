@@ -126,8 +126,8 @@ private final class MPCWiFiDirectTransportImplementation: NSObject, WiFiDirectTr
     private var inviteBackoffByPeerID: [String: TimeInterval] = [:]
     private var nextInviteAllowedAt: [String: Date] = [:]
     private var capabilitiesByPeerID: [String: Set<String>] = [:]
-    private let initialInviteBackoffSeconds: TimeInterval = 1.0
-    private let maxInviteBackoffSeconds: TimeInterval = 30.0
+    private let initialInviteBackoffSeconds: TimeInterval = TransportConfig.wifiDirectInviteInitialBackoffSeconds
+    private let maxInviteBackoffSeconds: TimeInterval = TransportConfig.wifiDirectInviteMaxBackoffSeconds
 
     required init(localPeerID: String?) {
         let displayName = Self.sanitizeDisplayName(localPeerID)
