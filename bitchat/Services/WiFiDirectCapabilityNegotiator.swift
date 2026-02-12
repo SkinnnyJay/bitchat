@@ -18,10 +18,11 @@ struct WiFiDirectCapabilityNegotiator {
             return true
         }
 
-        if let versionRaw = discoveryInfo["v"],
-           let version = Int(versionRaw),
-           version != Self.currentProtocolVersion {
-            return false
+        if let versionRaw = discoveryInfo["v"] {
+            guard let version = Int(versionRaw) else { return false }
+            if version != Self.currentProtocolVersion {
+                return false
+            }
         }
 
         guard let capabilityString = discoveryInfo["caps"] else {
