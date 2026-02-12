@@ -322,6 +322,49 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testHybridRateLimitTreatsFullAndShortSenderIDsAsSameSender() throws {
+        let noiseKey = Data(repeating: 0x55, count: 32)
+        let senderFull = PeerID(hexData: noiseKey)
+        let senderShort = PeerID(publicKey: noiseKey)
+
+        let mesh = MockTransport()
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let fixedNow = Date()
+        let manager = HybridTransportManager(meshTransport: mesh, wifiTransport: wifi, nowProvider: { fixedNow })
+        let delegate = MockDelegate()
+        manager.delegate = delegate
+
+        let maxEvents = TransportConfig.messageRouterInboundWiFiSenderRateMaxEvents
+        let createdAtMs = UInt64(fixedNow.timeIntervalSince1970 * 1000)
+        for idx in 0..<(maxEvents + 3) {
+            let useFull = idx % 2 == 0
+            let claimedSender = useFull ? senderFull.id : senderShort.id
+            let observedSender = useFull ? senderShort.id : senderFull.id
+            let payloadObject: [String: Any] = [
+                "version": WiFiDirectEnvelopeVersion.current,
+                "messageType": "private",
+                "senderPeerID": claimedSender,
+                "recipientPeerID": mesh.myPeerID.id,
+                "recipientNickname": "self",
+                "messageID": "mid-rate-cross-\(idx)",
+                "content": "hello",
+                "createdAtMs": createdAtMs
+            ]
+            let payload = try JSONSerialization.data(withJSONObject: payloadObject, options: [])
+            backend.simulateIncoming(payload, from: observedSender)
+        }
+
+        let expect = expectation(description: "hybrid cross-id rate limit settles")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(delegate.receivedEnvelopes.count, maxEvents)
+    }
+
+    @MainActor
     func testRejectsInboundPrivateEnvelopeWhenPayloadExceedsMaxBytes() {
         let mesh = MockTransport()
         let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
