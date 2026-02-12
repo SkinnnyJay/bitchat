@@ -27,6 +27,7 @@ final class WiFiDirectTransportTests: XCTestCase {
         var stopDiscoveryCount = 0
         var sentPayloads: [(data: Data, peerID: String?)] = []
         var sendError: Error?
+        var capabilitiesByPeerID: [String: Set<String>] = [:]
 
         required init(localPeerID: String?) {
             isAvailable = true
@@ -49,7 +50,7 @@ final class WiFiDirectTransportTests: XCTestCase {
         }
 
         func capabilities(for peerID: String) -> Set<String>? {
-            nil
+            capabilitiesByPeerID[peerID]
         }
 
         func simulatePeerUpdate(_ peers: [String]) {
@@ -125,5 +126,14 @@ final class WiFiDirectTransportTests: XCTestCase {
     func testSendWithoutPeersThrows() {
         let transport = WiFiDirectTransport()
         XCTAssertThrowsError(try transport.send(Data("hello".utf8)))
+    }
+
+    func testPeerCapabilitiesAreReadFromBackend() {
+        let backend = MockBackend(localPeerID: "self")
+        backend.capabilitiesByPeerID["peer-a"] = ["pm", "ack"]
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+
+        XCTAssertEqual(transport.peerCapabilities(peerID: "peer-a"), ["pm", "ack"])
+        XCTAssertNil(transport.peerCapabilities(peerID: "missing"))
     }
 }

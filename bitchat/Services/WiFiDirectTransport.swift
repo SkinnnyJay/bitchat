@@ -198,6 +198,8 @@ extension MPCWiFiDirectTransportImplementation: MCSessionDelegate {
         if state == .connected {
             inviteBackoffByPeerID.removeValue(forKey: peerKey)
             nextInviteAllowedAt.removeValue(forKey: peerKey)
+        } else if state == .notConnected {
+            capabilitiesByPeerID.removeValue(forKey: peerKey)
         }
         let peers = session.connectedPeers.map(\.displayName).sorted()
         owner?.didUpdatePeers(peers)
@@ -241,6 +243,9 @@ extension MPCWiFiDirectTransportImplementation: MCNearbyServiceAdvertiserDelegat
         guard capabilityNegotiator.isPeerCompatible(discoveryInfo: discoveryInfoFromContext) else {
             invitationHandler(false, nil)
             return
+        }
+        if let caps = discoveryInfoFromContext?["caps"] {
+            capabilitiesByPeerID[peerID.displayName] = WiFiDirectCapabilityNegotiator.parseCapabilities(caps)
         }
         invitationHandler(true, session)
     }
