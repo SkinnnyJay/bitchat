@@ -68,4 +68,63 @@ final class ReadReceiptTests: XCTestCase {
         XCTAssertEqual(decoded.readerID, "abcdef0123456789")
         XCTAssertEqual(decoded.readerNickname, "alice")
     }
+
+    func testBinaryRoundTripSupportsCanonicalMessageIDs() {
+        let receipt = ReadReceipt(
+            originalMessageID: "mid-binary-roundtrip",
+            readerID: "abcdef0123456789",
+            readerNickname: "alice"
+        )
+
+        let data = receipt.toBinaryData()
+        let decoded = ReadReceipt.fromBinaryData(data)
+
+        XCTAssertEqual(decoded?.originalMessageID, "mid-binary-roundtrip")
+        XCTAssertEqual(decoded?.readerID, "abcdef0123456789")
+        XCTAssertEqual(decoded?.readerNickname, "alice")
+    }
+
+    func testBinaryEncodingReturnsEmptyDataForInvalidReaderID() {
+        let receipt = ReadReceipt(
+            originalMessageID: "mid-binary-invalid-reader",
+            readerID: "invalid id",
+            readerNickname: "alice"
+        )
+
+        XCTAssertTrue(receipt.toBinaryData().isEmpty)
+    }
+
+    func testBinaryDecodeSupportsLegacyUUIDFormat() {
+        let originalMessageID = UUID().uuidString
+        let receiptID = UUID().uuidString
+        let readerID = "abcdef0123456789"
+        let nickname = "alice"
+        let timestamp = Date()
+
+        var data = Data()
+        data.appendUUID(originalMessageID)
+        data.appendUUID(receiptID)
+        data.append(Data(hexString: readerID)!)
+        data.appendDate(timestamp)
+        data.appendString(nickname)
+
+        let decoded = ReadReceipt.fromBinaryData(data)
+
+        XCTAssertEqual(decoded?.originalMessageID, originalMessageID.uppercased())
+        XCTAssertEqual(decoded?.receiptID, receiptID.uppercased())
+        XCTAssertEqual(decoded?.readerID, readerID)
+        XCTAssertEqual(decoded?.readerNickname, nickname)
+    }
+
+    func testBinaryDecodeRejectsInvalidV1MessageID() {
+        var data = Data()
+        data.append(0x01) // version
+        data.appendString("invalid message id", maxLength: 255)
+        data.appendString("receipt-valid", maxLength: 255)
+        data.append(Data(hexString: "abcdef0123456789")!)
+        data.appendDate(Date())
+        data.appendString("alice", maxLength: 255)
+
+        XCTAssertNil(ReadReceipt.fromBinaryData(data))
+    }
 }

@@ -9,6 +9,10 @@
 import Foundation
 
 struct ReadReceipt: Codable {
+    private enum BinaryVersion: UInt8 {
+        case v1 = 0x01
+    }
+
     let originalMessageID: String
     let receiptID: String
     var readerID: String  // Who read it
@@ -143,48 +147,88 @@ struct ReadReceipt: Codable {
     // MARK: - Binary Encoding
     
     func toBinaryData() -> Data {
+        guard let safeOriginalMessageID = InputValidator.validateMessageID(originalMessageID),
+              let safeReceiptID = InputValidator.validateMessageID(receiptID),
+              let safeReaderNickname = InputValidator.validateNickname(readerNickname),
+              InputValidator.validateTimestamp(timestamp) else {
+            return Data()
+        }
+        let canonicalReaderID = PeerID(str: readerID).toShort()
+        guard canonicalReaderID.isShort,
+              let readerData = Data(hexString: canonicalReaderID.id),
+              readerData.count == 8 else {
+            return Data()
+        }
+
         var data = Data()
-        data.appendUUID(originalMessageID)
-        data.appendUUID(receiptID)
-        // ReaderID as 8-byte hex string
-        var readerData = Data()
-        var tempID = readerID
-        while tempID.count >= 2 && readerData.count < 8 {
-            let hexByte = String(tempID.prefix(2))
-            if let byte = UInt8(hexByte, radix: 16) {
-                readerData.append(byte)
-            }
-            tempID = String(tempID.dropFirst(2))
-        }
-        while readerData.count < 8 {
-            readerData.append(0)
-        }
+        data.append(BinaryVersion.v1.rawValue)
+        data.appendString(safeOriginalMessageID, maxLength: 255)
+        data.appendString(safeReceiptID, maxLength: 255)
         data.append(readerData)
         data.appendDate(timestamp)
-        data.appendString(readerNickname)
+        data.appendString(safeReaderNickname, maxLength: 255)
         return data
     }
     
     static func fromBinaryData(_ data: Data) -> ReadReceipt? {
         // Create defensive copy
         let dataCopy = Data(data)
+        guard !dataCopy.isEmpty else { return nil }
+        
+        if dataCopy.first == BinaryVersion.v1.rawValue {
+            return decodeV1BinaryData(dataCopy)
+        }
+        
+        return decodeLegacyBinaryData(dataCopy)
+    }
+    
+    private static func decodeV1BinaryData(_ dataCopy: Data) -> ReadReceipt? {
+        var offset = 0
+        guard let version = dataCopy.readUInt8(at: &offset),
+              version == BinaryVersion.v1.rawValue else { return nil }
+        guard let originalMessageIDRaw = dataCopy.readString(at: &offset, maxLength: 255),
+              let originalMessageID = InputValidator.validateMessageID(originalMessageIDRaw),
+              let receiptIDRaw = dataCopy.readString(at: &offset, maxLength: 255),
+              let receiptID = InputValidator.validateMessageID(receiptIDRaw),
+              let readerIDData = dataCopy.readFixedBytes(at: &offset, count: 8) else { return nil }
+        let readerID = readerIDData.hexEncodedString()
+        guard PeerID(str: readerID).isShort else { return nil }
+        guard let timestamp = dataCopy.readDate(at: &offset),
+              InputValidator.validateTimestamp(timestamp),
+              let readerNicknameRaw = dataCopy.readString(at: &offset, maxLength: 255),
+              let readerNickname = InputValidator.validateNickname(readerNicknameRaw),
+              offset == dataCopy.count else { return nil }
+        
+        return ReadReceipt(
+            originalMessageID: originalMessageID,
+            receiptID: receiptID,
+            readerID: readerID,
+            readerNickname: readerNickname,
+            timestamp: timestamp
+        )
+    }
+    
+    private static func decodeLegacyBinaryData(_ dataCopy: Data) -> ReadReceipt? {
         
         // Minimum size: 2 UUIDs (32) + readerID (8) + timestamp (8) + min nickname
         guard dataCopy.count >= 49 else { return nil }
         
         var offset = 0
         
-        guard let originalMessageID = dataCopy.readUUID(at: &offset),
-              let receiptID = dataCopy.readUUID(at: &offset) else { return nil }
+        guard let originalMessageIDRaw = dataCopy.readUUID(at: &offset),
+              let originalMessageID = InputValidator.validateMessageID(originalMessageIDRaw),
+              let receiptIDRaw = dataCopy.readUUID(at: &offset),
+              let receiptID = InputValidator.validateMessageID(receiptIDRaw) else { return nil }
         
         guard let readerIDData = dataCopy.readFixedBytes(at: &offset, count: 8) else { return nil }
         let readerID = readerIDData.hexEncodedString()
-        guard PeerID(str: readerID).isValid else { return nil }
+        guard PeerID(str: readerID).isShort else { return nil }
         
         guard let timestamp = dataCopy.readDate(at: &offset),
               InputValidator.validateTimestamp(timestamp),
               let readerNicknameRaw = dataCopy.readString(at: &offset),
-              let readerNickname = InputValidator.validateNickname(readerNicknameRaw) else { return nil }
+              let readerNickname = InputValidator.validateNickname(readerNicknameRaw),
+              offset == dataCopy.count else { return nil }
         
         return ReadReceipt(originalMessageID: originalMessageID,
                           receiptID: receiptID,
