@@ -206,4 +206,26 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
         XCTAssertEqual(parsed?["v"], "__invalid__")
         XCTAssertFalse(negotiator.isPeerCompatible(discoveryInfo: parsed))
     }
+
+    func testParseDiscoveryInfoMarksEmptyCapabilitiesAsInvalid() throws {
+        let negotiator = WiFiDirectCapabilityNegotiator()
+        let raw: [String: Any] = ["v": 1, "caps": "   "]
+        let context = try JSONSerialization.data(withJSONObject: raw, options: [])
+
+        let parsed = negotiator.parseDiscoveryInfo(from: context)
+
+        XCTAssertEqual(parsed?["caps"], "__invalid__")
+        XCTAssertFalse(negotiator.isPeerCompatible(discoveryInfo: parsed))
+    }
+
+    func testParseDiscoveryInfoMarksEmptyVersionAsInvalid() throws {
+        let negotiator = WiFiDirectCapabilityNegotiator()
+        let raw: [String: Any] = ["v": "   ", "caps": "pm,ack"]
+        let context = try JSONSerialization.data(withJSONObject: raw, options: [])
+
+        let parsed = negotiator.parseDiscoveryInfo(from: context)
+
+        XCTAssertEqual(parsed?["v"], "__invalid__")
+        XCTAssertFalse(negotiator.isPeerCompatible(discoveryInfo: parsed))
+    }
 }
