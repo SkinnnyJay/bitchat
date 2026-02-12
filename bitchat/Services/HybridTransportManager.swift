@@ -101,7 +101,11 @@ final class HybridTransportManager {
     private let wifiRoutingPolicy: WiFiDirectRoutingPolicy
     private let inboundTimestampMaxAgeSeconds: TimeInterval
     private let inboundTimestampFutureSkewSeconds: TimeInterval
+    private let inboundDedupMaxCount: Int
+    private let inboundDedupMaxAgeSeconds: TimeInterval
     private let nowProvider: () -> Date
+    private var inboundDedupByKey: [String: Date] = [:]
+    private var inboundDedupOrder: [String] = []
 
     weak var delegate: HybridTransportManagerDelegate?
 
@@ -116,6 +120,8 @@ final class HybridTransportManager {
         self.wifiRoutingPolicy = wifiRoutingPolicy
         self.inboundTimestampMaxAgeSeconds = TransportConfig.messageRouterInboundWiFiTimestampMaxAgeSeconds
         self.inboundTimestampFutureSkewSeconds = TransportConfig.messageRouterInboundWiFiTimestampFutureSkewSeconds
+        self.inboundDedupMaxCount = TransportConfig.messageRouterInboundWiFiDedupMaxCount
+        self.inboundDedupMaxAgeSeconds = TransportConfig.messageRouterInboundWiFiDedupMaxAgeSeconds
         self.nowProvider = nowProvider
         self.wifiTransport.delegate = self
     }
@@ -221,6 +227,34 @@ final class HybridTransportManager {
         }
         return true
     }
+
+    private func shouldAcceptInboundEnvelope(dedupKey: String) -> Bool {
+        let now = nowProvider()
+        cleanupInboundDedup(now: now)
+        if inboundDedupByKey[dedupKey] != nil {
+            return false
+        }
+        inboundDedupByKey[dedupKey] = now
+        inboundDedupOrder.append(dedupKey)
+        if inboundDedupOrder.count > inboundDedupMaxCount {
+            let overflow = inboundDedupOrder.count - inboundDedupMaxCount
+            for _ in 0..<overflow {
+                let oldest = inboundDedupOrder.removeFirst()
+                inboundDedupByKey.removeValue(forKey: oldest)
+            }
+        }
+        return true
+    }
+
+    private func cleanupInboundDedup(now: Date) {
+        let cutoff = now.addingTimeInterval(-inboundDedupMaxAgeSeconds)
+        while let first = inboundDedupOrder.first,
+              let timestamp = inboundDedupByKey[first],
+              timestamp < cutoff {
+            inboundDedupOrder.removeFirst()
+            inboundDedupByKey.removeValue(forKey: first)
+        }
+    }
 }
 
 extension HybridTransportManager: WiFiDirectTransportDelegate {
@@ -242,6 +276,8 @@ extension HybridTransportManager: WiFiDirectTransportDelegate {
                   self.isInboundTimestampAcceptable(envelope.createdAtMs) else {
                 return
             }
+            let dedupKey = "pm:\(envelope.senderPeerID):\(envelope.messageID)"
+            guard self.shouldAcceptInboundEnvelope(dedupKey: dedupKey) else { return }
             self.delegate?.hybridTransportManager(self, didReceivePrivateEnvelope: envelope)
         }
     }
