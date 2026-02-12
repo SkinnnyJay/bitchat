@@ -222,10 +222,59 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     }
     
     // MARK: - Public Methods
+
+    static func lookupKeys(for peerID: String) -> [String] {
+        let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        var keys: [String] = []
+        func appendKey(_ key: String) {
+            let candidate = key.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !candidate.isEmpty else { return }
+            if !keys.contains(candidate) {
+                keys.append(candidate)
+            }
+        }
+
+        appendKey(trimmed)
+        appendKey(trimmed.lowercased())
+        for candidate in WiFiPeerIdentity.candidateIDs(for: PeerID(str: trimmed)) {
+            appendKey(candidate)
+            appendKey(candidate.lowercased())
+        }
+        appendKey(WiFiPeerIdentity.normalizedKey(trimmed))
+        return keys
+    }
+
+    static func resolvePeer(from peerIndex: [String: BitchatPeer], peerID: String) -> BitchatPeer? {
+        let lookupKeys = lookupKeys(for: peerID)
+        guard !lookupKeys.isEmpty else { return nil }
+
+        for key in lookupKeys {
+            if let peer = peerIndex[key] {
+                return peer
+            }
+        }
+
+        let normalizedTarget = WiFiPeerIdentity.normalizedKey(peerID)
+        guard !normalizedTarget.isEmpty else { return nil }
+        return peerIndex.values.first {
+            WiFiPeerIdentity.normalizedKey($0.peerID.id) == normalizedTarget
+        }
+    }
+
+    static func resolveCachedFingerprint(from cache: [String: String], peerID: String) -> String? {
+        for key in lookupKeys(for: peerID) {
+            if let fingerprint = cache[key] {
+                return fingerprint
+            }
+        }
+        return nil
+    }
     
     /// Get peer by ID
     func getPeer(by id: String) -> BitchatPeer? {
-        return peerIndex[id]
+        Self.resolvePeer(from: peerIndex, peerID: id)
     }
     
     /// Get peer ID for nickname
@@ -240,7 +289,10 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     
     /// Check if peer is online
     func isOnline(_ peerID: String) -> Bool {
-        return connectedPeerIDs.contains(peerID)
+        if connectedPeerIDs.contains(peerID) {
+            return true
+        }
+        return connectedPeerIDs.contains { WiFiPeerIdentity.isEquivalent($0, peerID) }
     }
     
     /// Check if peer is blocked
@@ -355,20 +407,24 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     /// Get fingerprint for peer ID
     func getFingerprint(for peerID: String) -> String? {
         // Check cache first
-        if let cached = fingerprintCache[peerID] {
+        if let cached = Self.resolveCachedFingerprint(from: fingerprintCache, peerID: peerID) {
             return cached
         }
         
         // Try to get from mesh service
         if let fingerprint = meshService.getFingerprint(for: PeerID(str: peerID)) {
-            fingerprintCache[peerID] = fingerprint
+            for key in Self.lookupKeys(for: peerID) {
+                fingerprintCache[key] = fingerprint
+            }
             return fingerprint
         }
         
         // Try to get from peer's public key
         if let peer = getPeer(by: peerID) {
             let fingerprint = peer.noisePublicKey.sha256Fingerprint()
-            fingerprintCache[peerID] = fingerprint
+            for key in Self.lookupKeys(for: peerID) {
+                fingerprintCache[key] = fingerprint
+            }
             return fingerprint
         }
         
