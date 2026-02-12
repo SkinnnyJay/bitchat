@@ -44,4 +44,11 @@ final class WiFiPeerIdentityTests: XCTestCase {
         XCTAssertTrue(WiFiPeerIdentity.isEquivalent("mesh:peerabc000000000", "peerabc000000000"))
         XCTAssertTrue(WiFiPeerIdentity.isEquivalent("name:peerabc000000000", "peerabc000000000"))
     }
+
+    func testIsEquivalentRejectsEmptyOrWhitespacePeerIDs() {
+        XCTAssertFalse(WiFiPeerIdentity.isEquivalent("", "peerabc000000000"))
+        XCTAssertFalse(WiFiPeerIdentity.isEquivalent("peerabc000000000", ""))
+        XCTAssertFalse(WiFiPeerIdentity.isEquivalent("   ", "peerabc000000000"))
+        XCTAssertFalse(WiFiPeerIdentity.isEquivalent("peerabc000000000", "   "))
+    }
 }

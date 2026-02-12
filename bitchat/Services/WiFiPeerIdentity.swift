@@ -6,8 +6,12 @@ enum WiFiPeerIdentity {
     }
 
     static func isEquivalent(_ lhs: String, _ rhs: String) -> Bool {
-        let left = PeerID(str: lhs)
-        let right = PeerID(str: rhs)
+        let leftRaw = lhs.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rightRaw = rhs.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !leftRaw.isEmpty, !rightRaw.isEmpty else { return false }
+
+        let left = PeerID(str: leftRaw)
+        let right = PeerID(str: rightRaw)
         if left.id == right.id {
             return true
         }
