@@ -149,7 +149,7 @@ final class GossipSyncManager {
         // 1) Announcements: send latest per peer if requester lacks them
         for (_, pair) in latestAnnouncementByPeer {
             let (idHex, pkt) = pair
-            let idBytes = Data(hexString: idHex) ?? Data()
+            guard let idBytes = Self.packetIDBytes(from: idHex) else { continue }
             if !mightContain(idBytes) {
                 var toSend = pkt
                 toSend.ttl = 0
@@ -215,5 +215,11 @@ final class GossipSyncManager {
             messages.removeValue(forKey: id)
             messageOrder.removeAll { $0 == id }
         }
+    }
+
+    static func packetIDBytes(from idHex: String) -> Data? {
+        let trimmed = idHex.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count == 32, let data = Data(hexString: trimmed), data.count == 16 else { return nil }
+        return data
     }
 }

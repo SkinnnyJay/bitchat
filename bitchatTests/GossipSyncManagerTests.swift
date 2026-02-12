@@ -3,6 +3,19 @@ import XCTest
 @testable import bitchat
 
 final class GossipSyncManagerTests: XCTestCase {
+    func testPacketIDBytesAcceptsCanonicalHexID() {
+        let idHex = String(repeating: "ab", count: 16)
+
+        let packetID = GossipSyncManager.packetIDBytes(from: idHex)
+
+        XCTAssertEqual(packetID?.count, 16)
+    }
+
+    func testPacketIDBytesRejectsInvalidLengthOrNonHex() {
+        XCTAssertNil(GossipSyncManager.packetIDBytes(from: "abc"))
+        XCTAssertNil(GossipSyncManager.packetIDBytes(from: String(repeating: "zz", count: 16)))
+    }
+
     func testCanonicalRoutingIDHexNormalizesPrefixedShortPeerID() {
         XCTAssertEqual(
             GossipSyncManager.canonicalRoutingIDHex(for: PeerID(str: "mesh:abcdef0123456789")),
