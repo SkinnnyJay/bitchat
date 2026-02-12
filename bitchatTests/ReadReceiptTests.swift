@@ -18,6 +18,16 @@ final class ReadReceiptTests: XCTestCase {
         XCTAssertEqual(receipt.readerNickname, "user")
     }
 
+    func testInitializerNormalizesPrefixedReaderIDToBareShortHex() {
+        let receipt = ReadReceipt(
+            originalMessageID: "mid-prefixed-reader",
+            readerID: "mesh:abcdef0123456789",
+            readerNickname: "alice"
+        )
+
+        XCTAssertEqual(receipt.readerID, "abcdef0123456789")
+    }
+
     func testCodableDecodeRejectsInvalidReaderID() throws {
         let raw: [String: Any] = [
             "originalMessageID": "mid-reader-invalid",

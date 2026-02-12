@@ -23,7 +23,7 @@ struct ReadReceipt: Codable {
         self.originalMessageID = InputValidator.validateMessageID(originalMessageID) ?? UUID().uuidString
         self.receiptID = UUID().uuidString
         let canonicalReader = PeerID(str: readerID).toShort()
-        self.readerID = canonicalReader.isShort ? canonicalReader.id : readerID
+        self.readerID = canonicalReader.isShort ? canonicalReader.bare : readerID
         self.readerNickname = InputValidator.validateNickname(readerNickname) ?? "user"
         self.timestamp = Date()
     }
@@ -89,7 +89,7 @@ struct ReadReceipt: Codable {
         self.init(
             originalMessageID: originalMessageID,
             receiptID: receiptID,
-            readerID: canonicalReaderID.id,
+            readerID: canonicalReaderID.bare,
             readerNickname: readerNickname,
             timestamp: timestamp
         )
@@ -131,7 +131,7 @@ struct ReadReceipt: Codable {
 
         try container.encode(originalMessageID, forKey: .originalMessageID)
         try container.encode(receiptID, forKey: .receiptID)
-        try container.encode(canonicalReaderID.id, forKey: .readerID)
+        try container.encode(canonicalReaderID.bare, forKey: .readerID)
         try container.encode(readerNickname, forKey: .readerNickname)
         try container.encode(timestamp, forKey: .timestamp)
     }
@@ -155,7 +155,7 @@ struct ReadReceipt: Codable {
         }
         let canonicalReaderID = PeerID(str: readerID).toShort()
         guard canonicalReaderID.isShort,
-              let readerData = Data(hexString: canonicalReaderID.id),
+              let readerData = Data(hexString: canonicalReaderID.bare),
               readerData.count == 8 else {
             return Data()
         }
