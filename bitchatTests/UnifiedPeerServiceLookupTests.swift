@@ -245,4 +245,46 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
 
         XCTAssertEqual(UnifiedPeerService.fingerprintFromPeer(peer), key.sha256Fingerprint())
     }
+
+    func testResolvedNoisePublicKeyPrefersSnapshotNoiseKeyWhenValid() {
+        let snapshotKey = Data(repeating: 0x33, count: 32)
+        let peerIDNoise = String(repeating: "ab", count: 32)
+        let snapshot = TransportPeerSnapshot(
+            peerID: PeerID(str: peerIDNoise),
+            nickname: "peer",
+            isConnected: true,
+            noisePublicKey: snapshotKey,
+            lastSeen: Date()
+        )
+
+        XCTAssertEqual(UnifiedPeerService.resolvedNoisePublicKey(for: snapshot), snapshotKey)
+    }
+
+    func testResolvedNoisePublicKeyFallsBackToPeerIDNoiseKey() {
+        let peerIDNoise = String(repeating: "cd", count: 32)
+        let snapshot = TransportPeerSnapshot(
+            peerID: PeerID(str: peerIDNoise),
+            nickname: "peer",
+            isConnected: true,
+            noisePublicKey: nil,
+            lastSeen: Date()
+        )
+
+        XCTAssertEqual(
+            UnifiedPeerService.resolvedNoisePublicKey(for: snapshot),
+            Data(hexString: peerIDNoise)
+        )
+    }
+
+    func testResolvedNoisePublicKeyRejectsInvalidLengths() {
+        let snapshot = TransportPeerSnapshot(
+            peerID: PeerID(str: "abcdef0123456789"),
+            nickname: "peer",
+            isConnected: true,
+            noisePublicKey: Data(repeating: 0x11, count: 8),
+            lastSeen: Date()
+        )
+
+        XCTAssertNil(UnifiedPeerService.resolvedNoisePublicKey(for: snapshot))
+    }
 }

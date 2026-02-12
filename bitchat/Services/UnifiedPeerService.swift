@@ -85,9 +85,11 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         for peerInfo in meshPeers {
             let peerID = peerInfo.peerID
             guard peerID != meshService.myPeerID else { continue }  // Never add self
+            let resolvedNoisePublicKey = Self.resolvedNoisePublicKey(for: peerInfo)
             
             let peer = buildPeerFromMesh(
                 peerInfo: peerInfo,
+                resolvedNoisePublicKey: resolvedNoisePublicKey,
                 favorites: favorites,
                 meshAttached: hasAnyConnected
             )
@@ -97,7 +99,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             addedPeerIDs.insert(peerID)
             
             // Update fingerprint cache
-            if let publicKey = peerInfo.noisePublicKey {
+            if let publicKey = resolvedNoisePublicKey {
                 fingerprintCache[peerID.id] = publicKey.sha256Fingerprint()
             }
         }
@@ -170,14 +172,15 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     
     private func buildPeerFromMesh(
         peerInfo: TransportPeerSnapshot,
+        resolvedNoisePublicKey: Data?,
         favorites: [Data: FavoritesPersistenceService.FavoriteRelationship],
         meshAttached: Bool
     ) -> BitchatPeer {
         // Determine reachability based on lastSeen and identity trust
         let now = Date()
-        let fingerprint = peerInfo.noisePublicKey?.sha256Fingerprint()
+        let fingerprint = resolvedNoisePublicKey?.sha256Fingerprint()
         let isVerified = fingerprint.map { identityManager.isVerified(fingerprint: $0) } ?? false
-        let isFav = peerInfo.noisePublicKey.flatMap { favorites[$0]?.isFavorite } ?? false
+        let isFav = resolvedNoisePublicKey.flatMap { favorites[$0]?.isFavorite } ?? false
         let retention: TimeInterval = (isVerified || isFav) ? TransportConfig.bleReachabilityRetentionVerifiedSeconds : TransportConfig.bleReachabilityRetentionUnverifiedSeconds
         // A peer is reachable if we recently saw them AND we are attached to the mesh
         let withinRetention = now.timeIntervalSince(peerInfo.lastSeen) <= retention
@@ -185,7 +188,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
 
         var peer = BitchatPeer(
             peerID: peerInfo.peerID,
-            noisePublicKey: peerInfo.noisePublicKey ?? Data(),
+            noisePublicKey: resolvedNoisePublicKey ?? Data(),
             nickname: peerInfo.nickname,
             lastSeen: peerInfo.lastSeen,
             isConnected: peerInfo.isConnected,
@@ -193,7 +196,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         )
         
         // Check for favorite status
-        if let noiseKey = peerInfo.noisePublicKey,
+        if let noiseKey = resolvedNoisePublicKey,
            let favoriteStatus = favorites[noiseKey] {
             peer.favoriteStatus = favoriteStatus
             peer.nostrPublicKey = favoriteStatus.peerNostrPublicKey
@@ -312,6 +315,16 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         }
 
         return true
+    }
+
+    static func resolvedNoisePublicKey(for snapshot: TransportPeerSnapshot) -> Data? {
+        if let noisePublicKey = snapshot.noisePublicKey, noisePublicKey.count == 32 {
+            return noisePublicKey
+        }
+        if let peerIDNoiseKey = snapshot.peerID.noiseKey, peerIDNoiseKey.count == 32 {
+            return peerIDNoiseKey
+        }
+        return nil
     }
 
     static func fingerprintFromPeer(_ peer: BitchatPeer) -> String? {
