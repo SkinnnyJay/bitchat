@@ -2893,8 +2893,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         if let direct = unifiedPeerService.getPeer(by: senderPeerID)?.nickname {
             return direct
         }
-        let senderShortID = PeerID(str: senderPeerID).toShort().id
-        if let match = unifiedPeerService.peers.first(where: { $0.peerID.toShort().id == senderShortID }) {
+        if let match = unifiedPeerService.peers.first(where: {
+            WiFiPeerIdentity.isEquivalent($0.peerID, senderPeerID)
+        }) {
             return match.nickname
         }
         return nil
