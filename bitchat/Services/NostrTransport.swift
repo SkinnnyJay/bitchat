@@ -260,15 +260,21 @@ extension NostrTransport {
 
     @MainActor
     private func resolveRecipientNpub(for peerID: PeerID) -> String? {
-        if let noiseKey = Data(hexString: peerID.id),
-           let fav = FavoritesPersistenceService.shared.getFavoriteStatus(for: noiseKey),
-           let npub = fav.peerNostrPublicKey {
-            return npub
-        }
-        if peerID.id.count == 16,
-           let fav = FavoritesPersistenceService.shared.getFavoriteStatus(forPeerID: peerID),
-           let npub = fav.peerNostrPublicKey {
-            return npub
+        for candidate in WiFiPeerIdentity.candidateIDs(for: peerID) {
+            if let data = Data(hexString: candidate), data.count == 32,
+               let favorite = FavoritesPersistenceService.shared.getFavoriteStatus(for: data),
+               let npub = favorite.peerNostrPublicKey {
+                return npub
+            }
+
+            if candidate.count == 16 {
+                let shortPeerID = PeerID(str: candidate)
+                guard shortPeerID.isValid else { continue }
+                if let favorite = FavoritesPersistenceService.shared.getFavoriteStatus(forPeerID: shortPeerID),
+                   let npub = favorite.peerNostrPublicKey {
+                    return npub
+                }
+            }
         }
         return nil
     }
