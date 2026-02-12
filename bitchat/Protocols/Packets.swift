@@ -89,11 +89,12 @@ struct PrivateMessagePacket {
     }
 
     func encode() -> Data? {
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return nil }
         var data = Data()
-        data.reserveCapacity(2 + min(messageID.count, 255) + 2 + min(content.count, 255))
+        data.reserveCapacity(2 + min(safeMessageID.utf8.count, 255) + 2 + min(content.utf8.count, 255))
 
         // TLV for messageID
-        guard let messageIDData = messageID.data(using: .utf8), messageIDData.count <= 255 else { return nil }
+        guard let messageIDData = safeMessageID.data(using: .utf8), messageIDData.count <= 255 else { return nil }
         data.append(TLVType.messageID.rawValue)
         data.append(UInt8(messageIDData.count))
         data.append(messageIDData)
@@ -131,7 +132,9 @@ struct PrivateMessagePacket {
             }
         }
 
-        guard let messageID = messageID, let content = content else { return nil }
-        return PrivateMessagePacket(messageID: messageID, content: content)
+        guard let messageID = messageID,
+              let safeMessageID = InputValidator.validateMessageID(messageID),
+              let content = content else { return nil }
+        return PrivateMessagePacket(messageID: safeMessageID, content: content)
     }
 }
