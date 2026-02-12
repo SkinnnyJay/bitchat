@@ -272,7 +272,8 @@ extension NostrTransport {
         for candidate in WiFiPeerIdentity.candidateIDs(for: peerID) {
             if let data = Data(hexString: candidate), data.count == 32,
                let favorite = FavoritesPersistenceService.shared.getFavoriteStatus(for: data),
-               let npub = favorite.peerNostrPublicKey {
+               let npub = favorite.peerNostrPublicKey,
+               isValidNpub(npub) {
                 return npub
             }
 
@@ -280,7 +281,8 @@ extension NostrTransport {
                 let shortPeerID = PeerID(str: candidate)
                 guard shortPeerID.isValid else { continue }
                 if let favorite = FavoritesPersistenceService.shared.getFavoriteStatus(forPeerID: shortPeerID),
-                   let npub = favorite.peerNostrPublicKey {
+                   let npub = favorite.peerNostrPublicKey,
+                   isValidNpub(npub) {
                     return npub
                 }
             }
@@ -291,5 +293,10 @@ extension NostrTransport {
     private func normalizedSenderPeerID() -> PeerID? {
         let canonical = senderPeerID.toShort()
         return canonical.isShort ? canonical : nil
+    }
+
+    private func isValidNpub(_ npub: String) -> Bool {
+        guard let (hrp, data) = try? Bech32.decode(npub) else { return false }
+        return hrp == "npub" && data.count == 32
     }
 }
