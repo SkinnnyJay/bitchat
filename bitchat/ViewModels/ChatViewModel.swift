@@ -4481,6 +4481,16 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         return keys
     }
+
+    static func shouldResolveNicknameLookup(for value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        let parsed = PeerID(str: trimmed)
+        if parsed.prefix != .empty {
+            return true
+        }
+        return trimmed.allSatisfy { $0.isHexDigit }
+    }
     
     @MainActor
     func getFingerprint(for peerID: String) -> String? {
@@ -4498,10 +4508,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             return "unknown"
         }
         
-        // Check if this might already be a nickname (not a hex peer ID)
-        // Peer IDs are hex strings, so they only contain 0-9 and a-f
-        let isHexID = peerID.allSatisfy { $0.isHexDigit }
-        if !isHexID {
+        // Check if this might already be a nickname instead of a peer identifier
+        if !Self.shouldResolveNicknameLookup(for: peerID) {
             // If it's already a nickname, just return it
             return peerID
         }
