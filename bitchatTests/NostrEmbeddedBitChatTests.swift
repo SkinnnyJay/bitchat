@@ -102,6 +102,12 @@ final class NostrEmbeddedBitChatTests: XCTestCase {
 
         XCTAssertNotNil(result)
         XCTAssertTrue(result?.hasPrefix("bitchat1:") == true)
+
+        let decoded = decodeEmbeddedPacket(result)
+        let expectedRecipient = PeerID(publicKey: Data(hexString: noiseRecipient)!).id
+        let expectedSender = PeerID(publicKey: Data(hexString: noiseSender)!).id
+        XCTAssertEqual(decoded?.recipientID?.hexEncodedString(), expectedRecipient)
+        XCTAssertEqual(decoded?.senderID.hexEncodedString(), expectedSender)
     }
 
     func testEncodePMForNostrAcceptsPrefixedFullNoisePeerIDs() {
@@ -119,15 +125,20 @@ final class NostrEmbeddedBitChatTests: XCTestCase {
     }
 
     func testEncodeAckForNostrAcceptsPrefixedShortPeerIDs() {
+        let recipient = "mesh:abcdef0123456789"
+        let sender = "mesh:0123456789abcdef"
         let result = NostrEmbeddedBitChat.encodeAckForNostr(
             type: .delivered,
             messageID: "mid-prefixed-peer",
-            recipientPeerID: "mesh:abcdef0123456789",
-            senderPeerID: "mesh:0123456789abcdef"
+            recipientPeerID: recipient,
+            senderPeerID: sender
         )
 
         XCTAssertNotNil(result)
         XCTAssertTrue(result?.hasPrefix("bitchat1:") == true)
+        let decoded = decodeEmbeddedPacket(result)
+        XCTAssertEqual(decoded?.recipientID?.hexEncodedString(), PeerID(str: recipient).toShort().id)
+        XCTAssertEqual(decoded?.senderID.hexEncodedString(), PeerID(str: sender).toShort().id)
     }
 
     func testEncodeAckForNostrNoRecipientAcceptsFullNoiseSenderPeerID() {
@@ -140,6 +151,9 @@ final class NostrEmbeddedBitChatTests: XCTestCase {
 
         XCTAssertNotNil(result)
         XCTAssertTrue(result?.hasPrefix("bitchat1:") == true)
+        let decoded = decodeEmbeddedPacket(result)
+        XCTAssertEqual(decoded?.recipientID, nil)
+        XCTAssertEqual(decoded?.senderID.hexEncodedString(), PeerID(publicKey: Data(hexString: noiseSender)!).id)
     }
 
     func testEncodeAckForNostrNoRecipientRejectsNonRoutableSenderPeerID() {
@@ -161,5 +175,23 @@ final class NostrEmbeddedBitChatTests: XCTestCase {
         )
 
         XCTAssertNil(result)
+    }
+
+    private func decodeEmbeddedPacket(_ encoded: String?) -> BitchatPacket? {
+        guard let encoded, encoded.hasPrefix("bitchat1:") else { return nil }
+        let payload = String(encoded.dropFirst("bitchat1:".count))
+        guard let packetData = base64URLDecode(payload) else { return nil }
+        return BitchatPacket.from(packetData)
+    }
+
+    private func base64URLDecode(_ value: String) -> Data? {
+        var normalized = value
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        let padding = normalized.count % 4
+        if padding > 0 {
+            normalized.append(String(repeating: "=", count: 4 - padding))
+        }
+        return Data(base64Encoded: normalized)
     }
 }
