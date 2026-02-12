@@ -41,6 +41,17 @@ final class ChatViewModelNicknameLookupTests: XCTestCase {
         XCTAssertEqual(resolved, "alice")
     }
 
+    func testResolveMeshNicknameMatchesUppercasePrefixedIdentifier() {
+        let peerNicknames: [PeerID: String] = [PeerID(str: "abcdef0123456789"): "alice"]
+
+        let resolved = ChatViewModel.resolveMeshNickname(
+            from: peerNicknames,
+            for: "MESH:ABCDEF0123456789"
+        )
+
+        XCTAssertEqual(resolved, "alice")
+    }
+
     func testResolveMeshNicknameRespectsGeoPrefixIsolation() {
         let peerNicknames: [PeerID: String] = [PeerID(str: "abcdef0123456789"): "alice"]
 
