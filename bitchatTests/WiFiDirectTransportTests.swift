@@ -157,6 +157,16 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertThrowsError(try transport.send(Data("hello".utf8), to: "peer-a"))
     }
 
+    func testSendRejectsWhitespacePeerIDBeforeBackendSend() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+
+        XCTAssertThrowsError(try transport.send(Data("hello".utf8), to: "   ")) { error in
+            XCTAssertEqual(error as? WiFiDirectTransportError, .peerNotFound)
+        }
+        XCTAssertTrue(backend.sentPayloads.isEmpty)
+    }
+
     func testDelegateReceivesPeerAndMessageEvents() {
         let backend = MockBackend(localPeerID: "self")
         let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)

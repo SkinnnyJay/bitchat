@@ -6,7 +6,7 @@ protocol WiFiDirectTransportDelegate: AnyObject {
     func wifiTransportDidChangeAvailability(_ isAvailable: Bool)
 }
 
-enum WiFiDirectTransportError: Error {
+enum WiFiDirectTransportError: Error, Equatable {
     case notAvailable
     case peerNotFound
     case sendFailed
@@ -63,6 +63,9 @@ final class WiFiDirectTransport: NSObject {
     }
 
     func send(_ data: Data, to peerID: String? = nil) throws {
+        if let peerID, peerID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            throw WiFiDirectTransportError.peerNotFound
+        }
         try impl.send(data, to: peerID)
     }
 
