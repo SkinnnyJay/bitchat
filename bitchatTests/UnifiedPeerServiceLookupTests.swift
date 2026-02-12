@@ -204,6 +204,25 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertEqual(resolved, first)
     }
 
+    func testResolveCachedFingerprintWithOrderPrefersMostRecentEquivalentKey() {
+        let older = String(repeating: "e5", count: 32)
+        let newer = String(repeating: "f6", count: 32)
+        let keyOlder = "mesh:abcdef0123456789"
+        let keyNewer = "abcdef0123456789"
+        let cache = [
+            keyOlder: older,
+            keyNewer: newer
+        ]
+
+        let resolved = UnifiedPeerService.resolveCachedFingerprint(
+            from: cache,
+            order: [keyOlder, keyNewer],
+            peerID: "name:abcdef0123456789"
+        )
+
+        XCTAssertEqual(resolved, newer)
+    }
+
     func testResolveCachedFingerprintMatchesShortQueryAgainstFullNoiseCacheKey() {
         let fullNoiseHex = String(repeating: "cd", count: 32)
         let shortID = PeerID(str: fullNoiseHex).toShort().bare

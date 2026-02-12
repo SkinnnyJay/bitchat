@@ -289,6 +289,48 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return matches.first.flatMap { canonicalFingerprint($0.value) }
     }
 
+    static func resolveCachedFingerprint(from cache: [String: String], order: [String], peerID: String) -> String? {
+        var candidateFingerprintsByKey: [String: String] = [:]
+
+        for key in lookupKeys(for: peerID) {
+            if let fingerprint = cache[key],
+               let canonicalFingerprint = canonicalFingerprint(fingerprint),
+               candidateFingerprintsByKey[key] == nil {
+                candidateFingerprintsByKey[key] = canonicalFingerprint
+            }
+        }
+
+        let normalizedTarget = WiFiPeerIdentity.normalizedKey(peerID)
+        if !normalizedTarget.isEmpty {
+            for (key, value) in cache
+            where candidateFingerprintsByKey[key] == nil
+                && WiFiPeerIdentity.normalizedKey(key) == normalizedTarget {
+                if let canonicalFingerprint = canonicalFingerprint(value) {
+                    candidateFingerprintsByKey[key] = canonicalFingerprint
+                }
+            }
+        }
+
+        guard !candidateFingerprintsByKey.isEmpty else { return nil }
+
+        var recencyByKey: [String: Int] = [:]
+        for (index, key) in order.enumerated() {
+            recencyByKey[key] = index
+        }
+
+        let preferredKey = candidateFingerprintsByKey.keys.sorted { lhs, rhs in
+            let leftRecency = recencyByKey[lhs] ?? -1
+            let rightRecency = recencyByKey[rhs] ?? -1
+            if leftRecency != rightRecency {
+                return leftRecency > rightRecency
+            }
+            return lhs < rhs
+        }.first
+
+        guard let preferredKey else { return nil }
+        return candidateFingerprintsByKey[preferredKey]
+    }
+
     static func shouldSortPeer(_ lhs: BitchatPeer, _ rhs: BitchatPeer) -> Bool {
         // Connectivity rank: connected > reachable > others
         func rank(_ peer: BitchatPeer) -> Int {
@@ -782,7 +824,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     /// Get fingerprint for peer ID
     func getFingerprint(for peerID: String) -> String? {
         // Check cache first
-        if let cached = Self.resolveCachedFingerprint(from: fingerprintCache, peerID: peerID) {
+        if let cached = Self.resolveCachedFingerprint(from: fingerprintCache, order: fingerprintCacheOrder, peerID: peerID) {
             return cached
         }
         
