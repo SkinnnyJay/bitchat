@@ -4426,7 +4426,40 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     // MARK: - Peer Lookup Helpers
     
     func getPeer(byID peerID: String) -> BitchatPeer? {
-        return peerIndex[peerID]
+        Self.resolvePeer(from: peerIndex, peerID: peerID)
+    }
+
+    static func resolvePeer(from peerIndex: [String: BitchatPeer], peerID: String) -> BitchatPeer? {
+        let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        var lookupKeys: [String] = []
+        func appendLookupKey(_ key: String) {
+            let candidate = key.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !candidate.isEmpty else { return }
+            if !lookupKeys.contains(candidate) {
+                lookupKeys.append(candidate)
+            }
+        }
+
+        appendLookupKey(trimmed)
+        appendLookupKey(trimmed.lowercased())
+        for candidate in WiFiPeerIdentity.candidateIDs(for: PeerID(str: trimmed)) {
+            appendLookupKey(candidate)
+            appendLookupKey(candidate.lowercased())
+        }
+
+        for key in lookupKeys {
+            if let peer = peerIndex[key] {
+                return peer
+            }
+        }
+
+        let normalizedTarget = WiFiPeerIdentity.normalizedKey(trimmed)
+        guard !normalizedTarget.isEmpty else { return nil }
+        return peerIndex.values.first {
+            WiFiPeerIdentity.normalizedKey($0.peerID.id) == normalizedTarget
+        }
     }
     
     @MainActor
