@@ -654,6 +654,15 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return snapshot.peerID.isValid
     }
 
+    static func resolveMeshNickname(for peerID: String, using resolver: (PeerID) -> String?) -> String? {
+        for lookupKey in lookupKeys(for: peerID) {
+            guard let nickname = resolver(PeerID(str: lookupKey)),
+                  let sanitized = InputValidator.validateNickname(nickname) else { continue }
+            return sanitized
+        }
+        return nil
+    }
+
     static func fingerprintFromPeer(_ peer: BitchatPeer) -> String? {
         guard peer.noisePublicKey.count == 32 else { return nil }
         return peer.noisePublicKey.sha256Fingerprint()
@@ -742,7 +751,10 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         
         if actualNickname.isEmpty {
             // Try to get from mesh service's current peer list
-            if let meshPeerNickname = meshService.peerNickname(peerID: PeerID(str: peerID)) {
+            if let meshPeerNickname = Self.resolveMeshNickname(
+                for: peer.peerID.id,
+                using: { [meshService] candidate in meshService.peerNickname(peerID: candidate) }
+            ) {
                 actualNickname = meshPeerNickname
                 SecureLogger.debug("🔍 Got nickname from mesh service: '\(actualNickname)'", category: .session)
             }
@@ -771,14 +783,14 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         }
         
         // Log the final nickname being saved
-        SecureLogger.debug("⭐️ Toggled favorite for '\(finalNickname)' (peerID: \(peerID), was: \(wasFavorite), now: \(!wasFavorite))", category: .session)
+        SecureLogger.debug("⭐️ Toggled favorite for '\(finalNickname)' (peerID: \(peer.peerID.id), was: \(wasFavorite), now: \(!wasFavorite))", category: .session)
         
         // Send favorite notification to the peer via router (mesh or Nostr)
         if let router = messageRouter {
-            router.sendFavoriteNotification(to: PeerID(str: peerID), isFavorite: !wasFavorite)
+            router.sendFavoriteNotification(to: peer.peerID, isFavorite: !wasFavorite)
         } else {
             // Fallback to mesh-only if router not yet wired
-            meshService.sendFavoriteNotification(to: PeerID(str: peerID), isFavorite: !wasFavorite)
+            meshService.sendFavoriteNotification(to: peer.peerID, isFavorite: !wasFavorite)
         }
         
         // Force update of peers to reflect the change

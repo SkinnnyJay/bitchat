@@ -619,6 +619,33 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertEqual(UnifiedPeerService.sanitizedPeerNickname("alice"), "alice")
     }
 
+    func testResolveMeshNicknameUsesEquivalentLookupVariants() {
+        let fullNoiseHex = String(repeating: "ab", count: 32)
+        let shortID = PeerID(str: fullNoiseHex).toShort().bare
+
+        let resolved = UnifiedPeerService.resolveMeshNickname(for: fullNoiseHex) { candidate in
+            candidate.id == shortID ? "alice" : nil
+        }
+
+        XCTAssertEqual(resolved, "alice")
+    }
+
+    func testResolveMeshNicknameSkipsInvalidValuesAndContinuesLookup() {
+        let prefixedShort = "mesh:abcdef0123456789"
+
+        let resolved = UnifiedPeerService.resolveMeshNickname(for: prefixedShort) { candidate in
+            if candidate.id == "mesh:abcdef0123456789" {
+                return "   "
+            }
+            if candidate.id == "abcdef0123456789" {
+                return "bob"
+            }
+            return nil
+        }
+
+        XCTAssertEqual(resolved, "bob")
+    }
+
     func testPeerIDLookupMatchesNicknameCaseInsensitivelyAndTrimmed() {
         let peer = BitchatPeer(
             peerID: PeerID(str: "abcdef0123456789"),
