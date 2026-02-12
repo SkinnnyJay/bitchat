@@ -100,6 +100,14 @@ final class PrivateChatManager: ObservableObject {
     func markReadReceiptSent(_ messageID: String) {
         _ = prepareReadReceiptMessageID(messageID)
     }
+
+    func replaceSentReadReceipts(with messageIDs: [String]) {
+        sentReadReceipts.removeAll()
+        sentReadReceiptOrder.removeAll()
+        for messageID in messageIDs {
+            _ = prepareReadReceiptMessageID(messageID)
+        }
+    }
     
     // MARK: - Private Methods
 

@@ -530,9 +530,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Initialize services
         self.commandProcessor = CommandProcessor(identityManager: identityManager)
         self.privateChatManager = PrivateChatManager(meshService: meshService)
-        for messageID in self.sentReadReceiptOrder {
-            self.privateChatManager.markReadReceiptSent(messageID)
-        }
+        self.privateChatManager.replaceSentReadReceipts(with: self.sentReadReceiptOrder)
         self.unifiedPeerService = UnifiedPeerService(meshService: meshService, identityManager: identityManager)
         let nostrTransport = NostrTransport(keychain: keychain)
         self.messageRouter = MessageRouter(mesh: meshService, nostr: nostrTransport)
@@ -2254,6 +2252,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         guard !sentReadReceipts.contains(safeMessageID) else { return }
         sentReadReceipts.insert(safeMessageID)
         sentReadReceiptOrder.append(safeMessageID)
+        privateChatManager.markReadReceiptSent(safeMessageID)
         if sentReadReceiptOrder.count > maxSentReadReceipts {
             let overflow = sentReadReceiptOrder.count - maxSentReadReceipts
             for _ in 0..<overflow {
@@ -3376,6 +3375,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Clear read receipt tracking
         sentReadReceipts.removeAll()
         sentReadReceiptOrder.removeAll()
+        privateChatManager.replaceSentReadReceipts(with: [])
         sentGeoDeliveryAcks.removeAll()
         sentGeoDeliveryAckOrder.removeAll()
         processedNostrAcks.removeAll()
@@ -5013,6 +5013,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         let oldCount = sentReadReceipts.count
         sentReadReceipts = sentReadReceipts.intersection(validMessageIDs)
         sentReadReceiptOrder = sentReadReceiptOrder.filter { sentReadReceipts.contains($0) }
+        privateChatManager.replaceSentReadReceipts(with: sentReadReceiptOrder)
         
         let removedCount = oldCount - sentReadReceipts.count
         if removedCount > 0 {
