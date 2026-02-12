@@ -365,7 +365,7 @@ final class MessageRouter {
         ) else { return false }
 
         let recipientNickname = mesh.peerNickname(peerID: peerID) ?? "user"
-        let content = isFavorite ? "[FAVORITED]" : "[UNFAVORITED]"
+        let content = favoriteNotificationPayloadContent(isFavorite: isFavorite)
         let envelope = WiFiDirectPrivateEnvelope(
             senderPeerID: mesh.myPeerID.id,
             recipientPeerID: targetPeerID,
@@ -383,6 +383,14 @@ final class MessageRouter {
             SecureLogger.debug("WiFi Direct favorite route failed for \(peerID.id.prefix(8))…, falling back", category: .session)
             return false
         }
+    }
+
+    private func favoriteNotificationPayloadContent(isFavorite: Bool) -> String {
+        let base = isFavorite ? "[FAVORITED]" : "[UNFAVORITED]"
+        if let identity = try? NostrIdentityBridge.getCurrentNostrIdentity() {
+            return "\(base):\(identity.npub)"
+        }
+        return base
     }
 
     private func resolveWiFiPeerIdentifier(
