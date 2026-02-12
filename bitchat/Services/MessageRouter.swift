@@ -330,7 +330,9 @@ extension MessageRouter: WiFiDirectTransportDelegate {
                envelope.messageType == "private",
                envelope.version == 1,
                envelope.senderPeerID == peerID,
-               envelope.recipientPeerID == self.mesh.myPeerID.id {
+               envelope.recipientPeerID == self.mesh.myPeerID.id,
+               !envelope.messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               envelope.content.utf8.count <= InputValidator.Limits.maxMessageLength {
                 let dedupKey = "pm:\(envelope.senderPeerID):\(envelope.messageID)"
                 guard self.shouldAcceptInboundWiFiEnvelope(dedupKey: dedupKey) else { return }
                 NotificationCenter.default.post(
@@ -345,7 +347,8 @@ extension MessageRouter: WiFiDirectTransportDelegate {
                envelope.messageType == "ack",
                envelope.version == 1,
                envelope.senderPeerID == peerID,
-               envelope.recipientPeerID == self.mesh.myPeerID.id {
+               envelope.recipientPeerID == self.mesh.myPeerID.id,
+               !envelope.messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 let dedupKey = "ack:\(envelope.ackType.rawValue):\(envelope.senderPeerID):\(envelope.messageID)"
                 guard self.shouldAcceptInboundWiFiEnvelope(dedupKey: dedupKey) else { return }
                 NotificationCenter.default.post(
