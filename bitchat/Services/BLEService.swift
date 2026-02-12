@@ -334,7 +334,7 @@ final class BLEService: NSObject {
                 // Create packet with explicit fields so we can sign it
                 let basePacket = BitchatPacket(
                     type: MessageType.message.rawValue,
-                    senderID: Data(hexString: self.myPeerID.id) ?? Data(),
+                    senderID: self.myPeerIDData,
                     recipientID: nil,
                     timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
                     payload: Data(content.utf8),
@@ -520,6 +520,12 @@ final class BLEService: NSObject {
         let canonical = peerID.toShort()
         guard canonical.isShort else { return nil }
         return PeerID(str: canonical.bare)
+    }
+
+    static func routingPeerIDData(for peerID: PeerID) -> Data? {
+        guard let canonical = canonicalRoutingPeerID(for: peerID) else { return nil }
+        guard let data = Data(hexString: canonical.bare), data.count == 8 else { return nil }
+        return data
     }
 
     static func isReachable(
@@ -1644,7 +1650,7 @@ extension BLEService {
     private func refreshPeerIdentity() {
         let fingerprint = noiseService.getIdentityFingerprint()
         myPeerID = PeerID(str: fingerprint.prefix(16))
-        myPeerIDData = Data(hexString: myPeerID.id) ?? Data()
+        myPeerIDData = Self.routingPeerIDData(for: myPeerID) ?? Data()
     }
 
     private func restartGossipManager() {

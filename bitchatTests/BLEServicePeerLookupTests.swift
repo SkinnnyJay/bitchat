@@ -51,6 +51,13 @@ final class BLEServicePeerLookupTests: XCTestCase {
         XCTAssertNil(BLEService.canonicalRoutingPeerID(for: PeerID(str: "peer-not-routable")))
     }
 
+    func testRoutingPeerIDDataNormalizesPrefixedShortToEightBytes() {
+        let data = BLEService.routingPeerIDData(for: PeerID(str: "mesh:ABCDEF0123456789"))
+
+        XCTAssertEqual(data?.count, 8)
+        XCTAssertEqual(data?.hexEncodedString(), "abcdef0123456789")
+    }
+
     func testIsReachableReturnsTrueWhenAnyCandidateIsConnected() {
         let now = Date()
         let states: [(Bool, Bool, Date)] = [
