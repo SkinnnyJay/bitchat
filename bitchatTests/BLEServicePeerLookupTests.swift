@@ -17,6 +17,12 @@ final class BLEServicePeerLookupTests: XCTestCase {
         XCTAssertTrue(keys.contains("abcdef0123456789"))
     }
 
+    func testPeerLookupKeysForGeoDMPeerIDDoNotIncludeBareMeshVariant() {
+        let keys = BLEService.peerLookupKeys(for: PeerID(str: "nostr_abcdef0123456789"))
+
+        XCTAssertEqual(keys, ["nostr_abcdef0123456789"])
+    }
+
     func testPeerLookupKeysIncludeDerivedShortForFullNoisePeerID() {
         let fullNoisePeerID = PeerID(str: String(repeating: "ab", count: 32))
         let expectedShort = fullNoisePeerID.toShort().bare

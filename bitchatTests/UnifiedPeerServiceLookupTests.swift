@@ -44,6 +44,12 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertEqual(keys, ["nostr_abcdef0123456789"])
     }
 
+    func testLookupKeysForUppercaseGeoDMPeerIDKeepPrefixedVariantOnly() {
+        let keys = UnifiedPeerService.lookupKeys(for: "NOSTR_ABCDEF0123456789")
+
+        XCTAssertEqual(keys, ["NOSTR_ABCDEF0123456789", "nostr_abcdef0123456789"])
+    }
+
     func testResolvePeerDoesNotCrossResolveGeoDMIntoBareMeshID() {
         let peer = BitchatPeer(
             peerID: PeerID(str: "abcdef0123456789"),
