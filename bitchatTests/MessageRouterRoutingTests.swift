@@ -161,6 +161,39 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testRoutesPrivateMessageViaWiFiWithInvalidRecipientNicknameSanitized() throws {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: true)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm", "ack"], for: recipient.id)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 16),
+            wifiTransport: wifi
+        )
+
+        let invalidNickname = String(repeating: "y", count: InputValidator.Limits.maxNicknameLength + 10)
+        router.sendPrivate(
+            String(repeating: "a", count: 64),
+            to: recipient,
+            recipientNickname: invalidNickname,
+            messageID: "msg-invalid-recipient-nick"
+        )
+
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        XCTAssertTrue(mesh.sentPrivateMessages.isEmpty)
+        let envelope = try JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: backend.sentPayloads[0].0)
+        XCTAssertEqual(envelope.recipientNickname, "user")
+    }
+
+    @MainActor
     func testRoutesViaWiFiWhenMeshIsUnreachableButWiFiPeerExists() throws {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()

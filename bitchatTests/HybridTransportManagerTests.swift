@@ -131,6 +131,31 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testSendPrivateRoutesViaWiFiWithInvalidRecipientNicknameSanitized() throws {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm"], for: recipient.id)
+
+        let manager = HybridTransportManager(
+            meshTransport: mesh,
+            wifiTransport: wifi,
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 1)
+        )
+
+        let invalidNickname = String(repeating: "z", count: InputValidator.Limits.maxNicknameLength + 10)
+        let route = manager.sendPrivate("hello", to: recipient, recipientNickname: invalidNickname, messageID: "mid-invalid-recipient-nick")
+
+        XCTAssertEqual(route, .wifiDirect)
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        XCTAssertTrue(mesh.sentPrivateMessages.isEmpty)
+        let envelope = try JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: backend.sentPayloads[0].0)
+        XCTAssertEqual(envelope.recipientNickname, "user")
+    }
+
+    @MainActor
     func testStartAndStopLifecycleForwardedToMeshAndWiFiTransports() {
         let mesh = MockTransport()
         let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)

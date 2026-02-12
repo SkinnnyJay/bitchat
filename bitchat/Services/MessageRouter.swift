@@ -313,11 +313,12 @@ final class MessageRouter {
             )
             guard shouldUseWiFi else { return false }
         }
+        let safeRecipientNickname = InputValidator.validateNickname(recipientNickname) ?? "user"
 
         let envelope = WiFiDirectPrivateEnvelope(
             senderPeerID: mesh.myPeerID.id,
             recipientPeerID: targetPeerID,
-            recipientNickname: recipientNickname,
+            recipientNickname: safeRecipientNickname,
             messageID: messageID,
             content: content
         )

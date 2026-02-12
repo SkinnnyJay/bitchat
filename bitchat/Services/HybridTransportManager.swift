@@ -175,10 +175,11 @@ final class HybridTransportManager {
         let shouldFallbackToWiFi = !meshReachable && resolvedRecipientID != nil && canUseWiFiPayload
 
         if canUseWiFiPayload, (shouldUseWiFi || shouldFallbackToWiFi), let resolvedRecipientID {
+            let safeRecipientNickname = InputValidator.validateNickname(recipientNickname) ?? "user"
             let envelope = WiFiDirectPrivateEnvelope(
                 senderPeerID: meshTransport.myPeerID.id,
                 recipientPeerID: resolvedRecipientID,
-                recipientNickname: recipientNickname,
+                recipientNickname: safeRecipientNickname,
                 messageID: messageID,
                 content: content
             )
