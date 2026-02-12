@@ -351,7 +351,7 @@ final class MessageRouter {
             senderPeerID: mesh.myPeerID.id,
             recipientPeerID: targetPeerID,
             messageID: messageID,
-            senderNickname: senderNickname
+            senderNickname: senderNickname.flatMap { InputValidator.validateNickname($0) }
         )
         guard let payload = try? JSONEncoder().encode(envelope) else { return false }
 
@@ -373,7 +373,7 @@ final class MessageRouter {
             requiredCapability: "pm"
         ) else { return false }
 
-        let recipientNickname = mesh.peerNickname(peerID: peerID) ?? "user"
+        let recipientNickname = InputValidator.validateNickname(mesh.peerNickname(peerID: peerID) ?? "") ?? "user"
         let content = favoriteNotificationPayloadContent(isFavorite: isFavorite)
         let envelope = WiFiDirectPrivateEnvelope(
             senderPeerID: mesh.myPeerID.id,

@@ -1216,6 +1216,28 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testRoutesReadReceiptViaWiFiWithInvalidNicknameSanitized() throws {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm", "ack"], for: recipient.id)
+
+        let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        let invalidNickname = String(repeating: "x", count: InputValidator.Limits.maxNicknameLength + 10)
+        let receipt = ReadReceipt(originalMessageID: "mid-read-2", readerID: mesh.myPeerID.id, readerNickname: invalidNickname)
+        router.sendReadReceipt(receipt, to: recipient)
+
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        let envelope = try JSONDecoder().decode(WiFiDirectAckEnvelope.self, from: backend.sentPayloads[0].0)
+        XCTAssertEqual(envelope.ackType, .read)
+        XCTAssertEqual(envelope.messageID, "mid-read-2")
+        XCTAssertNil(envelope.senderNickname)
+    }
+
+    @MainActor
     func testRoutesDeliveryAckViaWiFiWhenPeerIsAvailable() throws {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
