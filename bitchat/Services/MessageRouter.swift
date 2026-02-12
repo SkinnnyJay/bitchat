@@ -208,25 +208,32 @@ final class MessageRouter {
 }
 
 extension MessageRouter: WiFiDirectTransportDelegate {
-    func wifiTransportDidUpdatePeers(_ peers: [String]) {
-        SecureLogger.debug("WiFi Direct peers updated count=\(peers.count)", category: .session)
-    }
-
-    func wifiTransportDidReceive(_ data: Data, from peerID: String) {
-        guard let envelope = try? JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: data),
-              envelope.messageType == "private",
-              envelope.recipientPeerID == mesh.myPeerID.id else {
-            return
+    nonisolated func wifiTransportDidUpdatePeers(_ peers: [String]) {
+        Task { @MainActor in
+            SecureLogger.debug("WiFi Direct peers updated count=\(peers.count)", category: .session)
         }
-
-        NotificationCenter.default.post(
-            name: .wifiDirectPrivateEnvelopeReceived,
-            object: nil,
-            userInfo: [WiFiDirectNotificationUserInfoKey.envelope: envelope]
-        )
     }
 
-    func wifiTransportDidChangeAvailability(_ isAvailable: Bool) {
-        SecureLogger.debug("WiFi Direct availability changed available=\(isAvailable)", category: .session)
+    nonisolated func wifiTransportDidReceive(_ data: Data, from peerID: String) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            guard let envelope = try? JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: data),
+                  envelope.messageType == "private",
+                  envelope.recipientPeerID == self.mesh.myPeerID.id else {
+                return
+            }
+
+            NotificationCenter.default.post(
+                name: .wifiDirectPrivateEnvelopeReceived,
+                object: nil,
+                userInfo: [WiFiDirectNotificationUserInfoKey.envelope: envelope]
+            )
+        }
+    }
+
+    nonisolated func wifiTransportDidChangeAvailability(_ isAvailable: Bool) {
+        Task { @MainActor in
+            SecureLogger.debug("WiFi Direct availability changed available=\(isAvailable)", category: .session)
+        }
     }
 }

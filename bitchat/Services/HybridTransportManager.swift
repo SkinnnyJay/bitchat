@@ -121,18 +121,24 @@ final class HybridTransportManager {
 }
 
 extension HybridTransportManager: WiFiDirectTransportDelegate {
-    func wifiTransportDidUpdatePeers(_ peers: [String]) {
-        delegate?.hybridTransportManager(self, didUpdateWiFiPeers: peers)
-    }
-
-    func wifiTransportDidReceive(_ data: Data, from peerID: String) {
-        guard let envelope = try? JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: data),
-              envelope.messageType == "private",
-              envelope.recipientPeerID == meshTransport.myPeerID.id else {
-            return
+    nonisolated func wifiTransportDidUpdatePeers(_ peers: [String]) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.delegate?.hybridTransportManager(self, didUpdateWiFiPeers: peers)
         }
-        delegate?.hybridTransportManager(self, didReceivePrivateEnvelope: envelope)
     }
 
-    func wifiTransportDidChangeAvailability(_ isAvailable: Bool) {}
+    nonisolated func wifiTransportDidReceive(_ data: Data, from peerID: String) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            guard let envelope = try? JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: data),
+                  envelope.messageType == "private",
+                  envelope.recipientPeerID == self.meshTransport.myPeerID.id else {
+                return
+            }
+            self.delegate?.hybridTransportManager(self, didReceivePrivateEnvelope: envelope)
+        }
+    }
+
+    nonisolated func wifiTransportDidChangeAvailability(_ isAvailable: Bool) {}
 }
