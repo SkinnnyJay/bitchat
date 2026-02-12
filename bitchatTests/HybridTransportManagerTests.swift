@@ -309,6 +309,29 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testSendPrivateDropsWhenMessageIDContainsInternalWhitespace() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: false)
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm"], for: recipient.id)
+
+        let manager = HybridTransportManager(
+            meshTransport: mesh,
+            wifiTransport: wifi,
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 1)
+        )
+
+        let route = manager.sendPrivate("hello", to: recipient, recipientNickname: "peer", messageID: "mid with-space")
+
+        XCTAssertEqual(route, .dropped)
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 0)
+    }
+
+    @MainActor
     func testSendPrivateDropsInvalidMessageIDEvenWhenMeshReachable() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()

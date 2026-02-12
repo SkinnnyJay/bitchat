@@ -381,6 +381,31 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testDropsPrivateMessageWhenMessageIDContainsInternalWhitespace() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: true)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 1),
+            wifiTransport: wifi
+        )
+
+        let whitespaceMessageID = "mid with-space"
+        router.sendPrivate("hello", to: recipient, recipientNickname: "peer", messageID: whitespaceMessageID)
+
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 0)
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 0)
+    }
+
+    @MainActor
     func testDropsPrivateMessageWithInvalidMessageIDWhenNoRouteAvailable() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
@@ -1707,6 +1732,24 @@ final class MessageRouterRoutingTests: XCTestCase {
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
         let oversizedMessageID = String(repeating: "d", count: InputValidator.Limits.maxMessageIDLength + 1)
         router.sendDeliveryAck(oversizedMessageID, to: recipient)
+
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentDeliveryAcks.count, 0)
+    }
+
+    @MainActor
+    func testDropsDeliveryAckWhenMessageIDContainsInternalWhitespace() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: true)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm", "ack"], for: recipient.id)
+
+        let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        router.sendDeliveryAck("mid with-space", to: recipient)
 
         XCTAssertEqual(backend.sentPayloads.count, 0)
         XCTAssertEqual(mesh.sentDeliveryAcks.count, 0)
