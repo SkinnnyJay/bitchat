@@ -27,6 +27,24 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertEqual(resolved, peer)
     }
 
+    func testResolvePeerMatchesShortQueryAgainstFullNoiseIndexedPeer() {
+        let fullNoiseHex = String(repeating: "ab", count: 32)
+        let shortID = PeerID(str: fullNoiseHex).toShort().bare
+        let peer = BitchatPeer(
+            peerID: PeerID(str: fullNoiseHex),
+            noisePublicKey: Data(hexString: fullNoiseHex) ?? Data(),
+            nickname: "noise-peer"
+        )
+        let peerIndex = [fullNoiseHex: peer]
+
+        let resolved = UnifiedPeerService.resolvePeer(
+            from: peerIndex,
+            peerID: shortID
+        )
+
+        XCTAssertEqual(resolved, peer)
+    }
+
     func testResolveCachedFingerprintMatchesEquivalentIdentifierVariants() {
         let cache = ["abcdef0123456789": "fp-1"]
 
@@ -47,6 +65,19 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         )
 
         XCTAssertEqual(resolved, "fp-2")
+    }
+
+    func testResolveCachedFingerprintMatchesShortQueryAgainstFullNoiseCacheKey() {
+        let fullNoiseHex = String(repeating: "cd", count: 32)
+        let shortID = PeerID(str: fullNoiseHex).toShort().bare
+        let cache = [fullNoiseHex: "fp-3"]
+
+        let resolved = UnifiedPeerService.resolveCachedFingerprint(
+            from: cache,
+            peerID: shortID
+        )
+
+        XCTAssertEqual(resolved, "fp-3")
     }
 
     func testLookupKeysForGeoDMPeerIDDoNotIncludeBareMeshCandidate() {

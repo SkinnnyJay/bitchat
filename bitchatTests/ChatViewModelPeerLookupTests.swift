@@ -41,6 +41,21 @@ final class ChatViewModelPeerLookupTests: XCTestCase {
         XCTAssertEqual(resolved, peer)
     }
 
+    func testResolvePeerMatchesShortQueryAgainstFullNoiseIndexedPeer() {
+        let fullNoiseHex = String(repeating: "ab", count: 32)
+        let shortID = PeerID(str: fullNoiseHex).toShort().bare
+        let peer = BitchatPeer(
+            peerID: PeerID(str: fullNoiseHex),
+            noisePublicKey: Data(hexString: fullNoiseHex) ?? Data(),
+            nickname: "noise-peer"
+        )
+        let index = [fullNoiseHex: peer]
+
+        let resolved = ChatViewModel.resolvePeer(from: index, peerID: shortID)
+
+        XCTAssertEqual(resolved, peer)
+    }
+
     func testResolvePeerReturnsNilForEmptyOrUnknownIdentifier() {
         let peer = BitchatPeer(
             peerID: PeerID(str: "abcdef0123456789"),
