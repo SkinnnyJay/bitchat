@@ -358,8 +358,12 @@ extension MessageRouter: WiFiDirectTransportDelegate {
     }
 
     nonisolated func wifiTransportDidChangeAvailability(_ isAvailable: Bool) {
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             SecureLogger.debug("WiFi Direct availability changed available=\(isAvailable)", category: .session)
+            if isAvailable {
+                self.flushAllOutbox()
+            }
         }
     }
 }
