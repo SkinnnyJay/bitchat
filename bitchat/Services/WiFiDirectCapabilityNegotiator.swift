@@ -26,6 +26,8 @@ struct WiFiDirectCapabilityNegotiator {
         for (key, value) in dictionary {
             if let stringValue = value as? String {
                 parsed[key] = stringValue
+            } else if let numberValue = value as? NSNumber {
+                parsed[key] = numberValue.stringValue
             }
         }
         return parsed.isEmpty ? nil : parsed
