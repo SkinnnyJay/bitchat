@@ -999,6 +999,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let envelope = try JSONDecoder().decode(WiFiDirectAckEnvelope.self, from: backend.sentPayloads[0].0)
         XCTAssertEqual(envelope.ackType, .read)
         XCTAssertEqual(envelope.messageID, "mid-read-1")
+        XCTAssertEqual(envelope.senderNickname, "me")
         XCTAssertTrue(mesh.sentReadReceipts.isEmpty)
     }
 
