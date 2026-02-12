@@ -344,4 +344,26 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
 
         XCTAssertNil(UnifiedPeerService.resolvedNoisePublicKey(for: snapshot))
     }
+
+    func testResolveFingerprintFromMeshChecksLookupKeyVariants() {
+        let lookup: [String: String] = ["abcdef0123456789": "fp-lookup"]
+
+        let resolved = UnifiedPeerService.resolveFingerprintFromMesh(
+            for: "mesh:ABCDEF0123456789"
+        ) { candidate in
+            lookup[candidate.id]
+        }
+
+        XCTAssertEqual(resolved, "fp-lookup")
+    }
+
+    func testResolveFingerprintFromMeshReturnsNilWhenNoVariantMatches() {
+        let resolved = UnifiedPeerService.resolveFingerprintFromMesh(
+            for: "mesh:abcdef0123456789"
+        ) { _ in
+            nil
+        }
+
+        XCTAssertNil(resolved)
+    }
 }

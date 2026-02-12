@@ -272,6 +272,18 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         }
     }
 
+    static func resolveFingerprintFromMesh(
+        for peerID: String,
+        using resolver: (PeerID) -> String?
+    ) -> String? {
+        for lookupKey in lookupKeys(for: peerID) {
+            if let fingerprint = resolver(PeerID(str: lookupKey)) {
+                return fingerprint
+            }
+        }
+        return nil
+    }
+
     static func buildPeerIndex(from peers: [BitchatPeer]) -> [String: BitchatPeer] {
         var index: [String: BitchatPeer] = [:]
         for peer in peers {
@@ -512,7 +524,10 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         }
         
         // Try to get from mesh service
-        if let fingerprint = meshService.getFingerprint(for: PeerID(str: peerID)) {
+        if let fingerprint = Self.resolveFingerprintFromMesh(
+            for: peerID,
+            using: { [meshService] candidate in meshService.getFingerprint(for: candidate) }
+        ) {
             Self.cacheFingerprint(fingerprint, for: peerID, in: &fingerprintCache)
             return fingerprint
         }
