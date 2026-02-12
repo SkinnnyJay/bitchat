@@ -901,6 +901,48 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testRoutesFavoriteNotificationUsingShortDerivedPeerIDForNoiseKeyRecipient() throws {
+        let noiseKey = Data(repeating: 0x52, count: 32)
+        let recipientFull = PeerID(hexData: noiseKey)
+        let recipientShort = PeerID(publicKey: noiseKey)
+        let mesh = MockTransport()
+        mesh.setPeerNickname("peer", for: recipientFull)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipientShort.id])
+        backend.setCapabilities(["pm", "ack"], for: recipientShort.id)
+
+        let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        router.sendFavoriteNotification(to: recipientFull, isFavorite: true)
+
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        let envelope = try JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: backend.sentPayloads[0].0)
+        XCTAssertEqual(envelope.recipientPeerID, recipientShort.id)
+        XCTAssertTrue(envelope.content.hasPrefix("[FAVORITED]"))
+    }
+
+    @MainActor
+    func testFallsBackFromWiFiFavoriteNotificationWhenPeerLacksPMCapability() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: true)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["ack"], for: recipient.id)
+
+        let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        router.sendFavoriteNotification(to: recipient, isFavorite: true)
+
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentFavoriteNotifications.count, 1)
+        XCTAssertEqual(mesh.sentFavoriteNotifications[0].peerID, recipient)
+        XCTAssertTrue(mesh.sentFavoriteNotifications[0].isFavorite)
+    }
+
+    @MainActor
     func testPostsNotificationForIncomingWiFiAckEnvelope() throws {
         let mesh = MockTransport()
         let nostr = NostrTransport(keychain: MockKeychain())
