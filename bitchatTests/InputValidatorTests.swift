@@ -19,6 +19,7 @@ final class InputValidatorTests: XCTestCase {
     func testValidateMessageIDRejectsInternalWhitespace() {
         XCTAssertNil(InputValidator.validateMessageID("mid with-space"))
         XCTAssertNil(InputValidator.validateMessageID("mid\twith-tab"))
+        XCTAssertNil(InputValidator.validateMessageID("mid\nwith-newline"))
     }
 
     func testValidateMessageIDRejectsOversizedIDs() {
