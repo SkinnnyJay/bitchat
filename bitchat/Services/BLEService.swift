@@ -490,20 +490,43 @@ final class BLEService: NSObject {
     }
     
     // MARK: Connectivity and peers
+
+    static func peerLookupKeys(for peerID: PeerID) -> [String] {
+        var keys: [String] = []
+
+        for candidate in WiFiPeerIdentity.candidateIDs(for: peerID) {
+            let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+
+            if !keys.contains(trimmed) {
+                keys.append(trimmed)
+            }
+
+            let shortCandidate = PeerID(str: trimmed).toShort()
+            if shortCandidate.isShort, !keys.contains(shortCandidate.bare) {
+                keys.append(shortCandidate.bare)
+            }
+        }
+
+        return keys
+    }
     
     func isPeerConnected(_ peerID: PeerID) -> Bool {
-        // Accept both 16-hex short IDs and 64-hex Noise keys
-        let shortID = peerID.toShort().id
-        return collectionsQueue.sync { peers[shortID]?.isConnected ?? false }
+        let lookupKeys = Self.peerLookupKeys(for: peerID)
+        return collectionsQueue.sync {
+            for key in lookupKeys where peers[key]?.isConnected == true {
+                return true
+            }
+            return false
+        }
     }
 
     func isPeerReachable(_ peerID: PeerID) -> Bool {
-        // Accept both 16-hex short IDs and 64-hex Noise keys
-        let shortID = peerID.toShort().id
+        let lookupKeys = Self.peerLookupKeys(for: peerID)
         return collectionsQueue.sync {
             // Must be mesh-attached: at least one live direct link to the mesh
             let meshAttached = peers.values.contains { $0.isConnected }
-            guard let info = peers[shortID] else { return false }
+            guard let info = lookupKeys.compactMap({ peers[$0] }).first else { return false }
             if info.isConnected { return true }
             guard meshAttached else { return false }
             // Apply reachability retention window
@@ -515,8 +538,12 @@ final class BLEService: NSObject {
 
     func peerNickname(peerID: PeerID) -> String? {
         collectionsQueue.sync {
-            guard let peer = peers[peerID.id], peer.isConnected else { return nil }
-            return peer.nickname
+            for key in Self.peerLookupKeys(for: peerID) {
+                if let peer = peers[key], peer.isConnected {
+                    return peer.nickname
+                }
+            }
+            return nil
         }
     }
 
@@ -532,7 +559,12 @@ final class BLEService: NSObject {
     
     func getFingerprint(for peerID: PeerID) -> String? {
         return collectionsQueue.sync {
-            return peers[peerID.id]?.noisePublicKey?.sha256Fingerprint()
+            for key in Self.peerLookupKeys(for: peerID) {
+                if let fingerprint = peers[key]?.noisePublicKey?.sha256Fingerprint() {
+                    return fingerprint
+                }
+            }
+            return nil
         }
     }
     
