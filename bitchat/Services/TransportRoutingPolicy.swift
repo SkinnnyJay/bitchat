@@ -7,6 +7,8 @@ import Foundation
 /// - If only one transport is available, use it.
 /// - If both are available, prefer mesh for smaller payloads and Nostr for
 ///   larger payloads.
+/// - Mesh/Nostr are treated as unavailable if payload exceeds their packet
+///   envelope limits.
 /// - If none are available, return `nil` so caller can queue for later.
 struct TransportRoutingPolicy {
     enum PrivateRoute: Equatable {
