@@ -93,7 +93,7 @@ final class WiFiDirectTransport: NSObject {
         let normalizedPeerID = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedPeerID.isEmpty else { return nil }
         guard normalizedPeerID.utf8.count <= maxPeerIDBytes else { return nil }
-        return impl.capabilities(for: normalizedPeerID) ?? impl.capabilities(for: peerID)
+        return impl.capabilities(for: normalizedPeerID)
     }
 
     deinit {
