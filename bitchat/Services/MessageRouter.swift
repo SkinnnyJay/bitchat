@@ -283,25 +283,24 @@ final class MessageRouter {
         requirePolicyThreshold: Bool
     ) -> Bool {
         guard let wifiTransport else { return false }
-        guard wifiTransport.isAvailable else { return false }
-        guard Set(wifiTransport.currentPeers).contains(peerID.id) else { return false }
+        guard let targetPeerID = resolveWiFiPeerIdentifier(
+            for: peerID,
+            wifiTransport: wifiTransport,
+            requiredCapability: "pm"
+        ) else { return false }
         if requirePolicyThreshold {
             let shouldUseWiFi = wifiRoutingPolicy.shouldUseWiFi(
                 payloadBytes: content.utf8.count,
-                recipientPeerID: peerID.id,
+                recipientPeerID: targetPeerID,
                 wifiAvailable: wifiTransport.isAvailable,
                 wifiPeerIDs: Set(wifiTransport.currentPeers)
             )
             guard shouldUseWiFi else { return false }
         }
-        if let capabilities = wifiTransport.peerCapabilities(peerID: peerID.id),
-           !capabilities.contains("pm") {
-            return false
-        }
 
         let envelope = WiFiDirectPrivateEnvelope(
             senderPeerID: mesh.myPeerID.id,
-            recipientPeerID: peerID.id,
+            recipientPeerID: targetPeerID,
             recipientNickname: recipientNickname,
             messageID: messageID,
             content: content
@@ -309,7 +308,7 @@ final class MessageRouter {
         guard let payload = try? JSONEncoder().encode(envelope) else { return false }
 
         do {
-            try wifiTransport.send(payload, to: peerID.id)
+            try wifiTransport.send(payload, to: targetPeerID)
             SecureLogger.debug("Routing PM via WiFi Direct to \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
             return true
         } catch {
@@ -325,24 +324,23 @@ final class MessageRouter {
         senderNickname: String?
     ) -> Bool {
         guard let wifiTransport else { return false }
-        guard wifiTransport.isAvailable else { return false }
-        guard Set(wifiTransport.currentPeers).contains(peerID.id) else { return false }
-        if let capabilities = wifiTransport.peerCapabilities(peerID: peerID.id),
-           !capabilities.contains("ack") {
-            return false
-        }
+        guard let targetPeerID = resolveWiFiPeerIdentifier(
+            for: peerID,
+            wifiTransport: wifiTransport,
+            requiredCapability: "ack"
+        ) else { return false }
 
         let envelope = WiFiDirectAckEnvelope(
             ackType: ackType,
             senderPeerID: mesh.myPeerID.id,
-            recipientPeerID: peerID.id,
+            recipientPeerID: targetPeerID,
             messageID: messageID,
             senderNickname: senderNickname
         )
         guard let payload = try? JSONEncoder().encode(envelope) else { return false }
 
         do {
-            try wifiTransport.send(payload, to: peerID.id)
+            try wifiTransport.send(payload, to: targetPeerID)
             SecureLogger.debug("Routing \(ackType.rawValue.uppercased()) ack via WiFi Direct to \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
             return true
         } catch {
@@ -353,18 +351,17 @@ final class MessageRouter {
 
     private func sendFavoriteNotificationViaWiFiIfAvailable(to peerID: PeerID, isFavorite: Bool) -> Bool {
         guard let wifiTransport else { return false }
-        guard wifiTransport.isAvailable else { return false }
-        guard Set(wifiTransport.currentPeers).contains(peerID.id) else { return false }
-        if let capabilities = wifiTransport.peerCapabilities(peerID: peerID.id),
-           !capabilities.contains("pm") {
-            return false
-        }
+        guard let targetPeerID = resolveWiFiPeerIdentifier(
+            for: peerID,
+            wifiTransport: wifiTransport,
+            requiredCapability: "pm"
+        ) else { return false }
 
         let recipientNickname = mesh.peerNickname(peerID: peerID) ?? "user"
         let content = isFavorite ? "[FAVORITED]" : "[UNFAVORITED]"
         let envelope = WiFiDirectPrivateEnvelope(
             senderPeerID: mesh.myPeerID.id,
-            recipientPeerID: peerID.id,
+            recipientPeerID: targetPeerID,
             recipientNickname: recipientNickname,
             messageID: UUID().uuidString,
             content: content
@@ -372,13 +369,45 @@ final class MessageRouter {
         guard let payload = try? JSONEncoder().encode(envelope) else { return false }
 
         do {
-            try wifiTransport.send(payload, to: peerID.id)
+            try wifiTransport.send(payload, to: targetPeerID)
             SecureLogger.debug("Routing FAVORITE(\(isFavorite)) via WiFi Direct to \(peerID.id.prefix(8))…", category: .session)
             return true
         } catch {
             SecureLogger.debug("WiFi Direct favorite route failed for \(peerID.id.prefix(8))…, falling back", category: .session)
             return false
         }
+    }
+
+    private func resolveWiFiPeerIdentifier(
+        for peerID: PeerID,
+        wifiTransport: WiFiDirectTransport,
+        requiredCapability: String
+    ) -> String? {
+        guard wifiTransport.isAvailable else { return nil }
+        let availablePeerIDs = Set(wifiTransport.currentPeers)
+        for candidate in wifiPeerIDCandidates(for: peerID) where availablePeerIDs.contains(candidate) {
+            if let capabilities = wifiTransport.peerCapabilities(peerID: candidate),
+               !capabilities.contains(requiredCapability) {
+                continue
+            }
+            return candidate
+        }
+        return nil
+    }
+
+    private func wifiPeerIDCandidates(for peerID: PeerID) -> [String] {
+        var candidates: [String] = [peerID.id]
+        let short = peerID.toShort().id
+        if short != peerID.id {
+            candidates.append(short)
+        }
+        if let noiseKey = peerID.noiseKey {
+            let full = noiseKey.hexEncodedString()
+            if full != peerID.id && !candidates.contains(full) {
+                candidates.append(full)
+            }
+        }
+        return candidates
     }
 
     func flushAllOutbox() {

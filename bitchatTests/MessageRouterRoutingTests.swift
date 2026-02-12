@@ -211,6 +211,36 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testRoutesViaWiFiUsingShortDerivedPeerIDForNoiseKeyRecipient() throws {
+        let noiseKey = Data(repeating: 0x42, count: 32)
+        let recipientFull = PeerID(hexData: noiseKey)
+        let recipientShort = PeerID(publicKey: noiseKey)
+        let mesh = MockTransport()
+        mesh.setReachable(recipientFull, isReachable: false)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = true
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipientShort.id])
+        backend.setCapabilities(["pm", "ack"], for: recipientShort.id)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 8),
+            wifiTransport: wifi
+        )
+
+        router.sendPrivate("noise-key-recipient", to: recipientFull, recipientNickname: "peer", messageID: "msg-noise-full")
+
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        let envelope = try JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: backend.sentPayloads[0].0)
+        XCTAssertEqual(envelope.recipientPeerID, recipientShort.id)
+        XCTAssertEqual(backend.sentPayloads[0].1, recipientShort.id)
+    }
+
+    @MainActor
     func testFallsBackToMeshWhenWiFiSendFails() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
@@ -680,6 +710,28 @@ final class MessageRouterRoutingTests: XCTestCase {
         let envelope = try JSONDecoder().decode(WiFiDirectAckEnvelope.self, from: backend.sentPayloads[0].0)
         XCTAssertEqual(envelope.ackType, .delivered)
         XCTAssertEqual(envelope.messageID, "mid-delivered-1")
+        XCTAssertTrue(mesh.sentDeliveryAcks.isEmpty)
+    }
+
+    @MainActor
+    func testRoutesDeliveryAckViaWiFiUsingShortDerivedPeerIDForNoiseKeyRecipient() throws {
+        let noiseKey = Data(repeating: 0x24, count: 32)
+        let recipientFull = PeerID(hexData: noiseKey)
+        let recipientShort = PeerID(publicKey: noiseKey)
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipientShort.id])
+        backend.setCapabilities(["pm", "ack"], for: recipientShort.id)
+
+        let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        router.sendDeliveryAck("mid-delivered-noise-full", to: recipientFull)
+
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        let envelope = try JSONDecoder().decode(WiFiDirectAckEnvelope.self, from: backend.sentPayloads[0].0)
+        XCTAssertEqual(envelope.recipientPeerID, recipientShort.id)
+        XCTAssertEqual(backend.sentPayloads[0].1, recipientShort.id)
         XCTAssertTrue(mesh.sentDeliveryAcks.isEmpty)
     }
 
