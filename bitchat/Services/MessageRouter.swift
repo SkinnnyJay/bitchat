@@ -267,6 +267,10 @@ final class MessageRouter {
             let nickname = message.recipientNickname
             let messageID = message.messageID
             guard let safeMessageID = InputValidator.validateMessageID(messageID) else {
+                SecureLogger.warning(
+                    "Dropping queued PM with invalid message ID for \(outboxPeerID.id.prefix(8))…",
+                    category: .session
+                )
                 continue
             }
             if routePrivateViaWiFi(
