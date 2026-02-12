@@ -67,6 +67,7 @@ final class HybridTransportManagerTests: XCTestCase {
 
         func startDiscovery() { startDiscoveryCallCount += 1 }
         func stopDiscovery() { stopDiscoveryCallCount += 1 }
+        func resetState() {}
 
         func send(_ data: Data, to peerID: String?) throws {
             sentPayloads.append((data, peerID))

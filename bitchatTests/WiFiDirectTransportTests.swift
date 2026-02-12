@@ -25,6 +25,7 @@ final class WiFiDirectTransportTests: XCTestCase {
         var isAvailable: Bool
         var startDiscoveryCount = 0
         var stopDiscoveryCount = 0
+        var resetStateCount = 0
         var sentPayloads: [(data: Data, peerID: String?)] = []
         var sendError: Error?
         var capabilitiesByPeerID: [String: Set<String>] = [:]
@@ -40,6 +41,10 @@ final class WiFiDirectTransportTests: XCTestCase {
 
         func stopDiscovery() {
             stopDiscoveryCount += 1
+        }
+
+        func resetState() {
+            resetStateCount += 1
         }
 
         func send(_ data: Data, to peerID: String?) throws {
@@ -79,6 +84,7 @@ final class WiFiDirectTransportTests: XCTestCase {
         transport.stopDiscovery()
         XCTAssertFalse(transport.isDiscovering)
         XCTAssertEqual(backend.stopDiscoveryCount, 1)
+        XCTAssertEqual(backend.resetStateCount, 1)
     }
 
     func testStartDiscoveryWhenUnavailableDoesNotEnterDiscoveringState() {
@@ -176,5 +182,6 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertEqual(delegate.availability, [true, false])
         XCTAssertTrue(delegate.peerUpdates.contains(["peer-a"]))
         XCTAssertTrue(delegate.peerUpdates.contains([]))
+        XCTAssertEqual(backend.resetStateCount, 1)
     }
 }

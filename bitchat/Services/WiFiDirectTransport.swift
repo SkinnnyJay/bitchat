@@ -57,6 +57,7 @@ final class WiFiDirectTransport: NSObject {
         guard isDiscovering else { return }
         isDiscovering = false
         impl.stopDiscovery()
+        impl.resetState()
         didUpdatePeers([])
         didChangeAvailability(false)
     }
@@ -106,6 +107,7 @@ protocol WiFiDirectTransportBackend: AnyObject {
     init(localPeerID: String?)
     func startDiscovery()
     func stopDiscovery()
+    func resetState()
     func send(_ data: Data, to peerID: String?) throws
     func capabilities(for peerID: String) -> Set<String>?
 }
@@ -156,6 +158,12 @@ private final class MPCWiFiDirectTransportImplementation: NSObject, WiFiDirectTr
     func stopDiscovery() {
         advertiser.stopAdvertisingPeer()
         browser.stopBrowsingForPeers()
+    }
+
+    func resetState() {
+        inviteBackoffByPeerID.removeAll()
+        nextInviteAllowedAt.removeAll()
+        capabilitiesByPeerID.removeAll()
     }
 
     func send(_ data: Data, to peerID: String?) throws {
@@ -305,6 +313,8 @@ private final class NoopWiFiDirectTransportImplementation: WiFiDirectTransportBa
     }
 
     func stopDiscovery() {}
+
+    func resetState() {}
 
     func send(_ data: Data, to peerID: String?) throws {
         throw WiFiDirectTransportError.notAvailable

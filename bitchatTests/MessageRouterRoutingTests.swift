@@ -98,6 +98,7 @@ final class MessageRouterRoutingTests: XCTestCase {
 
         func startDiscovery() {}
         func stopDiscovery() {}
+        func resetState() {}
 
         func send(_ data: Data, to peerID: String?) throws {
             if let sendError {
