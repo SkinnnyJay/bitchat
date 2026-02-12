@@ -216,6 +216,23 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertEqual(delegate.peerUpdates.last, ["peer-a", "peer-b"])
     }
 
+    func testPeerUpdatesAreCappedToConfiguredMaximum() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let delegate = MockDelegate()
+        transport.delegate = delegate
+
+        let peers = (0..<400).map { "peer-\($0)" }
+        let expect = expectation(description: "peer updates are capped")
+        backend.simulatePeerUpdate(peers)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(delegate.peerUpdates.last?.count, TransportConfig.wifiDirectMaxTrackedPeers)
+    }
+
     func testReceivePeerIDIsTrimmedAndBlankSourceDropped() {
         let backend = MockBackend(localPeerID: "self")
         let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
