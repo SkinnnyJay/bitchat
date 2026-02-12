@@ -79,4 +79,26 @@ final class BitchatMessageTests: XCTestCase {
         XCTAssertNil(decoded?.recipientNickname)
         XCTAssertEqual(decoded?.mentions, ["alice", "bob"])
     }
+
+    func testBinaryDecodeRejectsInvalidMessageID() {
+        var payload = Data()
+        payload.append(0) // flags
+        payload.append(contentsOf: Array(repeating: UInt8(0), count: 8)) // timestamp
+
+        let invalidID = "invalid id"
+        payload.append(UInt8(invalidID.utf8.count))
+        payload.append(contentsOf: invalidID.utf8)
+
+        let sender = "alice"
+        payload.append(UInt8(sender.utf8.count))
+        payload.append(contentsOf: sender.utf8)
+
+        let content = "hello"
+        let contentLength = UInt16(content.utf8.count)
+        payload.append(UInt8((contentLength >> 8) & 0xFF))
+        payload.append(UInt8(contentLength & 0xFF))
+        payload.append(contentsOf: content.utf8)
+
+        XCTAssertNil(BitchatMessage(payload))
+    }
 }

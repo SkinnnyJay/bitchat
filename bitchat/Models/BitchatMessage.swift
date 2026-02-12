@@ -237,7 +237,10 @@ extension BitchatMessage {
         guard offset + idLength <= dataCopy.count else {
             return nil
         }
-        let id = String(data: dataCopy[offset..<offset+idLength], encoding: .utf8) ?? UUID().uuidString
+        guard let rawID = String(data: dataCopy[offset..<offset+idLength], encoding: .utf8),
+              let id = InputValidator.validateMessageID(rawID) else {
+            return nil
+        }
         offset += idLength
         
         // Sender
