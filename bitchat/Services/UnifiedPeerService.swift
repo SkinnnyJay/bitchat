@@ -138,11 +138,9 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         // Phase 4: Build subsets and indices
         var favoritesList: [BitchatPeer] = []
         var mutualsList: [BitchatPeer] = []
-        var newIndex: [String: BitchatPeer] = [:]
+        let newIndex = Self.buildPeerIndex(from: enrichedPeers)
         
         for peer in enrichedPeers {
-            newIndex[peer.peerID.id] = peer
-            
             if peer.isFavorite {
                 favoritesList.append(peer)
             }
@@ -258,6 +256,20 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return cache.first { key, _ in
             WiFiPeerIdentity.normalizedKey(key) == normalizedTarget
         }?.value
+    }
+
+    static func buildPeerIndex(from peers: [BitchatPeer]) -> [String: BitchatPeer] {
+        var index: [String: BitchatPeer] = [:]
+        for peer in peers {
+            for key in lookupKeys(for: peer.peerID.id) where index[key] == nil {
+                index[key] = peer
+            }
+            let normalized = WiFiPeerIdentity.normalizedKey(peer.peerID.id)
+            if !normalized.isEmpty, index[normalized] == nil {
+                index[normalized] = peer
+            }
+        }
+        return index
     }
 
     static func buildConnectedPeerLookupKeys(from connectedPeerIDs: Set<String>) -> Set<String> {

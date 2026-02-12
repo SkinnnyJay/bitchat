@@ -124,6 +124,38 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertEqual(resolved, peer)
     }
 
+    func testBuildPeerIndexIncludesLookupVariantsForPrefixedMeshPeer() {
+        let peer = BitchatPeer(
+            peerID: PeerID(str: "mesh:abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x55, count: 32),
+            nickname: "prefixed"
+        )
+
+        let index = UnifiedPeerService.buildPeerIndex(from: [peer])
+
+        XCTAssertEqual(index["mesh:abcdef0123456789"], peer)
+        XCTAssertEqual(index["abcdef0123456789"], peer)
+    }
+
+    func testBuildPeerIndexPrefersFirstPeerForEquivalentLookupKey() {
+        let fullNoiseHex = String(repeating: "ab", count: 32)
+        let shortPeer = BitchatPeer(
+            peerID: PeerID(str: PeerID(str: fullNoiseHex).toShort().bare),
+            noisePublicKey: Data(repeating: 0x66, count: 32),
+            nickname: "preferred"
+        )
+        let fullPeer = BitchatPeer(
+            peerID: PeerID(str: fullNoiseHex),
+            noisePublicKey: Data(hexString: fullNoiseHex) ?? Data(),
+            nickname: "fallback"
+        )
+
+        let index = UnifiedPeerService.buildPeerIndex(from: [shortPeer, fullPeer])
+        let shortID = PeerID(str: fullNoiseHex).toShort().bare
+
+        XCTAssertEqual(index[shortID], shortPeer)
+    }
+
     func testBuildConnectedPeerLookupKeysIncludesEquivalentVariants() {
         let fullNoiseHex = String(repeating: "ab", count: 32)
         let lookup = UnifiedPeerService.buildConnectedPeerLookupKeys(from: [fullNoiseHex])
