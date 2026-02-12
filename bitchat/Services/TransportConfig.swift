@@ -36,6 +36,8 @@ enum TransportConfig {
     static let nostrReadAckInterval: TimeInterval = 0.35 // ~3 per second
     // Prefer Nostr for larger private payloads when both mesh and Nostr are available.
     static let nostrPreferredPayloadBytes: Int = 8_192
+    // Prefer WiFi Direct for medium/large payloads when direct WiFi peer is available.
+    static let wifiDirectPreferredPayloadBytes: Int = 4_096
 
     // UI thresholds
     static let uiLateInsertThreshold: TimeInterval = 15.0
