@@ -510,6 +510,12 @@ final class BLEService: NSObject {
 
         return keys
     }
+
+    static func canonicalRoutingPeerID(for peerID: PeerID) -> PeerID? {
+        let canonical = peerID.toShort()
+        guard canonical.isShort else { return nil }
+        return PeerID(str: canonical.bare)
+    }
     
     func isPeerConnected(_ peerID: PeerID) -> Bool {
         let lookupKeys = Self.peerLookupKeys(for: peerID)
@@ -569,6 +575,14 @@ final class BLEService: NSObject {
     }
     
     func getNoiseSessionState(for peerID: PeerID) -> LazyHandshakeState {
+        if let canonicalRoutingPeerID = Self.canonicalRoutingPeerID(for: peerID) {
+            if noiseService.hasEstablishedSession(with: canonicalRoutingPeerID) {
+                return .established
+            } else if noiseService.hasSession(with: canonicalRoutingPeerID) {
+                return .handshaking
+            }
+        }
+
         if noiseService.hasEstablishedSession(with: peerID) {
             return .established
         } else if noiseService.hasSession(with: peerID) {

@@ -25,4 +25,21 @@ final class BLEServicePeerLookupTests: XCTestCase {
         XCTAssertEqual(keys.filter { $0 == "mesh:abcdef0123456789" }.count, 1)
         XCTAssertEqual(keys.filter { $0 == "abcdef0123456789" }.count, 1)
     }
+
+    func testCanonicalRoutingPeerIDNormalizesPrefixedShortToBareHex() {
+        let canonical = BLEService.canonicalRoutingPeerID(for: PeerID(str: "mesh:abcdef0123456789"))
+
+        XCTAssertEqual(canonical, PeerID(str: "abcdef0123456789"))
+    }
+
+    func testCanonicalRoutingPeerIDDerivesShortFromFullNoiseID() {
+        let fullNoiseID = PeerID(str: String(repeating: "ab", count: 32))
+        let canonical = BLEService.canonicalRoutingPeerID(for: fullNoiseID)
+
+        XCTAssertEqual(canonical, PeerID(str: fullNoiseID.toShort().bare))
+    }
+
+    func testCanonicalRoutingPeerIDRejectsNonRoutablePeerID() {
+        XCTAssertNil(BLEService.canonicalRoutingPeerID(for: PeerID(str: "peer-not-routable")))
+    }
 }
