@@ -74,7 +74,8 @@ final class MessageRouter {
             }
             // Handle key updates
             if let newKey = note.userInfo?["peerPublicKey"] as? Data,
-               let _ = note.userInfo?["isKeyUpdate"] as? Bool {
+               let isKeyUpdate = note.userInfo?["isKeyUpdate"] as? Bool,
+               isKeyUpdate {
                 let peerID = PeerID(publicKey: newKey)
                 if let oldKey = note.userInfo?["oldPeerPublicKey"] as? Data {
                     let oldPeerID = PeerID(publicKey: oldKey)
