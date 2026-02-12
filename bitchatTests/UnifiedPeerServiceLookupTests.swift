@@ -375,6 +375,19 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertEqual(cache["abcdef0123456789"], "fp-test")
     }
 
+    func testCacheFingerprintKeepsGeoPrefixIsolation() {
+        var cache: [String: String] = [:]
+
+        UnifiedPeerService.cacheFingerprint(
+            "fp-geo",
+            for: "nostr_abcdef0123456789",
+            in: &cache
+        )
+
+        XCTAssertEqual(cache["nostr_abcdef0123456789"], "fp-geo")
+        XCTAssertNil(cache["abcdef0123456789"])
+    }
+
     func testResolvedNoisePublicKeyPrefersSnapshotNoiseKeyWhenValid() {
         let snapshotKey = Data(repeating: 0x33, count: 32)
         let peerIDNoise = String(repeating: "ab", count: 32)
@@ -434,6 +447,16 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
             for: "mesh:abcdef0123456789"
         ) { _ in
             nil
+        }
+
+        XCTAssertNil(resolved)
+    }
+
+    func testResolveFingerprintFromMeshKeepsGeoPrefixIsolation() {
+        let resolved = UnifiedPeerService.resolveFingerprintFromMesh(
+            for: "nostr_abcdef0123456789"
+        ) { candidate in
+            candidate.id == "abcdef0123456789" ? "fp-bare" : nil
         }
 
         XCTAssertNil(resolved)
