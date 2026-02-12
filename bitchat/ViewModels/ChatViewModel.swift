@@ -481,6 +481,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     private let maxProcessedNostrAcks = TransportConfig.uiProcessedNostrAcksCap
     // Track which GeoDM messages we've already sent a delivery ACK for (by messageID)
     private var sentGeoDeliveryAcks: Set<String> = []
+    private var sentGeoDeliveryAckOrder: [String] = []
+    private let maxSentGeoDeliveryAcks = TransportConfig.uiSentGeoDeliveryAcksCap
+    private var sentReadReceiptOrder: [String] = []
+    private let maxSentReadReceipts = TransportConfig.uiSentReadReceiptsCap
     
     // Track app startup phase to prevent marking old messages as unread
     private var isStartupPhase = true
@@ -504,10 +508,23 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Load persisted read receipts
         if let data = UserDefaults.standard.data(forKey: "sentReadReceipts"),
            let receipts = try? JSONDecoder().decode([String].self, from: data) {
-            self.sentReadReceipts = Set(receipts)
+            var uniqueOrdered: [String] = []
+            var seen: Set<String> = []
+            for receiptID in receipts {
+                guard let safeMessageID = InputValidator.validateMessageID(receiptID) else { continue }
+                if seen.insert(safeMessageID).inserted {
+                    uniqueOrdered.append(safeMessageID)
+                }
+            }
+            if uniqueOrdered.count > self.maxSentReadReceipts {
+                uniqueOrdered = Array(uniqueOrdered.suffix(self.maxSentReadReceipts))
+            }
+            self.sentReadReceipts = Set(uniqueOrdered)
+            self.sentReadReceiptOrder = uniqueOrdered
             // Successfully loaded read receipts
         } else {
             // No persisted read receipts found
+            self.sentReadReceiptOrder = []
         }
         
         // Initialize services
@@ -1108,7 +1125,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // pared back: omit view-state log
         let isViewing = selectedPrivateChatPeer == convKey
-        let wasReadBefore = sentReadReceipts.contains(messageId)
+        let wasReadBefore = hasSentReadReceipt(messageId)
         let isRecentMessage = Date().timeIntervalSince(messageTimestamp) < 30
         let shouldMarkUnread = !wasReadBefore && !isViewing && isRecentMessage
         if shouldMarkUnread {
@@ -1134,21 +1151,21 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     private func sendDeliveryAckIfNeeded(to messageId: String, senderPubKey: String, from id: NostrIdentity) {
         guard let safeMessageID = InputValidator.validateMessageID(messageId) else { return }
         guard Data(hexString: senderPubKey)?.count == 32 else { return }
-        guard !sentGeoDeliveryAcks.contains(safeMessageID) else { return }
+        guard !hasSentGeoDeliveryAck(safeMessageID) else { return }
         let nt = NostrTransport(keychain: keychain)
         nt.senderPeerID = meshService.myPeerID
         nt.sendDeliveryAckGeohash(for: safeMessageID, toRecipientHex: senderPubKey, from: id)
-        sentGeoDeliveryAcks.insert(safeMessageID)
+        recordSentGeoDeliveryAck(safeMessageID)
     }
     
     private func sendReadReceiptIfNeeded(to messageId: String, senderPubKey: String, from id: NostrIdentity) {
         guard let safeMessageID = InputValidator.validateMessageID(messageId) else { return }
         guard Data(hexString: senderPubKey)?.count == 32 else { return }
-        guard !sentReadReceipts.contains(safeMessageID) else { return }
+        guard !hasSentReadReceipt(safeMessageID) else { return }
         let nt = NostrTransport(keychain: keychain)
         nt.senderPeerID = meshService.myPeerID
         nt.sendReadReceiptGeohash(safeMessageID, toRecipientHex: senderPubKey, from: id)
-        sentReadReceipts.insert(safeMessageID)
+        recordSentReadReceipt(safeMessageID)
     }
         
     // MARK: - Nickname Management
@@ -1808,7 +1825,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         privateChats[convKey]?.append(msg)
         
         let isViewing = selectedPrivateChatPeer == convKey
-        let wasReadBefore = sentReadReceipts.contains(messageId)
+        let wasReadBefore = hasSentReadReceipt(messageId)
         let isRecentMessage = Date().timeIntervalSince(messageTimestamp) < 30
         let shouldMarkUnread = !wasReadBefore && !isViewing && isRecentMessage
         if shouldMarkUnread {
@@ -2223,6 +2240,48 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             }
         }
     }
+
+    private func hasSentReadReceipt(_ messageID: String) -> Bool {
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return false }
+        return sentReadReceipts.contains(safeMessageID)
+    }
+
+    private func recordSentReadReceipt(_ messageID: String) {
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return }
+        guard !sentReadReceipts.contains(safeMessageID) else { return }
+        sentReadReceipts.insert(safeMessageID)
+        sentReadReceiptOrder.append(safeMessageID)
+        if sentReadReceiptOrder.count > maxSentReadReceipts {
+            let overflow = sentReadReceiptOrder.count - maxSentReadReceipts
+            for _ in 0..<overflow {
+                if let old = sentReadReceiptOrder.first {
+                    sentReadReceiptOrder.removeFirst()
+                    sentReadReceipts.remove(old)
+                }
+            }
+        }
+    }
+
+    private func hasSentGeoDeliveryAck(_ messageID: String) -> Bool {
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return false }
+        return sentGeoDeliveryAcks.contains(safeMessageID)
+    }
+
+    private func recordSentGeoDeliveryAck(_ messageID: String) {
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return }
+        guard !sentGeoDeliveryAcks.contains(safeMessageID) else { return }
+        sentGeoDeliveryAcks.insert(safeMessageID)
+        sentGeoDeliveryAckOrder.append(safeMessageID)
+        if sentGeoDeliveryAckOrder.count > maxSentGeoDeliveryAcks {
+            let overflow = sentGeoDeliveryAckOrder.count - maxSentGeoDeliveryAcks
+            for _ in 0..<overflow {
+                if let old = sentGeoDeliveryAckOrder.first {
+                    sentGeoDeliveryAckOrder.removeFirst()
+                    sentGeoDeliveryAcks.remove(old)
+                }
+            }
+        }
+    }
     
     /// Sends an encrypted private message to a specific peer.
     /// - Parameters:
@@ -2556,7 +2615,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                             // Never mark old messages as unread during consolidation
                             if message.senderPeerID != meshService.myPeerID {
                                 let messageAge = Date().timeIntervalSince(message.timestamp)
-                                if messageAge < 60 && !sentReadReceipts.contains(message.id) {
+                                if messageAge < 60 && !hasSentReadReceipt(message.id) {
                                     hasActualUnreadMessages = true
                                 }
                             }
@@ -2683,8 +2742,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     if let status = message.deliveryStatus {
                         switch status {
                         case .read, .delivered:
-                            sentReadReceipts.insert(message.id)
-                            privateChatManager.sentReadReceipts.insert(message.id)
+                            recordSentReadReceipt(message.id)
+                            if let safeMessageID = InputValidator.validateMessageID(message.id) {
+                                privateChatManager.sentReadReceipts.insert(safeMessageID)
+                            }
                         default:
                             break
                         }
@@ -3127,12 +3188,12 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
            let id = try? NostrIdentityBridge.deriveIdentity(forGeohash: ch.geohash) {
             let messages = privateChats[peerID] ?? []
             for message in messages where message.senderPeerID == peerID && !message.isRelay {
-                if !sentReadReceipts.contains(message.id) {
+                if !hasSentReadReceipt(message.id) {
                     SecureLogger.debug("GeoDM: sending READ for mid=\(message.id.prefix(8))… to=\(recipientHex.prefix(8))…", category: .session)
                     let nostrTransport = NostrTransport(keychain: keychain)
                     nostrTransport.senderPeerID = meshService.myPeerID
                     nostrTransport.sendReadReceiptGeohash(message.id, toRecipientHex: recipientHex, from: id)
-                    sentReadReceipts.insert(message.id)
+                    recordSentReadReceipt(message.id)
                 }
             }
             return
@@ -3170,12 +3231,12 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 // Check both the ephemeral peer ID and stable Noise key as sender
                 if (message.senderPeerID == peerID || message.senderPeerID == noiseKeyHex) && !message.isRelay {
                     // Skip if we already sent an ACK for this message
-                    if !sentReadReceipts.contains(message.id) {
+                    if !hasSentReadReceipt(message.id) {
                         // Use stable Noise key hex if available; else fall back to peerID
                         let recipPeer = (Data(hexString: peerID) != nil) ? peerID : (unifiedPeerService.getPeer(by: peerID)?.noisePublicKey.hexEncodedString() ?? peerID)
                         let receipt = ReadReceipt(originalMessageID: message.id, readerID: meshService.myPeerID.id, readerNickname: nickname)
                         messageRouter.sendReadReceipt(receipt, to: PeerID(str: recipPeer))
-                        sentReadReceipts.insert(message.id)
+                        recordSentReadReceipt(message.id)
                     }
                 }
             }
@@ -3311,6 +3372,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Clear read receipt tracking
         sentReadReceipts.removeAll()
+        sentReadReceiptOrder.removeAll()
+        sentGeoDeliveryAcks.removeAll()
+        sentGeoDeliveryAckOrder.removeAll()
         processedNostrAcks.removeAll()
         processedNostrAckOrder.removeAll()
         
@@ -4943,6 +5007,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Remove receipts for messages we no longer have
         let oldCount = sentReadReceipts.count
         sentReadReceipts = sentReadReceipts.intersection(validMessageIDs)
+        sentReadReceiptOrder = sentReadReceiptOrder.filter { sentReadReceipts.contains($0) }
         
         let removedCount = oldCount - sentReadReceipts.count
         if removedCount > 0 {
@@ -5285,7 +5350,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             return
         }
 
-        let wasReadBefore = sentReadReceipts.contains(messageId)
+        let wasReadBefore = hasSentReadReceipt(messageId)
 
         // Is viewing?
         var isViewingThisChat = false
@@ -5416,18 +5481,18 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             unreadPrivateMessages.remove(ephemeralPeerID)
         }
         guard let safeMessageID = InputValidator.validateMessageID(message.id) else { return }
-        if !sentReadReceipts.contains(safeMessageID) {
+        if !hasSentReadReceipt(safeMessageID) {
             if let key {
                 let receipt = ReadReceipt(originalMessageID: safeMessageID, readerID: meshService.myPeerID.id, readerNickname: nickname)
                 SecureLogger.debug("Viewing chat; sending READ ack for \(safeMessageID.prefix(8))… via router", category: .session)
                 messageRouter.sendReadReceipt(receipt, to: PeerID(hexData: key))
-                sentReadReceipts.insert(safeMessageID)
+                recordSentReadReceipt(safeMessageID)
             } else if let id = try? NostrIdentityBridge.getCurrentNostrIdentity() {
                 guard Data(hexString: senderPubkey)?.count == 32 else { return }
                 let nt = NostrTransport(keychain: keychain)
                 nt.senderPeerID = meshService.myPeerID
                 nt.sendReadReceiptGeohash(safeMessageID, toRecipientHex: senderPubkey, from: id)
-                sentReadReceipts.insert(safeMessageID)
+                recordSentReadReceipt(safeMessageID)
                 SecureLogger.debug("Viewing chat; sent READ ack directly to Nostr pub=\(senderPubkey.prefix(8))… for mid=\(safeMessageID.prefix(8))…", category: .session)
             }
         }
@@ -5611,7 +5676,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Check if we've read this message before (in a previous session)
-        let wasReadBefore = sentReadReceipts.contains(messageId)
+        let wasReadBefore = hasSentReadReceipt(messageId)
         
         // Try to find sender by checking all known peers for nickname matches
         // This is a fallback when we receive Nostr messages from someone not in favorites
@@ -6015,7 +6080,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         if selectedPrivateChatPeer != peerID {
             unreadPrivateMessages.insert(peerID)
             // Avoid notifying for messages that have been marked read already (resubscribe/dup cases)
-            if !sentReadReceipts.contains(message.id) {
+            if !hasSentReadReceipt(message.id) {
                 NotificationService.shared.sendPrivateMessageNotification(
                     from: message.sender,
                     message: message.content,
@@ -6031,7 +6096,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             cleanupStaleUnreadPeerIDs()
             
             // Send read receipt if needed
-            if !sentReadReceipts.contains(message.id) {
+            if !hasSentReadReceipt(message.id) {
                 let receipt = ReadReceipt(
                     originalMessageID: message.id,
                     readerID: meshService.myPeerID.id,
@@ -6051,7 +6116,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     
                     self.sendReadReceipt(receipt, to: recipientID, originalTransport: originalTransport)
                 }
-                sentReadReceipts.insert(message.id)
+                recordSentReadReceipt(message.id)
             }
             
             // Mark other messages as read

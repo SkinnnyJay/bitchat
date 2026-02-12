@@ -63,6 +63,8 @@ enum TransportConfig {
     static let uiLateInsertThresholdGeo: TimeInterval = 0.0
     static let uiProcessedNostrEventsCap: Int = 2000
     static let uiProcessedNostrAcksCap: Int = 2000
+    static let uiSentReadReceiptsCap: Int = 10_000
+    static let uiSentGeoDeliveryAcksCap: Int = 2_000
     static let uiChannelInactivityThresholdSeconds: TimeInterval = 9 * 60
     
     // UI rate limiters (token buckets)
