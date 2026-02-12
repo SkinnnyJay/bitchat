@@ -18,6 +18,15 @@ enum WiFiPeerIdentity {
         if trimmed.isEmpty {
             return peerID
         }
+
+        let lowercaseTrimmed = trimmed.lowercased()
+        if let matchedPrefix = PeerID.Prefix.allCases.first(where: { prefix in
+            prefix != .empty && lowercaseTrimmed.hasPrefix(prefix.rawValue)
+        }) {
+            let suffix = trimmed.dropFirst(matchedPrefix.rawValue.count)
+            return PeerID(str: matchedPrefix.rawValue + suffix)
+        }
+
         return PeerID(str: trimmed)
     }
 

@@ -207,6 +207,19 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         )
     }
 
+    func testIsPeerOnlineMatchesUppercasePrefixedMeshQuery() {
+        let connected = Set(["mesh:abcdef0123456789"])
+        let lookup = UnifiedPeerService.buildConnectedPeerLookupKeys(from: connected)
+
+        XCTAssertTrue(
+            UnifiedPeerService.isPeerOnline(
+                "MESH:ABCDEF0123456789",
+                connectedPeerIDs: connected,
+                connectedPeerLookupKeys: lookup
+            )
+        )
+    }
+
     func testShouldIncludeFavoriteAsOfflinePeerRejectsEquivalentExistingPeer() {
         let fullNoiseHex = String(repeating: "ab", count: 32)
         let shortID = PeerID(str: fullNoiseHex).toShort().bare

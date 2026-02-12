@@ -172,6 +172,22 @@ final class WiFiPeerIdentityTests: XCTestCase {
         XCTAssertEqual(keys, ["NOSTR_ABCDEF0123456789", "nostr_abcdef0123456789"])
     }
 
+    func testNormalizedKeyHandlesUppercaseMeshPrefixAsCanonicalPrefixedID() {
+        XCTAssertEqual(
+            WiFiPeerIdentity.normalizedKey("MESH:ABCDEF0123456789"),
+            "abcdef0123456789"
+        )
+    }
+
+    func testLookupKeysHandleUppercaseMeshPrefixWithBareVariant() {
+        let keys = WiFiPeerIdentity.lookupKeys(for: "MESH:ABCDEF0123456789")
+
+        XCTAssertTrue(keys.contains("MESH:ABCDEF0123456789"))
+        XCTAssertTrue(keys.contains("mesh:abcdef0123456789"))
+        XCTAssertTrue(keys.contains("ABCDEF0123456789"))
+        XCTAssertTrue(keys.contains("abcdef0123456789"))
+    }
+
     func testLookupKeysForFullNoisePeerIDIncludeShortFingerprintVariant() {
         let fullNoiseID = String(repeating: "ab", count: 32)
         let shortID = PeerID(str: fullNoiseID).toShort().bare
