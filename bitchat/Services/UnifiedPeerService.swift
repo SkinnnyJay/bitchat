@@ -26,6 +26,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     
     private var peerIndex: [String: BitchatPeer] = [:]
     private var fingerprintCache: [String: String] = [:]  // peerID -> fingerprint
+    private var fingerprintCacheOrder: [String] = []
     private var connectedPeerLookupKeys: Set<String> = []
     private let meshService: Transport
     private let identityManager: SecureIdentityStateManagerProtocol
@@ -111,7 +112,13 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             if peer.isConnected { connected.insert(peer.peerID) }
             addedPeerIDs.insert(peer.peerID)
             if let fingerprint = Self.fingerprintFromPeer(peer) {
-                Self.cacheFingerprint(fingerprint, for: peer.peerID.id, in: &fingerprintCache)
+                Self.cacheFingerprint(
+                    fingerprint,
+                    for: peer.peerID.id,
+                    in: &fingerprintCache,
+                    order: &fingerprintCacheOrder,
+                    cap: TransportConfig.uiFingerprintCacheCap
+                )
             }
         }
         
@@ -131,7 +138,13 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             addedPeerIDs.insert(peerID)
             
             // Update fingerprint cache
-            Self.cacheFingerprint(favoriteKey.sha256Fingerprint(), for: peerID.id, in: &fingerprintCache)
+            Self.cacheFingerprint(
+                favoriteKey.sha256Fingerprint(),
+                for: peerID.id,
+                in: &fingerprintCache,
+                order: &fingerprintCacheOrder,
+                cap: TransportConfig.uiFingerprintCacheCap
+            )
         }
         
         // Phase 3: Sort peers
@@ -280,6 +293,49 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         let normalized = WiFiPeerIdentity.normalizedKey(peerID)
         if !normalized.isEmpty {
             cache[normalized] = fingerprint
+        }
+    }
+
+    static func cacheFingerprint(
+        _ fingerprint: String,
+        for peerID: String,
+        in cache: inout [String: String],
+        order: inout [String],
+        cap: Int
+    ) {
+        guard cap > 0 else {
+            cache.removeAll()
+            order.removeAll()
+            return
+        }
+
+        var orderedKeys: [String] = []
+        func appendKey(_ key: String) {
+            guard !key.isEmpty else { return }
+            if !orderedKeys.contains(key) {
+                orderedKeys.append(key)
+            }
+        }
+
+        for key in lookupKeys(for: peerID) {
+            appendKey(key)
+        }
+        let normalized = WiFiPeerIdentity.normalizedKey(peerID)
+        if !normalized.isEmpty {
+            appendKey(normalized)
+        }
+
+        for key in orderedKeys {
+            cache[key] = fingerprint
+            if let existingIndex = order.firstIndex(of: key) {
+                order.remove(at: existingIndex)
+            }
+            order.append(key)
+        }
+
+        while order.count > cap {
+            let evicted = order.removeFirst()
+            cache.removeValue(forKey: evicted)
         }
     }
 
@@ -594,14 +650,26 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             for: peerID,
             using: { [meshService] candidate in meshService.getFingerprint(for: candidate) }
         ) {
-            Self.cacheFingerprint(fingerprint, for: peerID, in: &fingerprintCache)
+            Self.cacheFingerprint(
+                fingerprint,
+                for: peerID,
+                in: &fingerprintCache,
+                order: &fingerprintCacheOrder,
+                cap: TransportConfig.uiFingerprintCacheCap
+            )
             return fingerprint
         }
         
         // Try to get from peer's public key
         if let peer = getPeer(by: peerID) {
             if let fingerprint = Self.fingerprintFromPeer(peer) {
-                Self.cacheFingerprint(fingerprint, for: peerID, in: &fingerprintCache)
+                Self.cacheFingerprint(
+                    fingerprint,
+                    for: peerID,
+                    in: &fingerprintCache,
+                    order: &fingerprintCacheOrder,
+                    cap: TransportConfig.uiFingerprintCacheCap
+                )
                 return fingerprint
             }
         }

@@ -195,6 +195,7 @@ enum TransportConfig {
     static let uiVeryLongTokenThreshold: Int = 512
     static let uiLongMessageLineLimit: Int = 30
     static let uiFingerprintSampleCount: Int = 3
+    static let uiFingerprintCacheCap: Int = 20_000
     
     // UI swipe/gesture thresholds
     static let uiBackSwipeTranslationLarge: CGFloat = 50

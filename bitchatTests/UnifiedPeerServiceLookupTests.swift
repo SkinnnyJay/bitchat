@@ -484,6 +484,32 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertNil(cache["abcdef0123456789"])
     }
 
+    func testCacheFingerprintCappedEvictsOldestKeysWhenCapExceeded() {
+        var cache: [String: String] = [:]
+        var order: [String] = []
+
+        UnifiedPeerService.cacheFingerprint("fp-a", for: "peera", in: &cache, order: &order, cap: 2)
+        UnifiedPeerService.cacheFingerprint("fp-b", for: "peerb", in: &cache, order: &order, cap: 2)
+        UnifiedPeerService.cacheFingerprint("fp-c", for: "peerc", in: &cache, order: &order, cap: 2)
+
+        XCTAssertEqual(order, ["peerb", "peerc"])
+        XCTAssertNil(cache["peera"])
+        XCTAssertEqual(cache["peerb"], "fp-b")
+        XCTAssertEqual(cache["peerc"], "fp-c")
+    }
+
+    func testCacheFingerprintCappedRefreshesExistingKeyRecency() {
+        var cache: [String: String] = [:]
+        var order: [String] = []
+
+        UnifiedPeerService.cacheFingerprint("fp-a", for: "peera", in: &cache, order: &order, cap: 2)
+        UnifiedPeerService.cacheFingerprint("fp-b", for: "peerb", in: &cache, order: &order, cap: 2)
+        UnifiedPeerService.cacheFingerprint("fp-a2", for: "peera", in: &cache, order: &order, cap: 2)
+
+        XCTAssertEqual(order, ["peerb", "peera"])
+        XCTAssertEqual(cache["peera"], "fp-a2")
+    }
+
     func testResolvedNoisePublicKeyPrefersSnapshotNoiseKeyWhenValid() {
         let snapshotKey = Data(repeating: 0x33, count: 32)
         let peerIDNoise = String(repeating: "ab", count: 32)
