@@ -75,6 +75,7 @@ final class WiFiDirectTransport: NSObject {
     }
 
     func peerCapabilities(peerID: String) -> Set<String>? {
+        guard isDiscovering else { return nil }
         let normalizedPeerID = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedPeerID.isEmpty else { return nil }
         return impl.capabilities(for: normalizedPeerID) ?? impl.capabilities(for: peerID)
