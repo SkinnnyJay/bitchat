@@ -104,6 +104,11 @@ final class NostrTransport: Transport {
     func sendReadReceipt(_ receipt: ReadReceipt, to peerID: PeerID) {
         guard peerID.isValid else { return }
         guard let safeMessageID = InputValidator.validateMessageID(receipt.originalMessageID) else { return }
+        let sanitizedReceipt = ReadReceipt(
+            originalMessageID: safeMessageID,
+            readerID: receipt.readerID,
+            readerNickname: InputValidator.validateNickname(receipt.readerNickname) ?? "user"
+        )
         if readQueue.contains(where: {
             $0.receipt.originalMessageID == safeMessageID &&
             WiFiPeerIdentity.isEquivalent($0.peerID.id, peerID.id)
@@ -117,7 +122,7 @@ final class NostrTransport: Transport {
             }
         }
         // Enqueue and process with throttling to avoid relay rate limits
-        readQueue.append(QueuedRead(receipt: receipt, peerID: peerID))
+        readQueue.append(QueuedRead(receipt: sanitizedReceipt, peerID: peerID))
         processReadQueueIfNeeded()
     }
 
