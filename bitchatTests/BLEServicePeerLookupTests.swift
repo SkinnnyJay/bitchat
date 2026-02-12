@@ -40,6 +40,12 @@ final class BLEServicePeerLookupTests: XCTestCase {
         XCTAssertEqual(canonical, PeerID(str: "abcdef0123456789"))
     }
 
+    func testCanonicalRoutingPeerIDTrimsWhitespaceBeforeNormalization() {
+        let canonical = BLEService.canonicalRoutingPeerID(for: PeerID(str: "  mesh:abcdef0123456789  "))
+
+        XCTAssertEqual(canonical, PeerID(str: "abcdef0123456789"))
+    }
+
     func testCanonicalRoutingPeerIDDerivesShortFromFullNoiseID() {
         let fullNoiseID = PeerID(str: String(repeating: "ab", count: 32))
         let canonical = BLEService.canonicalRoutingPeerID(for: fullNoiseID)

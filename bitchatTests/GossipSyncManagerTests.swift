@@ -10,6 +10,13 @@ final class GossipSyncManagerTests: XCTestCase {
         )
     }
 
+    func testCanonicalRoutingIDHexTrimsWhitespaceBeforeNormalization() {
+        XCTAssertEqual(
+            GossipSyncManager.canonicalRoutingIDHex(for: PeerID(str: "  mesh:abcdef0123456789  ")),
+            "abcdef0123456789"
+        )
+    }
+
     func testCanonicalRoutingIDHexDerivesShortFromFullNoisePeerID() {
         let fullNoisePeerID = PeerID(str: String(repeating: "ab", count: 32))
         let expectedShort = fullNoisePeerID.toShort().bare

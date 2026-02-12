@@ -33,7 +33,8 @@ final class GossipSyncManager {
     }
 
     static func canonicalRoutingIDHex(for peerID: PeerID) -> String? {
-        let canonical = peerID.toShort()
+        let trimmed = peerID.id.trimmingCharacters(in: .whitespacesAndNewlines)
+        let canonical = PeerID(str: trimmed).toShort()
         guard canonical.isShort else { return nil }
         return canonical.bare.lowercased()
     }

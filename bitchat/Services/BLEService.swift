@@ -517,7 +517,8 @@ final class BLEService: NSObject {
     }
 
     static func canonicalRoutingPeerID(for peerID: PeerID) -> PeerID? {
-        let canonical = peerID.toShort()
+        let trimmed = peerID.id.trimmingCharacters(in: .whitespacesAndNewlines)
+        let canonical = PeerID(str: trimmed).toShort()
         guard canonical.isShort else { return nil }
         return PeerID(str: canonical.bare)
     }
