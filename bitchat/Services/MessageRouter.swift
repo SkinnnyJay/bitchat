@@ -267,6 +267,11 @@ final class MessageRouter {
 
     func flushOutbox(for peerID: PeerID) {
         let outboxPeerID = normalizedOutboxPeerID(for: peerID)
+        guard outboxPeerID.isValid else {
+            outbox.removeValue(forKey: outboxPeerID)
+            SecureLogger.warning("Dropped outbox queue for invalid peer ID", category: .session)
+            return
+        }
         pruneExpiredOutboxMessages(for: outboxPeerID)
         guard let queued = outbox[outboxPeerID], !queued.isEmpty else { return }
         SecureLogger.debug("Flushing outbox for \(outboxPeerID.id.prefix(8))… count=\(queued.count)", category: .session)
