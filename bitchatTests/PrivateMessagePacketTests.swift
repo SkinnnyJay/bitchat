@@ -44,6 +44,12 @@ final class PrivateMessagePacketTests: XCTestCase {
         XCTAssertEqual(decoded.content, "hello")
     }
 
+    func testDecodeRejectsTrailingTruncatedTLVHeader() throws {
+        var data = try encodedPacketData(messageID: "mid-1", content: "hello")
+        data.append(0x7F) // trailing type byte without length/value
+        XCTAssertNil(PrivateMessagePacket.decode(from: data))
+    }
+
     private func encodedPacketData(messageID: String, content: String) throws -> Data {
         var data = Data()
         let messageIDData = try XCTUnwrap(messageID.data(using: .utf8))

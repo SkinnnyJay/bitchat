@@ -51,6 +51,16 @@ final class AnnouncementPacketTests: XCTestCase {
         XCTAssertEqual(decoded.nickname, "alice")
     }
 
+    func testDecodeRejectsTrailingTruncatedTLVHeader() throws {
+        var encoded = try encodedAnnouncementData(
+            nickname: "alice",
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            signingPublicKey: Data(repeating: 0x22, count: 32)
+        )
+        encoded.append(0x7E) // trailing type byte without length/value
+        XCTAssertNil(AnnouncementPacket.decode(from: encoded))
+    }
+
     func testEncodeRejectsInvalidNoiseOrSigningKeyLengths() {
         let invalidNoise = AnnouncementPacket(
             nickname: "alice",

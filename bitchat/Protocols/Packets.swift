@@ -72,6 +72,7 @@ struct AnnouncementPacket {
             }
         }
 
+        guard offset == data.count else { return nil }
         guard let nickname = nickname,
               let safeNickname = InputValidator.validateNickname(nickname),
               let noisePublicKey = noisePublicKey,
@@ -144,6 +145,7 @@ struct PrivateMessagePacket {
             }
         }
 
+        guard offset == data.count else { return nil }
         guard let messageID = messageID,
               let safeMessageID = InputValidator.validateMessageID(messageID),
               let content = content else { return nil }
