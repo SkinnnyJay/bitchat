@@ -470,7 +470,7 @@ final class MessageRouter {
             messageID: safeMessageID,
             senderNickname: senderNickname.flatMap { InputValidator.validateNickname($0) }
         )
-        guard let payload = try? JSONEncoder().encode(envelope) else { return false }
+        guard let payload = encodedWiFiAckEnvelopeData(envelope) else { return false }
 
         do {
             try wifiTransport.send(payload, to: targetPeerID)
@@ -492,14 +492,12 @@ final class MessageRouter {
 
         let recipientNickname = InputValidator.validateNickname(mesh.peerNickname(peerID: peerID) ?? "") ?? "user"
         let content = favoriteNotificationPayloadContent(isFavorite: isFavorite)
-        let envelope = WiFiDirectPrivateEnvelope(
-            senderPeerID: mesh.myPeerID.id,
+        guard let payload = encodedWiFiPrivateEnvelopeData(
+            content: content,
             recipientPeerID: targetPeerID,
             recipientNickname: recipientNickname,
-            messageID: UUID().uuidString,
-            content: content
-        )
-        guard let payload = try? JSONEncoder().encode(envelope) else { return false }
+            messageID: UUID().uuidString
+        ) else { return false }
 
         do {
             try wifiTransport.send(payload, to: targetPeerID)
@@ -517,6 +515,12 @@ final class MessageRouter {
             return "\(base):\(identity.npub)"
         }
         return base
+    }
+
+    private func encodedWiFiAckEnvelopeData(_ envelope: WiFiDirectAckEnvelope) -> Data? {
+        guard let data = try? JSONEncoder().encode(envelope) else { return nil }
+        guard data.count <= inboundWiFiPayloadMaxBytes else { return nil }
+        return data
     }
 
     private func resolveWiFiPeerIdentifier(
