@@ -245,6 +245,32 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testDropsOversizedPrivateMessageWhenNoRouteAvailable() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: false)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = false
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 1),
+            wifiTransport: wifi
+        )
+
+        let oversized = String(repeating: "x", count: InputValidator.Limits.maxMessageLength + 1)
+        router.sendPrivate(oversized, to: recipient, recipientNickname: "peer", messageID: "mid-oversized-no-route")
+
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 0)
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 0)
+    }
+
+    @MainActor
     func testSanitizesRecipientNicknameWhenRoutingViaMesh() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
