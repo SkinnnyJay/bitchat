@@ -496,6 +496,30 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testSendPrivateDropsWhenWiFiEnvelopeEncodingExceedsPayloadLimit() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: true)
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm"], for: recipient.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        let manager = HybridTransportManager(
+            meshTransport: mesh,
+            wifiTransport: wifi,
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 10_000)
+        )
+
+        let jsonExpansionHeavy = String(repeating: "\\", count: InputValidator.Limits.maxMessageLength)
+        let route = manager.sendPrivate(jsonExpansionHeavy, to: recipient, recipientNickname: "peer", messageID: "mid-json-heavy")
+
+        XCTAssertEqual(route, .dropped)
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 0)
+    }
+
+    @MainActor
     func testSendPrivateRoutesViaWiFiUsingBarePeerIDFromPrefixedRecipientID() throws {
         let recipientBare = "peerabc000000000"
         let recipientPrefixed = PeerID(str: "mesh:\(recipientBare)")
