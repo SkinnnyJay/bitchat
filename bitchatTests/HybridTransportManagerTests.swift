@@ -170,6 +170,53 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testSendPrivateFallsBackToMeshWhenMessageIDIsEmptyForWiFiPath() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: false)
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm"], for: recipient.id)
+
+        let manager = HybridTransportManager(
+            meshTransport: mesh,
+            wifiTransport: wifi,
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 1)
+        )
+
+        let route = manager.sendPrivate("hello", to: recipient, recipientNickname: "peer", messageID: "   ")
+
+        XCTAssertEqual(route, .mesh)
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 1)
+    }
+
+    @MainActor
+    func testSendPrivateFallsBackToMeshWhenContentExceedsMaxMessageLengthForWiFiPath() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: false)
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm"], for: recipient.id)
+
+        let manager = HybridTransportManager(
+            meshTransport: mesh,
+            wifiTransport: wifi,
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 1)
+        )
+
+        let oversized = String(repeating: "x", count: InputValidator.Limits.maxMessageLength + 1)
+        let route = manager.sendPrivate(oversized, to: recipient, recipientNickname: "peer", messageID: "mid-oversized")
+
+        XCTAssertEqual(route, .mesh)
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 1)
+    }
+
+    @MainActor
     func testSendPrivateFallsBackToWiFiWhenMeshUnreachableEvenBelowThreshold() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
