@@ -114,7 +114,7 @@ struct PrivateMessagePacket {
         var content: String?
 
         while offset + 2 <= data.count {
-            guard let type = TLVType(rawValue: data[offset]) else { return nil }
+            let typeRaw = data[offset]
             offset += 1
 
             let length = Int(data[offset])
@@ -124,11 +124,16 @@ struct PrivateMessagePacket {
             let value = data[offset..<offset + length]
             offset += length
 
-            switch type {
-            case .messageID:
-                messageID = String(data: value, encoding: .utf8)
-            case .content:
-                content = String(data: value, encoding: .utf8)
+            if let type = TLVType(rawValue: typeRaw) {
+                switch type {
+                case .messageID:
+                    messageID = String(data: value, encoding: .utf8)
+                case .content:
+                    content = String(data: value, encoding: .utf8)
+                }
+            } else {
+                // Unknown TLV; skip for forward compatibility.
+                continue
             }
         }
 

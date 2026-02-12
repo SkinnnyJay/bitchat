@@ -33,6 +33,17 @@ final class PrivateMessagePacketTests: XCTestCase {
         XCTAssertNil(PrivateMessagePacket.decode(from: data))
     }
 
+    func testDecodeSkipsUnknownTLVs() throws {
+        var data = try encodedPacketData(messageID: "mid-unknown", content: "hello")
+        data.append(0x7F) // unknown type
+        data.append(0x03) // length
+        data.append(Data([0x41, 0x42, 0x43]))
+
+        let decoded = try XCTUnwrap(PrivateMessagePacket.decode(from: data))
+        XCTAssertEqual(decoded.messageID, "mid-unknown")
+        XCTAssertEqual(decoded.content, "hello")
+    }
+
     private func encodedPacketData(messageID: String, content: String) throws -> Data {
         var data = Data()
         let messageIDData = try XCTUnwrap(messageID.data(using: .utf8))
