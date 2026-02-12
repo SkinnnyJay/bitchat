@@ -42,4 +42,39 @@ final class BLEServicePeerLookupTests: XCTestCase {
     func testCanonicalRoutingPeerIDRejectsNonRoutablePeerID() {
         XCTAssertNil(BLEService.canonicalRoutingPeerID(for: PeerID(str: "peer-not-routable")))
     }
+
+    func testIsReachableReturnsTrueWhenAnyCandidateIsConnected() {
+        let now = Date()
+        let states: [(Bool, Bool, Date)] = [
+            (false, false, now.addingTimeInterval(-10_000)),
+            (true, false, now.addingTimeInterval(-10_000))
+        ]
+
+        XCTAssertTrue(BLEService.isReachable(candidateStates: states, meshAttached: false, now: now))
+    }
+
+    func testIsReachableRespectsRetentionForDisconnectedCandidatesWhenMeshAttached() {
+        let now = Date()
+        let verifiedFresh = now.addingTimeInterval(-(TransportConfig.bleReachabilityRetentionVerifiedSeconds - 1))
+        let staleUnverified = now.addingTimeInterval(-(TransportConfig.bleReachabilityRetentionUnverifiedSeconds + 5))
+        let states: [(Bool, Bool, Date)] = [
+            (false, false, staleUnverified),
+            (false, true, verifiedFresh)
+        ]
+
+        XCTAssertTrue(BLEService.isReachable(candidateStates: states, meshAttached: true, now: now))
+    }
+
+    func testIsReachableReturnsFalseForDisconnectedStaleCandidates() {
+        let now = Date()
+        let staleVerified = now.addingTimeInterval(-(TransportConfig.bleReachabilityRetentionVerifiedSeconds + 5))
+        let staleUnverified = now.addingTimeInterval(-(TransportConfig.bleReachabilityRetentionUnverifiedSeconds + 5))
+        let states: [(Bool, Bool, Date)] = [
+            (false, false, staleUnverified),
+            (false, true, staleVerified)
+        ]
+
+        XCTAssertFalse(BLEService.isReachable(candidateStates: states, meshAttached: true, now: now))
+        XCTAssertFalse(BLEService.isReachable(candidateStates: states, meshAttached: false, now: now))
+    }
 }

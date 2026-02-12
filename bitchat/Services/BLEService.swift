@@ -516,6 +516,27 @@ final class BLEService: NSObject {
         guard canonical.isShort else { return nil }
         return PeerID(str: canonical.bare)
     }
+
+    static func isReachable(
+        candidateStates: [(isConnected: Bool, isVerifiedNickname: Bool, lastSeen: Date)],
+        meshAttached: Bool,
+        now: Date = Date()
+    ) -> Bool {
+        guard !candidateStates.isEmpty else { return false }
+        if candidateStates.contains(where: { $0.isConnected }) {
+            return true
+        }
+        guard meshAttached else { return false }
+        for candidate in candidateStates {
+            let retention: TimeInterval = candidate.isVerifiedNickname
+                ? TransportConfig.bleReachabilityRetentionVerifiedSeconds
+                : TransportConfig.bleReachabilityRetentionUnverifiedSeconds
+            if now.timeIntervalSince(candidate.lastSeen) <= retention {
+                return true
+            }
+        }
+        return false
+    }
     
     func isPeerConnected(_ peerID: PeerID) -> Bool {
         let lookupKeys = Self.peerLookupKeys(for: peerID)
@@ -532,13 +553,11 @@ final class BLEService: NSObject {
         return collectionsQueue.sync {
             // Must be mesh-attached: at least one live direct link to the mesh
             let meshAttached = peers.values.contains { $0.isConnected }
-            guard let info = lookupKeys.compactMap({ peers[$0] }).first else { return false }
-            if info.isConnected { return true }
-            guard meshAttached else { return false }
-            // Apply reachability retention window
-            let isVerified = info.isVerifiedNickname
-            let retention: TimeInterval = isVerified ? TransportConfig.bleReachabilityRetentionVerifiedSeconds : TransportConfig.bleReachabilityRetentionUnverifiedSeconds
-            return Date().timeIntervalSince(info.lastSeen) <= retention
+            let candidates = lookupKeys.compactMap { key -> (isConnected: Bool, isVerifiedNickname: Bool, lastSeen: Date)? in
+                guard let info = peers[key] else { return nil }
+                return (info.isConnected, info.isVerifiedNickname, info.lastSeen)
+            }
+            return Self.isReachable(candidateStates: candidates, meshAttached: meshAttached)
         }
     }
 
