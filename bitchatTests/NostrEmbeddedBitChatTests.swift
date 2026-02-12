@@ -177,6 +177,29 @@ final class NostrEmbeddedBitChatTests: XCTestCase {
         XCTAssertNil(result)
     }
 
+    func testEncodePMForNostrRejectsPrefixedGeoChatPeerIDsWithNonRoutableLength() {
+        let result = NostrEmbeddedBitChat.encodePMForNostr(
+            content: "hello",
+            messageID: "mid-geochat-short",
+            recipientPeerID: "nostr:abcdef01",
+            senderPeerID: "0123456789abcdef"
+        )
+
+        XCTAssertNil(result)
+    }
+
+    func testEncodeAckForNostrAcceptsUppercaseHexPeerIDs() {
+        let result = NostrEmbeddedBitChat.encodeAckForNostr(
+            type: .delivered,
+            messageID: "mid-uppercase-hex",
+            recipientPeerID: "ABCDEF0123456789",
+            senderPeerID: "0123456789ABCDEF"
+        )
+
+        XCTAssertNotNil(result)
+        XCTAssertTrue(result?.hasPrefix("bitchat1:") == true)
+    }
+
     private func decodeEmbeddedPacket(_ encoded: String?) -> BitchatPacket? {
         guard let encoded, encoded.hasPrefix("bitchat1:") else { return nil }
         let payload = String(encoded.dropFirst("bitchat1:".count))
