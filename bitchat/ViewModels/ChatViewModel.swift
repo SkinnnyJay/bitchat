@@ -745,6 +745,12 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             name: .wifiDirectPrivateEnvelopeReceived,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWiFiDirectAckEnvelope(_:)),
+            name: .wifiDirectAckEnvelopeReceived,
+            object: nil
+        )
         
         // Listen for delivery acknowledgments
                 
@@ -2749,6 +2755,42 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             )
             handlePrivateMessage(msg)
             messageRouter.sendDeliveryAck(envelope.messageID, to: PeerID(str: senderPeerID))
+        }
+    }
+
+    @objc private func handleWiFiDirectAckEnvelope(_ notification: Notification) {
+        guard let envelope = notification.userInfo?[WiFiDirectNotificationUserInfoKey.ackEnvelope] as? WiFiDirectAckEnvelope else {
+            return
+        }
+
+        Task { @MainActor in
+            guard envelope.recipientPeerID == meshService.myPeerID.id else { return }
+
+            switch envelope.ackType {
+            case .delivered:
+                let senderName = envelope.senderNickname
+                    ?? unifiedPeerService.getPeer(by: envelope.senderPeerID)?.nickname
+                    ?? resolveNickname(for: envelope.senderPeerID)
+                if let index = messages.firstIndex(where: { $0.id == envelope.messageID }) {
+                    messages[index].deliveryStatus = .delivered(to: senderName, at: Date())
+                }
+                for (peerID, chatMessages) in privateChats {
+                    if let index = chatMessages.firstIndex(where: { $0.id == envelope.messageID }) {
+                        privateChats[peerID]?[index].deliveryStatus = .delivered(to: senderName, at: Date())
+                        break
+                    }
+                }
+            case .read:
+                let senderName = envelope.senderNickname
+                    ?? unifiedPeerService.getPeer(by: envelope.senderPeerID)?.nickname
+                    ?? resolveNickname(for: envelope.senderPeerID)
+                let receipt = ReadReceipt(
+                    originalMessageID: envelope.messageID,
+                    readerID: envelope.senderPeerID,
+                    readerNickname: senderName
+                )
+                didReceiveReadReceipt(receipt)
+            }
         }
     }
     

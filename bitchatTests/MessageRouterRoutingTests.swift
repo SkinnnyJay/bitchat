@@ -22,6 +22,8 @@ final class MessageRouterRoutingTests: XCTestCase {
         private let noiseService = NoiseEncryptionService(keychain: MockKeychain())
 
         private(set) var sentPrivateMessages: [(content: String, peerID: PeerID, nickname: String, messageID: String)] = []
+        private(set) var sentReadReceipts: [(receipt: ReadReceipt, peerID: PeerID)] = []
+        private(set) var sentDeliveryAcks: [(messageID: String, peerID: PeerID)] = []
 
         func setReachable(_ peerID: PeerID, isReachable: Bool) {
             if isReachable {
@@ -72,10 +74,14 @@ final class MessageRouterRoutingTests: XCTestCase {
             sentPrivateMessages.append((content, peerID, recipientNickname, messageID))
         }
 
-        func sendReadReceipt(_ receipt: ReadReceipt, to peerID: PeerID) {}
+        func sendReadReceipt(_ receipt: ReadReceipt, to peerID: PeerID) {
+            sentReadReceipts.append((receipt, peerID))
+        }
         func sendFavoriteNotification(to peerID: PeerID, isFavorite: Bool) {}
         func sendBroadcastAnnounce() {}
-        func sendDeliveryAck(for messageID: String, to peerID: PeerID) {}
+        func sendDeliveryAck(for messageID: String, to peerID: PeerID) {
+            sentDeliveryAcks.append((messageID, peerID))
+        }
     }
 
     private final class MockWiFiBackend: WiFiDirectTransportBackend {
@@ -279,5 +285,80 @@ final class MessageRouterRoutingTests: XCTestCase {
 
         XCTAssertEqual(router.queuedMessageCount(for: recipient), cap)
         XCTAssertTrue(mesh.sentPrivateMessages.isEmpty)
+    }
+
+    @MainActor
+    func testRoutesReadReceiptViaWiFiWhenPeerIsAvailable() throws {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+
+        let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        let receipt = ReadReceipt(originalMessageID: "mid-read-1", readerID: mesh.myPeerID.id, readerNickname: "me")
+        router.sendReadReceipt(receipt, to: recipient)
+
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        let envelope = try JSONDecoder().decode(WiFiDirectAckEnvelope.self, from: backend.sentPayloads[0].0)
+        XCTAssertEqual(envelope.ackType, .read)
+        XCTAssertEqual(envelope.messageID, "mid-read-1")
+        XCTAssertTrue(mesh.sentReadReceipts.isEmpty)
+    }
+
+    @MainActor
+    func testRoutesDeliveryAckViaWiFiWhenPeerIsAvailable() throws {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+
+        let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        router.sendDeliveryAck("mid-delivered-1", to: recipient)
+
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        let envelope = try JSONDecoder().decode(WiFiDirectAckEnvelope.self, from: backend.sentPayloads[0].0)
+        XCTAssertEqual(envelope.ackType, .delivered)
+        XCTAssertEqual(envelope.messageID, "mid-delivered-1")
+        XCTAssertTrue(mesh.sentDeliveryAcks.isEmpty)
+    }
+
+    @MainActor
+    func testPostsNotificationForIncomingWiFiAckEnvelope() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "receives WiFi ack envelope notification")
+        var receivedEnvelope: WiFiDirectAckEnvelope?
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectAckEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { note in
+            receivedEnvelope = note.userInfo?[WiFiDirectNotificationUserInfoKey.ackEnvelope] as? WiFiDirectAckEnvelope
+            expect.fulfill()
+        }
+
+        let envelope = WiFiDirectAckEnvelope(
+            ackType: .read,
+            senderPeerID: "peer-1",
+            recipientPeerID: mesh.myPeerID.id,
+            messageID: "mid-read-2",
+            senderNickname: "peer"
+        )
+        let payload = try JSONEncoder().encode(envelope)
+        backend.simulateIncoming(payload, from: "peer-1")
+
+        wait(for: [expect], timeout: 1.0)
+        NotificationCenter.default.removeObserver(token)
+        XCTAssertEqual(receivedEnvelope?.messageID, "mid-read-2")
+        XCTAssertEqual(receivedEnvelope?.ackType, .read)
     }
 }

@@ -24,6 +24,11 @@ enum HybridOutboundRoute: Equatable {
     case wifiDirect
 }
 
+enum WiFiDirectAckType: String, Codable, Equatable {
+    case delivered
+    case read
+}
+
 struct WiFiDirectPrivateEnvelope: Codable, Equatable {
     let version: Int
     let messageType: String
@@ -48,6 +53,34 @@ struct WiFiDirectPrivateEnvelope: Codable, Equatable {
         self.recipientNickname = recipientNickname
         self.messageID = messageID
         self.content = content
+        self.createdAtMs = UInt64(Date().timeIntervalSince1970 * 1000)
+    }
+}
+
+struct WiFiDirectAckEnvelope: Codable, Equatable {
+    let version: Int
+    let messageType: String
+    let ackType: WiFiDirectAckType
+    let senderPeerID: String
+    let recipientPeerID: String
+    let messageID: String
+    let senderNickname: String?
+    let createdAtMs: UInt64
+
+    init(
+        ackType: WiFiDirectAckType,
+        senderPeerID: String,
+        recipientPeerID: String,
+        messageID: String,
+        senderNickname: String? = nil
+    ) {
+        self.version = 1
+        self.messageType = "ack"
+        self.ackType = ackType
+        self.senderPeerID = senderPeerID
+        self.recipientPeerID = recipientPeerID
+        self.messageID = messageID
+        self.senderNickname = senderNickname
         self.createdAtMs = UInt64(Date().timeIntervalSince1970 * 1000)
     }
 }

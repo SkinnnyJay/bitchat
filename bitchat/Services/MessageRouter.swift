@@ -91,6 +91,14 @@ final class MessageRouter {
     }
 
     func sendReadReceipt(_ receipt: ReadReceipt, to peerID: PeerID) {
+        if routeAckViaWiFiIfAvailable(
+            ackType: .read,
+            messageID: receipt.originalMessageID,
+            to: peerID,
+            senderNickname: receipt.readerNickname
+        ) {
+            return
+        }
         // Prefer mesh for reachable peers; BLE will queue if handshake is needed
         if mesh.isPeerReachable(peerID) {
             SecureLogger.debug("Routing READ ack via mesh (reachable) to \(peerID.id.prefix(8))… id=\(receipt.originalMessageID.prefix(8))…", category: .session)
@@ -102,6 +110,14 @@ final class MessageRouter {
     }
 
     func sendDeliveryAck(_ messageID: String, to peerID: PeerID) {
+        if routeAckViaWiFiIfAvailable(
+            ackType: .delivered,
+            messageID: messageID,
+            to: peerID,
+            senderNickname: nil
+        ) {
+            return
+        }
         if mesh.isPeerReachable(peerID) {
             SecureLogger.debug("Routing DELIVERED ack via mesh (reachable) to \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
             mesh.sendDeliveryAck(for: messageID, to: peerID)
@@ -208,6 +224,35 @@ final class MessageRouter {
         }
     }
 
+    private func routeAckViaWiFiIfAvailable(
+        ackType: WiFiDirectAckType,
+        messageID: String,
+        to peerID: PeerID,
+        senderNickname: String?
+    ) -> Bool {
+        guard let wifiTransport else { return false }
+        guard wifiTransport.isAvailable else { return false }
+        guard Set(wifiTransport.currentPeers).contains(peerID.id) else { return false }
+
+        let envelope = WiFiDirectAckEnvelope(
+            ackType: ackType,
+            senderPeerID: mesh.myPeerID.id,
+            recipientPeerID: peerID.id,
+            messageID: messageID,
+            senderNickname: senderNickname
+        )
+        guard let payload = try? JSONEncoder().encode(envelope) else { return false }
+
+        do {
+            try wifiTransport.send(payload, to: peerID.id)
+            SecureLogger.debug("Routing \(ackType.rawValue.uppercased()) ack via WiFi Direct to \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
+            return true
+        } catch {
+            SecureLogger.debug("WiFi Direct \(ackType.rawValue.uppercased()) ack route failed for \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…, falling back", category: .session)
+            return false
+        }
+    }
+
     func flushAllOutbox() {
         for key in Array(outbox.keys) { flushOutbox(for: key) }
     }
@@ -227,17 +272,26 @@ extension MessageRouter: WiFiDirectTransportDelegate {
     nonisolated func wifiTransportDidReceive(_ data: Data, from peerID: String) {
         Task { @MainActor [weak self] in
             guard let self else { return }
-            guard let envelope = try? JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: data),
-                  envelope.messageType == "private",
-                  envelope.recipientPeerID == self.mesh.myPeerID.id else {
+            if let envelope = try? JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: data),
+               envelope.messageType == "private",
+               envelope.recipientPeerID == self.mesh.myPeerID.id {
+                NotificationCenter.default.post(
+                    name: .wifiDirectPrivateEnvelopeReceived,
+                    object: nil,
+                    userInfo: [WiFiDirectNotificationUserInfoKey.envelope: envelope]
+                )
                 return
             }
 
-            NotificationCenter.default.post(
-                name: .wifiDirectPrivateEnvelopeReceived,
-                object: nil,
-                userInfo: [WiFiDirectNotificationUserInfoKey.envelope: envelope]
-            )
+            if let envelope = try? JSONDecoder().decode(WiFiDirectAckEnvelope.self, from: data),
+               envelope.messageType == "ack",
+               envelope.recipientPeerID == self.mesh.myPeerID.id {
+                NotificationCenter.default.post(
+                    name: .wifiDirectAckEnvelopeReceived,
+                    object: nil,
+                    userInfo: [WiFiDirectNotificationUserInfoKey.ackEnvelope: envelope]
+                )
+            }
         }
     }
 
