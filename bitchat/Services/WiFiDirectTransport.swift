@@ -57,8 +57,6 @@ final class WiFiDirectTransport: NSObject {
         guard isDiscovering else { return }
         isDiscovering = false
         impl.stopDiscovery()
-        impl.resetState()
-        didUpdatePeers([])
         didChangeAvailability(false)
     }
 
@@ -118,6 +116,7 @@ final class WiFiDirectTransport: NSObject {
                 return
             }
             if !available {
+                self.impl.resetState()
                 self.currentPeers = []
                 self.isDiscovering = false
             }

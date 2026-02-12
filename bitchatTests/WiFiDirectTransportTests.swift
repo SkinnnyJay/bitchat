@@ -317,6 +317,7 @@ final class WiFiDirectTransportTests: XCTestCase {
 
     func testAvailabilityDropClearsPeersWithoutStopDiscovery() {
         let backend = MockBackend(localPeerID: "self")
+        backend.capabilitiesByPeerID["peer-a"] = ["pm", "ack"]
         let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
         let delegate = MockDelegate()
         transport.delegate = delegate
@@ -335,6 +336,8 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertTrue(delegate.peerUpdates.contains(["peer-a"]))
         XCTAssertTrue(delegate.peerUpdates.contains([]))
         XCTAssertFalse(transport.isDiscovering)
+        XCTAssertEqual(backend.resetStateCount, 1)
+        XCTAssertNil(transport.peerCapabilities(peerID: "peer-a"))
     }
 
     func testAvailabilityDropAllowsDiscoveryRestartAfterRecovery() {
