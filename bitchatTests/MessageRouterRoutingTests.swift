@@ -2552,6 +2552,82 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testInboundWiFiRateLimiterIgnoresBlankSenderIDsForBucketCap() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let fixedNow = Date()
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { fixedNow })
+
+        var receivedCount = 0
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            receivedCount += 1
+        }
+
+        let senderCap = TransportConfig.messageRouterInboundWiFiSenderRateMaxTrackedSenders
+        let createdAtMs = UInt64(fixedNow.timeIntervalSince1970 * 1000)
+        for idx in 0..<(senderCap - 1) {
+            let sender = "peer-cap-\(idx)"
+            let payloadObject: [String: Any] = [
+                "version": WiFiDirectEnvelopeVersion.current,
+                "messageType": "private",
+                "senderPeerID": sender,
+                "recipientPeerID": mesh.myPeerID.id,
+                "recipientNickname": "self",
+                "messageID": "mid-cap-\(idx)",
+                "content": "hello",
+                "createdAtMs": createdAtMs
+            ]
+            let payload = try JSONSerialization.data(withJSONObject: payloadObject, options: [])
+            backend.simulateIncoming(payload, from: sender)
+        }
+
+        // Blank sender should be ignored and must not consume tracked-sender capacity.
+        let blankPayloadObject: [String: Any] = [
+            "version": WiFiDirectEnvelopeVersion.current,
+            "messageType": "private",
+            "senderPeerID": "   ",
+            "recipientPeerID": mesh.myPeerID.id,
+            "recipientNickname": "self",
+            "messageID": "mid-cap-blank",
+            "content": "hello",
+            "createdAtMs": createdAtMs
+        ]
+        let blankPayload = try JSONSerialization.data(withJSONObject: blankPayloadObject, options: [])
+        backend.simulateIncoming(blankPayload, from: "   ")
+
+        // This sender should still be accepted.
+        let finalSender = "peer-cap-final"
+        let finalPayloadObject: [String: Any] = [
+            "version": WiFiDirectEnvelopeVersion.current,
+            "messageType": "private",
+            "senderPeerID": finalSender,
+            "recipientPeerID": mesh.myPeerID.id,
+            "recipientNickname": "self",
+            "messageID": "mid-cap-final",
+            "content": "hello",
+            "createdAtMs": createdAtMs
+        ]
+        let finalPayload = try JSONSerialization.data(withJSONObject: finalPayloadObject, options: [])
+        backend.simulateIncoming(finalPayload, from: finalSender)
+
+        let expect = expectation(description: "blank sender does not consume sender bucket capacity")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+        NotificationCenter.default.removeObserver(token)
+
+        XCTAssertEqual(receivedCount, senderCap)
+    }
+
+    @MainActor
     func testFallsBackFromWiFiReadReceiptWhenPeerLacksAckCapability() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()

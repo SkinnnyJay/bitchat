@@ -563,6 +563,7 @@ final class MessageRouter {
 
     private func allowInboundWiFiEvent(from senderID: String) -> Bool {
         let normalizedSenderID = normalizedWiFiIdentityKey(senderID)
+        guard !normalizedSenderID.isEmpty else { return false }
         let now = nowProvider()
         cleanupInboundWiFiSenderRate(now: now)
         if inboundWiFiSenderEventTimestamps[normalizedSenderID] == nil,

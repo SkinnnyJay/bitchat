@@ -270,6 +270,7 @@ final class HybridTransportManager {
 
     private func allowInboundEvent(from senderID: String) -> Bool {
         let normalizedSenderID = normalizedIdentityKey(senderID)
+        guard !normalizedSenderID.isEmpty else { return false }
         let now = nowProvider()
         cleanupInboundSenderRate(now: now)
         if inboundSenderEventTimestamps[normalizedSenderID] == nil,
