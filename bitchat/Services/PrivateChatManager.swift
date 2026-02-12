@@ -17,7 +17,7 @@ final class PrivateChatManager: ObservableObject {
     @Published var unreadMessages: Set<String> = []
     
     private var selectedPeerFingerprint: String? = nil
-    var sentReadReceipts: Set<String> = []  // Made accessible for ChatViewModel
+    private(set) var sentReadReceipts: Set<String> = []
     private var sentReadReceiptOrder: [String] = []
     
     weak var meshService: Transport?
