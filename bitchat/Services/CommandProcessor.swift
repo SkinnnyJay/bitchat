@@ -212,6 +212,7 @@ final class CommandProcessor {
         }
         
         let nickname = targetName.hasPrefix("@") ? String(targetName.dropFirst()) : targetName
+        let sanitizedNickname = Self.sanitizedNicknameForIdentity(nickname)
         
         if let peerID = chatViewModel?.getPeerIDForNickname(nickname),
            let fingerprint = meshService?.getFingerprint(for: PeerID(str: peerID)) {
@@ -222,12 +223,13 @@ final class CommandProcessor {
             if var identity = identityManager.getSocialIdentity(for: fingerprint) {
                 identity.isBlocked = true
                 identity.isFavorite = false
+                identity.claimedNickname = sanitizedNickname
                 identityManager.updateSocialIdentity(identity)
             } else {
                 let blockedIdentity = SocialIdentity(
                     fingerprint: fingerprint,
                     localPetname: nil,
-                    claimedNickname: nickname,
+                    claimedNickname: sanitizedNickname,
                     trustLevel: .unknown,
                     isFavorite: false,
                     isBlocked: true,
@@ -326,6 +328,10 @@ final class CommandProcessor {
     }
 
     static func favoriteNicknameForPersistence(_ nickname: String) -> String {
+        InputValidator.validateNickname(nickname) ?? "user"
+    }
+
+    static func sanitizedNicknameForIdentity(_ nickname: String) -> String {
         InputValidator.validateNickname(nickname) ?? "user"
     }
     

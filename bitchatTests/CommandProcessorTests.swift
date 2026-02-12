@@ -103,4 +103,12 @@ final class CommandProcessorTests: XCTestCase {
     func testFavoriteNicknameForPersistenceFallsBackToUserForInvalidInput() {
         XCTAssertEqual(CommandProcessor.favoriteNicknameForPersistence("   "), "user")
     }
+
+    func testSanitizedNicknameForIdentityKeepsValidNickname() {
+        XCTAssertEqual(CommandProcessor.sanitizedNicknameForIdentity("alice"), "alice")
+    }
+
+    func testSanitizedNicknameForIdentityFallsBackToUserForInvalidInput() {
+        XCTAssertEqual(CommandProcessor.sanitizedNicknameForIdentity("   "), "user")
+    }
 }
