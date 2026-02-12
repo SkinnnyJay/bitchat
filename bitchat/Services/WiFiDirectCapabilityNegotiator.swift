@@ -5,6 +5,7 @@ struct WiFiDirectCapabilityNegotiator {
         static let maxVersionLength = 16
         static let maxCapabilitiesLength = 512
         static let maxCapabilityTokenLength = 32
+        static let maxCapabilityTokenCount = 32
     }
     private static let invalidFieldSentinel = "__invalid__"
 
@@ -81,6 +82,7 @@ struct WiFiDirectCapabilityNegotiator {
         Set(
             capabilityString
                 .split(separator: ",")
+                .prefix(Limits.maxCapabilityTokenCount)
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
                 .filter {
                     !$0.isEmpty &&
