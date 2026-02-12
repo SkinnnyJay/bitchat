@@ -268,6 +268,50 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertNil(UnifiedPeerService.peerID(for: "   ", in: [peer]))
     }
 
+    func testPeerIDLookupPrefersConnectedPeerWhenNicknamesDuplicate() {
+        let connected = BitchatPeer(
+            peerID: PeerID(str: "1111111111111111"),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "alice",
+            isConnected: true,
+            isReachable: true
+        )
+        let offline = BitchatPeer(
+            peerID: PeerID(str: "2222222222222222"),
+            noisePublicKey: Data(repeating: 0x22, count: 32),
+            nickname: "alice",
+            isConnected: false,
+            isReachable: false
+        )
+
+        let resolved = UnifiedPeerService.peerID(for: "alice", in: [offline, connected])
+
+        XCTAssertEqual(resolved, connected.peerID.id)
+    }
+
+    func testBestPeerForNicknameMatchFallsBackToMostRecentWhenPriorityEqual() {
+        let older = BitchatPeer(
+            peerID: PeerID(str: "3333333333333333"),
+            noisePublicKey: Data(repeating: 0x33, count: 32),
+            nickname: "alice",
+            lastSeen: Date(timeIntervalSince1970: 10),
+            isConnected: false,
+            isReachable: false
+        )
+        let newer = BitchatPeer(
+            peerID: PeerID(str: "4444444444444444"),
+            noisePublicKey: Data(repeating: 0x44, count: 32),
+            nickname: "alice",
+            lastSeen: Date(timeIntervalSince1970: 20),
+            isConnected: false,
+            isReachable: false
+        )
+
+        let best = UnifiedPeerService.bestPeerForNicknameMatch([older, newer])
+
+        XCTAssertEqual(best, newer)
+    }
+
     func testFingerprintFromPeerRejectsNon32ByteNoiseKey() {
         let peer = BitchatPeer(
             peerID: PeerID(str: "abcdef0123456789"),

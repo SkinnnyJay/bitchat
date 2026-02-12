@@ -388,14 +388,32 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         guard !target.isEmpty else { return nil }
         let normalizedTarget = target.lowercased()
 
-        for peer in peers {
+        let candidates = peers.filter { peer in
             let display = peer.displayName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             let rawNick = peer.nickname.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            if display == normalizedTarget || rawNick == normalizedTarget {
-                return peer.peerID.id
-            }
+            return display == normalizedTarget || rawNick == normalizedTarget
         }
-        return nil
+        guard !candidates.isEmpty else { return nil }
+        return bestPeerForNicknameMatch(candidates)?.peerID.id
+    }
+
+    static func bestPeerForNicknameMatch(_ peers: [BitchatPeer]) -> BitchatPeer? {
+        peers.max { lhs, rhs in
+            if nicknameMatchPriority(lhs) != nicknameMatchPriority(rhs) {
+                return nicknameMatchPriority(lhs) < nicknameMatchPriority(rhs)
+            }
+            if lhs.lastSeen != rhs.lastSeen {
+                return lhs.lastSeen < rhs.lastSeen
+            }
+            return lhs.peerID.id > rhs.peerID.id
+        }
+    }
+
+    private static func nicknameMatchPriority(_ peer: BitchatPeer) -> Int {
+        if peer.isConnected { return 3 }
+        if peer.isReachable { return 2 }
+        if peer.isMutualFavorite { return 1 }
+        return 0
     }
     
     /// Check if peer is online
