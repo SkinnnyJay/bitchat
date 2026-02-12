@@ -114,10 +114,11 @@ final class MessageRouter {
             SecureLogger.warning("Dropping PM with invalid message ID for \(peerID.id.prefix(8))…", category: .session)
             return
         }
+        let safeRecipientNickname = InputValidator.validateNickname(recipientNickname) ?? "user"
         if routePrivateViaWiFi(
             content,
             to: peerID,
-            recipientNickname: recipientNickname,
+            recipientNickname: safeRecipientNickname,
             messageID: safeMessageID,
             requirePolicyThreshold: true
         ) {
@@ -135,16 +136,16 @@ final class MessageRouter {
         case .mesh?:
             SecureLogger.debug("Routing PM via mesh (reachable) to \(peerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…", category: .session)
             // BLEService will initiate a handshake if needed and queue the message
-            mesh.sendPrivateMessage(content, to: peerID, recipientNickname: recipientNickname, messageID: safeMessageID)
+            mesh.sendPrivateMessage(content, to: peerID, recipientNickname: safeRecipientNickname, messageID: safeMessageID)
         case .nostr?:
             SecureLogger.debug("Routing PM via Nostr to \(peerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…", category: .session)
-            nostr.sendPrivateMessage(content, to: peerID, recipientNickname: recipientNickname, messageID: safeMessageID)
+            nostr.sendPrivateMessage(content, to: peerID, recipientNickname: safeRecipientNickname, messageID: safeMessageID)
         case nil:
             let outboxPeerID = normalizedOutboxPeerID(for: peerID)
             if routePrivateViaWiFi(
                 content,
                 to: outboxPeerID,
-                recipientNickname: recipientNickname,
+                recipientNickname: safeRecipientNickname,
                 messageID: safeMessageID,
                 requirePolicyThreshold: false
             ) {
@@ -157,7 +158,7 @@ final class MessageRouter {
             outbox[outboxPeerID]?.append(
                 QueuedPrivateMessage(
                     content: content,
-                    recipientNickname: recipientNickname,
+                    recipientNickname: safeRecipientNickname,
                     messageID: safeMessageID,
                     enqueuedAt: nowProvider()
                 )
