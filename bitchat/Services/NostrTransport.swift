@@ -72,23 +72,7 @@ final class NostrTransport: Transport {
             guard let recipientNpub = resolveRecipientNpub(for: peerID) else { return }
             guard let senderIdentity = try? NostrIdentityBridge.getCurrentNostrIdentity() else { return }
             SecureLogger.debug("NostrTransport: preparing PM to \(recipientNpub.prefix(16))… for peerID \(peerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…", category: .session)
-            // Convert recipient npub -> hex (x-only)
-            let recipientHex: String
-            do {
-                let (hrp, data) = try Bech32.decode(recipientNpub)
-                guard hrp == "npub" else {
-                    SecureLogger.error("NostrTransport: recipient key not npub (hrp=\(hrp))", category: .session)
-                    return
-                }
-                guard data.count == 32 else {
-                    SecureLogger.error("NostrTransport: recipient npub payload length invalid", category: .session)
-                    return
-                }
-                recipientHex = data.hexEncodedString()
-            } catch {
-                SecureLogger.error("NostrTransport: failed to decode npub -> hex: \(error)", category: .session)
-                return
-            }
+            guard let recipientHex = decodeRecipientHex(fromNpub: recipientNpub) else { return }
             guard let embedded = NostrEmbeddedBitChat.encodePMForNostr(content: content, messageID: safeMessageID, recipientPeerID: peerID.id, senderPeerID: senderRoutingPeerID.id) else {
                 SecureLogger.error("NostrTransport: failed to embed PM packet", category: .session)
                 return
@@ -135,13 +119,7 @@ final class NostrTransport: Transport {
             guard let senderIdentity = try? NostrIdentityBridge.getCurrentNostrIdentity() else { return }
             let content = isFavorite ? "[FAVORITED]:\(senderIdentity.npub)" : "[UNFAVORITED]:\(senderIdentity.npub)"
             SecureLogger.debug("NostrTransport: preparing FAVORITE(\(isFavorite)) to \(recipientNpub.prefix(16))…", category: .session)
-            // Convert recipient npub -> hex
-            let recipientHex: String
-            do {
-                let (hrp, data) = try Bech32.decode(recipientNpub)
-                guard hrp == "npub", data.count == 32 else { return }
-                recipientHex = data.hexEncodedString()
-            } catch { return }
+            guard let recipientHex = decodeRecipientHex(fromNpub: recipientNpub) else { return }
             guard let embedded = NostrEmbeddedBitChat.encodePMForNostr(content: content, messageID: UUID().uuidString, recipientPeerID: peerID.id, senderPeerID: senderRoutingPeerID.id) else {
                 SecureLogger.error("NostrTransport: failed to embed favorite notification", category: .session)
                 return
@@ -164,12 +142,7 @@ final class NostrTransport: Transport {
             guard let recipientNpub = resolveRecipientNpub(for: peerID) else { return }
             guard let senderIdentity = try? NostrIdentityBridge.getCurrentNostrIdentity() else { return }
             SecureLogger.debug("NostrTransport: preparing DELIVERED ack for id=\(safeMessageID.prefix(8))… to \(recipientNpub.prefix(16))…", category: .session)
-            let recipientHex: String
-            do {
-                let (hrp, data) = try Bech32.decode(recipientNpub)
-                guard hrp == "npub", data.count == 32 else { return }
-                recipientHex = data.hexEncodedString()
-            } catch { return }
+            guard let recipientHex = decodeRecipientHex(fromNpub: recipientNpub) else { return }
             guard let ack = NostrEmbeddedBitChat.encodeAckForNostr(type: .delivered, messageID: safeMessageID, recipientPeerID: peerID.id, senderPeerID: senderRoutingPeerID.id) else {
                 SecureLogger.error("NostrTransport: failed to embed DELIVERED ack", category: .session)
                 return
@@ -261,13 +234,7 @@ extension NostrTransport {
             guard let recipientNpub = resolveRecipientNpub(for: item.peerID) else { scheduleNextReadAck(); return }
             guard let senderIdentity = try? NostrIdentityBridge.getCurrentNostrIdentity() else { scheduleNextReadAck(); return }
             SecureLogger.debug("NostrTransport: preparing READ ack for id=\(item.receipt.originalMessageID.prefix(8))… to \(recipientNpub.prefix(16))…", category: .session)
-            // Convert recipient npub -> hex
-            let recipientHex: String
-            do {
-                let (hrp, data) = try Bech32.decode(recipientNpub)
-                guard hrp == "npub", data.count == 32 else { scheduleNextReadAck(); return }
-                recipientHex = data.hexEncodedString()
-            } catch { scheduleNextReadAck(); return }
+            guard let recipientHex = decodeRecipientHex(fromNpub: recipientNpub) else { scheduleNextReadAck(); return }
             guard let ack = NostrEmbeddedBitChat.encodeAckForNostr(type: .readReceipt, messageID: item.receipt.originalMessageID, recipientPeerID: item.peerID.id, senderPeerID: senderRoutingPeerID.id) else {
                 SecureLogger.error("NostrTransport: failed to embed READ ack", category: .session)
                 scheduleNextReadAck(); return
@@ -287,6 +254,16 @@ extension NostrTransport {
             guard let self = self else { return }
             self.isSendingReadAcks = false
             self.processReadQueueIfNeeded()
+        }
+    }
+
+    private func decodeRecipientHex(fromNpub recipientNpub: String) -> String? {
+        do {
+            let (hrp, data) = try Bech32.decode(recipientNpub)
+            guard hrp == "npub", data.count == 32 else { return nil }
+            return data.hexEncodedString()
+        } catch {
+            return nil
         }
     }
 
