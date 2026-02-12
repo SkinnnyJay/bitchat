@@ -37,4 +37,42 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
 
         XCTAssertEqual(resolved, "fp-1")
     }
+
+    func testLookupKeysForGeoDMPeerIDDoNotIncludeBareMeshCandidate() {
+        let keys = UnifiedPeerService.lookupKeys(for: "nostr_abcdef0123456789")
+
+        XCTAssertEqual(keys, ["nostr_abcdef0123456789"])
+    }
+
+    func testResolvePeerDoesNotCrossResolveGeoDMIntoBareMeshID() {
+        let peer = BitchatPeer(
+            peerID: PeerID(str: "abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x33, count: 32),
+            nickname: "bob"
+        )
+        let peerIndex = ["abcdef0123456789": peer]
+
+        let resolved = UnifiedPeerService.resolvePeer(
+            from: peerIndex,
+            peerID: "nostr_abcdef0123456789"
+        )
+
+        XCTAssertNil(resolved)
+    }
+
+    func testResolvePeerFindsExactGeoDMKeyCaseInsensitively() {
+        let peer = BitchatPeer(
+            peerID: PeerID(str: "nostr_abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x44, count: 32),
+            nickname: "carol"
+        )
+        let peerIndex = ["nostr_abcdef0123456789": peer]
+
+        let resolved = UnifiedPeerService.resolvePeer(
+            from: peerIndex,
+            peerID: "NOSTR_ABCDEF0123456789"
+        )
+
+        XCTAssertEqual(resolved, peer)
+    }
 }

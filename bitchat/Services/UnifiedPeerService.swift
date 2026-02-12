@@ -226,6 +226,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     static func lookupKeys(for peerID: String) -> [String] {
         let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
+        let parsedPeerID = PeerID(str: trimmed)
 
         var keys: [String] = []
         func appendKey(_ key: String) {
@@ -238,7 +239,10 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
 
         appendKey(trimmed)
         appendKey(trimmed.lowercased())
-        for candidate in WiFiPeerIdentity.candidateIDs(for: PeerID(str: trimmed)) {
+        if parsedPeerID.isGeoDM || parsedPeerID.isGeoChat {
+            return keys
+        }
+        for candidate in WiFiPeerIdentity.candidateIDs(for: parsedPeerID) {
             appendKey(candidate)
             appendKey(candidate.lowercased())
         }

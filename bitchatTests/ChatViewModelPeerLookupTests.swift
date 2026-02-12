@@ -52,4 +52,30 @@ final class ChatViewModelPeerLookupTests: XCTestCase {
         XCTAssertNil(ChatViewModel.resolvePeer(from: index, peerID: ""))
         XCTAssertNil(ChatViewModel.resolvePeer(from: index, peerID: "unknown-peer"))
     }
+
+    func testResolvePeerDoesNotCrossResolveGeoDMPrefixIntoBareMeshID() {
+        let meshPeer = BitchatPeer(
+            peerID: PeerID(str: "abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x55, count: 32),
+            nickname: "erin"
+        )
+        let index = ["abcdef0123456789": meshPeer]
+
+        let resolved = ChatViewModel.resolvePeer(from: index, peerID: "nostr_abcdef0123456789")
+
+        XCTAssertNil(resolved)
+    }
+
+    func testResolvePeerFindsExactGeoDMPeerKeyCaseInsensitively() {
+        let geoPeer = BitchatPeer(
+            peerID: PeerID(str: "nostr_abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x66, count: 32),
+            nickname: "frank"
+        )
+        let index = ["nostr_abcdef0123456789": geoPeer]
+
+        let resolved = ChatViewModel.resolvePeer(from: index, peerID: "NOSTR_ABCDEF0123456789")
+
+        XCTAssertEqual(resolved, geoPeer)
+    }
 }

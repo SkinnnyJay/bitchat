@@ -4432,6 +4432,14 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     static func resolvePeer(from peerIndex: [String: BitchatPeer], peerID: String) -> BitchatPeer? {
         let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+        let parsedPeerID = PeerID(str: trimmed)
+
+        if parsedPeerID.isGeoDM || parsedPeerID.isGeoChat {
+            if let direct = peerIndex[trimmed] {
+                return direct
+            }
+            return peerIndex[trimmed.lowercased()]
+        }
 
         var lookupKeys: [String] = []
         func appendLookupKey(_ key: String) {
@@ -4444,7 +4452,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
         appendLookupKey(trimmed)
         appendLookupKey(trimmed.lowercased())
-        for candidate in WiFiPeerIdentity.candidateIDs(for: PeerID(str: trimmed)) {
+        for candidate in WiFiPeerIdentity.candidateIDs(for: parsedPeerID) {
             appendLookupKey(candidate)
             appendLookupKey(candidate.lowercased())
         }
