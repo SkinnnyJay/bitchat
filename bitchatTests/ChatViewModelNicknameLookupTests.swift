@@ -11,6 +11,11 @@ final class ChatViewModelNicknameLookupTests: XCTestCase {
         XCTAssertTrue(ChatViewModel.shouldResolveNicknameLookup(for: "noise:\(String(repeating: "ab", count: 32))"))
     }
 
+    func testShouldResolveNicknameLookupForUppercasePrefixedPeerIDs() {
+        XCTAssertTrue(ChatViewModel.shouldResolveNicknameLookup(for: "MESH:ABCDEF0123456789"))
+        XCTAssertTrue(ChatViewModel.shouldResolveNicknameLookup(for: "NOSTR_ABCDEF0123456789"))
+    }
+
     func testShouldResolveNicknameLookupRejectsPlainNicknames() {
         XCTAssertFalse(ChatViewModel.shouldResolveNicknameLookup(for: "alice"))
         XCTAssertFalse(ChatViewModel.shouldResolveNicknameLookup(for: "bob-123"))

@@ -4493,8 +4493,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     static func shouldResolveNicknameLookup(for value: String) -> Bool {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
-        let parsed = PeerID(str: trimmed)
-        if parsed.prefix != .empty {
+        let lowered = trimmed.lowercased()
+        if PeerID.Prefix.allCases.contains(where: { prefix in
+            prefix != .empty && lowered.hasPrefix(prefix.rawValue)
+        }) {
             return true
         }
         return trimmed.allSatisfy { $0.isHexDigit }
