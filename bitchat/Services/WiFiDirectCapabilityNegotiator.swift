@@ -27,7 +27,12 @@ struct WiFiDirectCapabilityNegotiator {
         let sanitizedRequired = Self.sanitizeCapabilities(requiredCapabilities)
         let sanitizedDefault = Self.sanitizeCapabilities(defaultCapabilities)
         self.requiredCapabilitiesSet = sanitizedRequired
-        self.defaultCapabilitiesSet = sanitizedDefault.union(sanitizedRequired)
+        var advertised = sanitizedRequired.sorted()
+        for capability in sanitizedDefault.sorted() where !advertised.contains(capability) {
+            if advertised.count >= Limits.maxCapabilityTokenCount { break }
+            advertised.append(capability)
+        }
+        self.defaultCapabilitiesSet = Set(advertised)
     }
 
     func discoveryInfo() -> [String: String] {
