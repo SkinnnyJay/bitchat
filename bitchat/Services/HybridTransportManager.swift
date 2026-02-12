@@ -131,29 +131,76 @@ final class HybridTransportManager {
         messageID: String
     ) -> HybridOutboundRoute {
         let recipientID = peerID.id
+        let resolvedRecipientID = resolveWiFiPeerIdentifier(for: peerID, requiredCapability: "pm")
         let shouldUseWiFi = wifiRoutingPolicy.shouldUseWiFi(
             payloadBytes: content.utf8.count,
-            recipientPeerID: recipientID,
+            recipientPeerID: resolvedRecipientID ?? recipientID,
             wifiAvailable: wifiTransport.isAvailable,
             wifiPeerIDs: Set(wifiTransport.currentPeers)
         )
 
-        if shouldUseWiFi {
+        if shouldUseWiFi, let resolvedRecipientID {
             let envelope = WiFiDirectPrivateEnvelope(
                 senderPeerID: meshTransport.myPeerID.id,
-                recipientPeerID: recipientID,
+                recipientPeerID: resolvedRecipientID,
                 recipientNickname: recipientNickname,
                 messageID: messageID,
                 content: content
             )
             if let data = try? JSONEncoder().encode(envelope),
-               (try? wifiTransport.send(data, to: recipientID)) != nil {
+               (try? wifiTransport.send(data, to: resolvedRecipientID)) != nil {
                 return .wifiDirect
             }
         }
 
         meshTransport.sendPrivateMessage(content, to: peerID, recipientNickname: recipientNickname, messageID: messageID)
         return .mesh
+    }
+
+    private func resolveWiFiPeerIdentifier(for peerID: PeerID, requiredCapability: String) -> String? {
+        guard wifiTransport.isAvailable else { return nil }
+        let availablePeerIDs = Set(wifiTransport.currentPeers)
+        for candidate in wifiPeerIDCandidates(for: peerID) where availablePeerIDs.contains(candidate) {
+            if let capabilities = wifiTransport.peerCapabilities(peerID: candidate),
+               !capabilities.contains(requiredCapability) {
+                continue
+            }
+            return candidate
+        }
+        return nil
+    }
+
+    private func wifiPeerIDCandidates(for peerID: PeerID) -> [String] {
+        var candidates: [String] = [peerID.id]
+        let short = peerID.toShort().id
+        if short != peerID.id {
+            candidates.append(short)
+        }
+        if let noiseKey = peerID.noiseKey {
+            let full = noiseKey.hexEncodedString()
+            if full != peerID.id && !candidates.contains(full) {
+                candidates.append(full)
+            }
+        }
+        return candidates
+    }
+
+    private func senderMatchesTransportPeerID(claimedSenderID: String, transportPeerID: String) -> Bool {
+        let claimed = PeerID(str: claimedSenderID)
+        let observed = PeerID(str: transportPeerID)
+        if claimed.id == observed.id {
+            return true
+        }
+        return claimed.toShort().id == observed.toShort().id
+    }
+
+    private func recipientMatchesLocalPeerID(_ claimedRecipientID: String) -> Bool {
+        let claimed = PeerID(str: claimedRecipientID)
+        let local = meshTransport.myPeerID
+        if claimed.id == local.id {
+            return true
+        }
+        return claimed.toShort().id == local.toShort().id
     }
 }
 
@@ -170,7 +217,9 @@ extension HybridTransportManager: WiFiDirectTransportDelegate {
             guard let self else { return }
             guard let envelope = try? JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: data),
                   envelope.messageType == "private",
-                  envelope.recipientPeerID == self.meshTransport.myPeerID.id else {
+                  envelope.version == WiFiDirectEnvelopeVersion.current,
+                  self.senderMatchesTransportPeerID(claimedSenderID: envelope.senderPeerID, transportPeerID: peerID),
+                  self.recipientMatchesLocalPeerID(envelope.recipientPeerID) else {
                 return
             }
             self.delegate?.hybridTransportManager(self, didReceivePrivateEnvelope: envelope)
