@@ -407,6 +407,30 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testDropsPrivateMessageForInvalidRecipientPeerID() {
+        let invalidRecipient = PeerID(str: "invalid peer id with spaces")
+        let mesh = MockTransport()
+        mesh.setReachable(invalidRecipient, isReachable: true)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 1),
+            wifiTransport: wifi
+        )
+
+        router.sendPrivate("hello", to: invalidRecipient, recipientNickname: "peer", messageID: "mid-invalid-peer")
+
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 0)
+        XCTAssertEqual(router.queuedMessageCount(for: invalidRecipient), 0)
+    }
+
+    @MainActor
     func testRoutesViaWiFiBelowThresholdWhenNoOtherRouteExists() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()

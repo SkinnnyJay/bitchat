@@ -108,6 +108,10 @@ final class MessageRouter {
     }
 
     func sendPrivate(_ content: String, to peerID: PeerID, recipientNickname: String, messageID: String) {
+        guard peerID.isValid else {
+            SecureLogger.warning("Dropping PM to invalid peer ID", category: .session)
+            return
+        }
         guard content.utf8.count <= InputValidator.Limits.maxMessageLength else {
             SecureLogger.warning("Dropping PM with oversized content for \(peerID.id.prefix(8))…", category: .session)
             return
