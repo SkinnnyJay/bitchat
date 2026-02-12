@@ -321,7 +321,9 @@ extension HybridTransportManager: WiFiDirectTransportDelegate {
                   envelope.version == WiFiDirectEnvelopeVersion.current,
                   self.senderMatchesTransportPeerID(claimedSenderID: envelope.senderPeerID, transportPeerID: peerID),
                   self.recipientMatchesLocalPeerID(envelope.recipientPeerID),
-                  self.isInboundTimestampAcceptable(envelope.createdAtMs) else {
+                  self.isInboundTimestampAcceptable(envelope.createdAtMs),
+                  !envelope.messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  envelope.content.utf8.count <= InputValidator.Limits.maxMessageLength else {
                 return
             }
             let dedupKey = "pm:\(self.normalizedIdentityKey(envelope.senderPeerID)):\(envelope.messageID)"
