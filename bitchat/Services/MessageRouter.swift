@@ -7,13 +7,24 @@ final class MessageRouter {
     private let mesh: Transport
     private let nostr: NostrTransport
     private let routingPolicy: TransportRoutingPolicy
+    private let wifiRoutingPolicy: WiFiDirectRoutingPolicy
+    private let wifiTransport: WiFiDirectTransport?
     private var outbox: [PeerID: [(content: String, nickname: String, messageID: String)]] = [:] // peerID -> queued messages
 
-    init(mesh: Transport, nostr: NostrTransport, routingPolicy: TransportRoutingPolicy = TransportRoutingPolicy()) {
+    init(
+        mesh: Transport,
+        nostr: NostrTransport,
+        routingPolicy: TransportRoutingPolicy = TransportRoutingPolicy(),
+        wifiRoutingPolicy: WiFiDirectRoutingPolicy = WiFiDirectRoutingPolicy(),
+        wifiTransport: WiFiDirectTransport? = nil
+    ) {
         self.mesh = mesh
         self.nostr = nostr
         self.routingPolicy = routingPolicy
+        self.wifiRoutingPolicy = wifiRoutingPolicy
+        self.wifiTransport = wifiTransport ?? WiFiDirectTransport(localPeerID: mesh.myPeerID.id)
         self.nostr.senderPeerID = mesh.myPeerID
+        self.wifiTransport?.startDiscovery()
 
         // Observe favorites changes to learn Nostr mapping and flush queued messages
         NotificationCenter.default.addObserver(
@@ -39,8 +50,15 @@ final class MessageRouter {
         }
     }
 
+    deinit {
+        wifiTransport?.stopDiscovery()
+    }
+
     func sendPrivate(_ content: String, to peerID: PeerID, recipientNickname: String, messageID: String) {
         let reachableMesh = mesh.isPeerReachable(peerID)
+        if reachableMesh, routePrivateViaWiFiIfPreferred(content, to: peerID, recipientNickname: recipientNickname, messageID: messageID) {
+            return
+        }
         let nostrAvailable = canSendViaNostr(peerID: peerID)
         let context = TransportRoutingPolicy.Context(
             payloadBytes: content.utf8.count,
@@ -118,9 +136,14 @@ final class MessageRouter {
         var remaining: [(content: String, nickname: String, messageID: String)] = []
         // Re-evaluate route for each message as transport availability may have changed.
         for (content, nickname, messageID) in queued {
+            let reachableMesh = mesh.isPeerReachable(peerID)
+            if reachableMesh,
+               routePrivateViaWiFiIfPreferred(content, to: peerID, recipientNickname: nickname, messageID: messageID) {
+                continue
+            }
             let context = TransportRoutingPolicy.Context(
                 payloadBytes: content.utf8.count,
-                meshReachable: mesh.isPeerReachable(peerID),
+                meshReachable: reachableMesh,
                 nostrAvailable: canSendViaNostr(peerID: peerID)
             )
 
@@ -141,6 +164,40 @@ final class MessageRouter {
             outbox.removeValue(forKey: peerID)
         } else {
             outbox[peerID] = remaining
+        }
+    }
+
+    private func routePrivateViaWiFiIfPreferred(
+        _ content: String,
+        to peerID: PeerID,
+        recipientNickname: String,
+        messageID: String
+    ) -> Bool {
+        guard let wifiTransport else { return false }
+        let shouldUseWiFi = wifiRoutingPolicy.shouldUseWiFi(
+            payloadBytes: content.utf8.count,
+            recipientPeerID: peerID.id,
+            wifiAvailable: wifiTransport.isAvailable,
+            wifiPeerIDs: Set(wifiTransport.currentPeers)
+        )
+        guard shouldUseWiFi else { return false }
+
+        let envelope = WiFiDirectPrivateEnvelope(
+            senderPeerID: mesh.myPeerID.id,
+            recipientPeerID: peerID.id,
+            recipientNickname: recipientNickname,
+            messageID: messageID,
+            content: content
+        )
+        guard let payload = try? JSONEncoder().encode(envelope) else { return false }
+
+        do {
+            try wifiTransport.send(payload, to: peerID.id)
+            SecureLogger.debug("Routing PM via WiFi Direct to \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
+            return true
+        } catch {
+            SecureLogger.debug("WiFi Direct PM route failed for \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…, falling back", category: .session)
+            return false
         }
     }
 

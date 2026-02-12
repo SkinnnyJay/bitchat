@@ -67,11 +67,11 @@ final class HybridTransportManager {
 
     init(
         meshTransport: Transport,
-        wifiTransport: WiFiDirectTransport = WiFiDirectTransport(),
+        wifiTransport: WiFiDirectTransport? = nil,
         wifiRoutingPolicy: WiFiDirectRoutingPolicy = WiFiDirectRoutingPolicy()
     ) {
         self.meshTransport = meshTransport
-        self.wifiTransport = wifiTransport
+        self.wifiTransport = wifiTransport ?? WiFiDirectTransport(localPeerID: meshTransport.myPeerID.id)
         self.wifiRoutingPolicy = wifiRoutingPolicy
         self.wifiTransport.delegate = self
     }

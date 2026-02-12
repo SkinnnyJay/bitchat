@@ -2,16 +2,114 @@ import XCTest
 @testable import bitchat
 
 final class WiFiDirectTransportTests: XCTestCase {
-    func testAvailabilityAndStartStopAreSafe() {
-        let transport = WiFiDirectTransport()
-        transport.startDiscovery()
-        transport.stopDiscovery()
+    private final class MockDelegate: WiFiDirectTransportDelegate {
+        var peerUpdates: [[String]] = []
+        var receives: [(data: Data, from: String)] = []
+        var availability: [Bool] = []
 
-        #if canImport(MultipeerConnectivity)
-        XCTAssertTrue(transport.isAvailable)
-        #else
-        XCTAssertFalse(transport.isAvailable)
-        #endif
+        func wifiTransportDidUpdatePeers(_ peers: [String]) {
+            peerUpdates.append(peers)
+        }
+
+        func wifiTransportDidReceive(_ data: Data, from peerID: String) {
+            receives.append((data, peerID))
+        }
+
+        func wifiTransportDidChangeAvailability(_ isAvailable: Bool) {
+            availability.append(isAvailable)
+        }
+    }
+
+    private final class MockBackend: WiFiDirectTransportBackend {
+        weak var owner: WiFiDirectTransport?
+        var isAvailable: Bool
+        var startDiscoveryCount = 0
+        var stopDiscoveryCount = 0
+        var sentPayloads: [(data: Data, peerID: String?)] = []
+        var sendError: Error?
+
+        required init(localPeerID: String?) {
+            isAvailable = true
+        }
+
+        func startDiscovery() {
+            startDiscoveryCount += 1
+            owner?.didChangeAvailability(isAvailable)
+        }
+
+        func stopDiscovery() {
+            stopDiscoveryCount += 1
+        }
+
+        func send(_ data: Data, to peerID: String?) throws {
+            if let sendError {
+                throw sendError
+            }
+            sentPayloads.append((data, peerID))
+        }
+
+        func simulatePeerUpdate(_ peers: [String]) {
+            owner?.didUpdatePeers(peers)
+        }
+
+        func simulateReceive(_ data: Data, from peerID: String) {
+            owner?.didReceive(data, from: peerID)
+        }
+    }
+
+    private enum SampleError: Error {
+        case failedSend
+    }
+
+    func testStartStopDiscoveryAreIdempotent() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+
+        transport.startDiscovery()
+        transport.startDiscovery()
+        XCTAssertTrue(transport.isDiscovering)
+        XCTAssertEqual(backend.startDiscoveryCount, 1)
+
+        transport.stopDiscovery()
+        transport.stopDiscovery()
+        XCTAssertFalse(transport.isDiscovering)
+        XCTAssertEqual(backend.stopDiscoveryCount, 1)
+    }
+
+    func testSendIsForwardedToBackend() throws {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let payload = Data("hello".utf8)
+
+        try transport.send(payload, to: "peer-a")
+
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        XCTAssertEqual(backend.sentPayloads[0].data, payload)
+        XCTAssertEqual(backend.sentPayloads[0].peerID, "peer-a")
+    }
+
+    func testSendPropagatesBackendError() {
+        let backend = MockBackend(localPeerID: "self")
+        backend.sendError = SampleError.failedSend
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+
+        XCTAssertThrowsError(try transport.send(Data("hello".utf8), to: "peer-a"))
+    }
+
+    func testDelegateReceivesPeerAndMessageEvents() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let delegate = MockDelegate()
+        transport.delegate = delegate
+
+        transport.startDiscovery()
+        backend.simulatePeerUpdate(["peer-a", "peer-b"])
+        backend.simulateReceive(Data("ping".utf8), from: "peer-a")
+
+        XCTAssertEqual(delegate.availability, [true])
+        XCTAssertEqual(delegate.peerUpdates, [["peer-a", "peer-b"]])
+        XCTAssertEqual(delegate.receives.count, 1)
+        XCTAssertEqual(delegate.receives[0].from, "peer-a")
     }
 
     func testSendWithoutPeersThrows() {

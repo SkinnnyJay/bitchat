@@ -30,19 +30,28 @@ final class WiFiDirectTransport: NSObject {
         impl.isAvailable
     }
 
+    private(set) var isDiscovering = false
     private let impl: WiFiDirectTransportBackend
 
-    override init() {
-        impl = WiFiDirectTransportBackendImpl()
+    init(localPeerID: String? = nil, backend: WiFiDirectTransportBackend? = nil) {
+        impl = backend ?? WiFiDirectTransportBackendImpl(localPeerID: localPeerID)
         super.init()
         impl.owner = self
     }
 
+    override convenience init() {
+        self.init(localPeerID: nil, backend: nil)
+    }
+
     func startDiscovery() {
+        guard !isDiscovering else { return }
+        isDiscovering = true
         impl.startDiscovery()
     }
 
     func stopDiscovery() {
+        guard isDiscovering else { return }
+        isDiscovering = false
         impl.stopDiscovery()
     }
 
@@ -50,22 +59,27 @@ final class WiFiDirectTransport: NSObject {
         try impl.send(data, to: peerID)
     }
 
-    fileprivate func didReceive(_ data: Data, from peerID: String) {
+    deinit {
+        stopDiscovery()
+    }
+
+    func didReceive(_ data: Data, from peerID: String) {
         delegate?.wifiTransportDidReceive(data, from: peerID)
     }
 
-    fileprivate func didUpdatePeers(_ peers: [String]) {
+    func didUpdatePeers(_ peers: [String]) {
         currentPeers = peers
     }
 
-    fileprivate func didChangeAvailability(_ available: Bool) {
+    func didChangeAvailability(_ available: Bool) {
         delegate?.wifiTransportDidChangeAvailability(available)
     }
 }
 
-private protocol WiFiDirectTransportBackend: AnyObject {
+protocol WiFiDirectTransportBackend: AnyObject {
     var owner: WiFiDirectTransport? { get set }
     var isAvailable: Bool { get }
+    init(localPeerID: String?)
     func startDiscovery()
     func stopDiscovery()
     func send(_ data: Data, to peerID: String?) throws
@@ -90,9 +104,9 @@ private final class MPCWiFiDirectTransportImplementation: NSObject, WiFiDirectTr
         serviceType: serviceType
     )
 
-    override init() {
-        let fallbackName = ProcessInfo.processInfo.hostName
-        localPeerID = MCPeerID(displayName: String(fallbackName.prefix(63)))
+    required init(localPeerID: String?) {
+        let displayName = Self.sanitizeDisplayName(localPeerID)
+        self.localPeerID = MCPeerID(displayName: displayName)
         session = MCSession(peer: localPeerID, securityIdentity: nil, encryptionPreference: .required)
         super.init()
         session.delegate = self
@@ -133,6 +147,19 @@ private final class MPCWiFiDirectTransportImplementation: NSObject, WiFiDirectTr
         } catch {
             throw WiFiDirectTransportError.sendFailed
         }
+    }
+
+    private static func sanitizeDisplayName(_ candidate: String?) -> String {
+        let base = candidate?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallback = ProcessInfo.processInfo.hostName
+        let source = (base?.isEmpty == false) ? base! : fallback
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
+        let filteredScalars = source.unicodeScalars.filter { allowed.contains($0) }
+        let filtered = String(String.UnicodeScalarView(filteredScalars))
+        if filtered.isEmpty {
+            return "bitchat-peer"
+        }
+        return String(filtered.prefix(63))
     }
 }
 
@@ -197,6 +224,8 @@ private final class NoopWiFiDirectTransportImplementation: WiFiDirectTransportBa
     weak var owner: WiFiDirectTransport?
 
     var isAvailable: Bool { false }
+
+    required init(localPeerID: String?) {}
 
     func startDiscovery() {
         owner?.didChangeAvailability(false)
