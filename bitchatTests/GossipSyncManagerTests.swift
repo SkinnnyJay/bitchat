@@ -24,7 +24,7 @@ final class GossipSyncManagerTests: XCTestCase {
         let manager = GossipSyncManager(myPeerID: "mesh:abcdef0123456789")
         let delegate = RecordingDelegate()
         let sendExpectation = expectation(description: "initial sync sent")
-        delegate.onSend = { sendExpectation.fulfill() }
+        delegate.onSend = { _ in sendExpectation.fulfill() }
         manager.delegate = delegate
 
         manager.scheduleInitialSyncToPeer("mesh:1122334455667788", delaySeconds: 0.0)
@@ -35,11 +35,46 @@ final class GossipSyncManagerTests: XCTestCase {
         XCTAssertEqual(delegate.lastPacket?.recipientID?.hexEncodedString(), "1122334455667788")
     }
 
+    func testRemoveAnnouncementForEquivalentFullNoisePeerIDRemovesStoredShortSenderEntry() {
+        let fullNoiseID = String(repeating: "ab", count: 32)
+        let shortSenderID = PeerID(str: fullNoiseID).toShort().bare
+
+        let manager = GossipSyncManager(myPeerID: "0102030405060708")
+        let delegate = RecordingDelegate()
+        let noAnnouncementExpectation = expectation(description: "no announce sent after removal")
+        noAnnouncementExpectation.isInverted = true
+        delegate.onSend = { packet in
+            if packet.type == MessageType.announce.rawValue {
+                noAnnouncementExpectation.fulfill()
+            }
+        }
+        manager.delegate = delegate
+
+        let announcePacket = BitchatPacket(
+            type: MessageType.announce.rawValue,
+            senderID: Data(hexString: shortSenderID) ?? Data(),
+            recipientID: nil,
+            timestamp: 1234,
+            payload: Data([0x01]),
+            signature: nil,
+            ttl: 1
+        )
+
+        manager.onPublicPacketSeen(announcePacket)
+        manager.removeAnnouncementForPeer(PeerID(str: "noise:\(fullNoiseID)"))
+        manager.handleRequestSync(
+            from: "1122334455667788",
+            request: RequestSyncPacket(p: 1, m: 1, data: Data())
+        )
+
+        wait(for: [noAnnouncementExpectation], timeout: 0.2)
+    }
+
     func testConcurrentPacketIntakeAndSyncRequest() {
         let manager = GossipSyncManager(myPeerID: "0102030405060708")
         let delegate = RecordingDelegate()
         let sendExpectation = expectation(description: "sync request sent")
-        delegate.onSend = { sendExpectation.fulfill() }
+        delegate.onSend = { _ in sendExpectation.fulfill() }
         manager.delegate = delegate
 
         let iterations = 200
@@ -81,15 +116,17 @@ final class GossipSyncManagerTests: XCTestCase {
 }
 
 private final class RecordingDelegate: GossipSyncManager.Delegate {
-    var onSend: (() -> Void)?
+    var onSend: ((BitchatPacket) -> Void)?
     private(set) var lastPacket: BitchatPacket?
+    private(set) var sentPackets: [BitchatPacket] = []
     private let lock = NSLock()
 
     func sendPacket(_ packet: BitchatPacket) {
         lock.lock()
         lastPacket = packet
+        sentPackets.append(packet)
         lock.unlock()
-        onSend?()
+        onSend?(packet)
     }
 
     func sendPacket(to peerID: PeerID, packet: BitchatPacket) {
