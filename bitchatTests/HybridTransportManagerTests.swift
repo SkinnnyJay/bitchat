@@ -19,6 +19,8 @@ final class HybridTransportManagerTests: XCTestCase {
         private var reachablePeers: Set<PeerID> = []
 
         private(set) var sentPrivateMessages: [(content: String, peerID: PeerID, nickname: String, messageID: String)] = []
+        private(set) var startServicesCallCount = 0
+        private(set) var stopServicesCallCount = 0
 
         func setReachable(_ peerID: PeerID, isReachable: Bool) {
             if isReachable {
@@ -32,8 +34,8 @@ final class HybridTransportManagerTests: XCTestCase {
             myNickname = nickname
         }
 
-        func startServices() {}
-        func stopServices() {}
+        func startServices() { startServicesCallCount += 1 }
+        func stopServices() { stopServicesCallCount += 1 }
         func emergencyDisconnectAll() {}
         func isPeerConnected(_ peerID: PeerID) -> Bool { false }
         func isPeerReachable(_ peerID: PeerID) -> Bool { reachablePeers.contains(peerID) }
@@ -58,11 +60,13 @@ final class HybridTransportManagerTests: XCTestCase {
         var isAvailable = true
         var capabilitiesByPeerID: [String: Set<String>] = [:]
         private(set) var sentPayloads: [(Data, String?)] = []
+        private(set) var startDiscoveryCallCount = 0
+        private(set) var stopDiscoveryCallCount = 0
 
         required init(localPeerID: String?) {}
 
-        func startDiscovery() {}
-        func stopDiscovery() {}
+        func startDiscovery() { startDiscoveryCallCount += 1 }
+        func stopDiscovery() { stopDiscoveryCallCount += 1 }
 
         func send(_ data: Data, to peerID: String?) throws {
             sentPayloads.append((data, peerID))
@@ -123,6 +127,22 @@ final class HybridTransportManagerTests: XCTestCase {
         let envelope = try JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: backend.sentPayloads[0].0)
         XCTAssertEqual(envelope.recipientPeerID, recipientShort.id)
         XCTAssertTrue(mesh.sentPrivateMessages.isEmpty)
+    }
+
+    @MainActor
+    func testStartAndStopLifecycleForwardedToMeshAndWiFiTransports() {
+        let mesh = MockTransport()
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let manager = HybridTransportManager(meshTransport: mesh, wifiTransport: wifi)
+
+        manager.start()
+        manager.stop()
+
+        XCTAssertEqual(mesh.startServicesCallCount, 1)
+        XCTAssertEqual(mesh.stopServicesCallCount, 1)
+        XCTAssertEqual(backend.startDiscoveryCallCount, 1)
+        XCTAssertEqual(backend.stopDiscoveryCallCount, 1)
     }
 
     @MainActor
