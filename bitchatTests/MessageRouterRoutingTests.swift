@@ -1304,6 +1304,127 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testRateLimitsInboundWiFiEventsPerSenderWithinWindow() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let fixedNow = Date()
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { fixedNow })
+
+        var receivedCount = 0
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            receivedCount += 1
+        }
+
+        let maxEvents = TransportConfig.messageRouterInboundWiFiSenderRateMaxEvents
+        let createdAtMs = UInt64(fixedNow.timeIntervalSince1970 * 1000)
+        for idx in 0..<(maxEvents + 5) {
+            let payloadObject: [String: Any] = [
+                "version": WiFiDirectEnvelopeVersion.current,
+                "messageType": "private",
+                "senderPeerID": "peer-rate",
+                "recipientPeerID": mesh.myPeerID.id,
+                "recipientNickname": "self",
+                "messageID": "mid-rate-\(idx)",
+                "content": "hello",
+                "createdAtMs": createdAtMs
+            ]
+            let payload = try JSONSerialization.data(withJSONObject: payloadObject, options: [])
+            backend.simulateIncoming(payload, from: "peer-rate")
+        }
+
+        let expect = expectation(description: "rate-limited notifications settle")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+        NotificationCenter.default.removeObserver(token)
+
+        XCTAssertEqual(receivedCount, maxEvents)
+    }
+
+    @MainActor
+    func testInboundWiFiRateLimitResetsAfterWindowExpires() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        var now = Date()
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { now })
+
+        var receivedCount = 0
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            receivedCount += 1
+        }
+
+        let maxEvents = TransportConfig.messageRouterInboundWiFiSenderRateMaxEvents
+        for idx in 0..<maxEvents {
+            let payloadObject: [String: Any] = [
+                "version": WiFiDirectEnvelopeVersion.current,
+                "messageType": "private",
+                "senderPeerID": "peer-rate-reset",
+                "recipientPeerID": mesh.myPeerID.id,
+                "recipientNickname": "self",
+                "messageID": "mid-rate-reset-\(idx)",
+                "content": "hello",
+                "createdAtMs": UInt64(now.timeIntervalSince1970 * 1000)
+            ]
+            let payload = try JSONSerialization.data(withJSONObject: payloadObject, options: [])
+            backend.simulateIncoming(payload, from: "peer-rate-reset")
+        }
+
+        // This one should be rate-limited.
+        let blockedPayload: [String: Any] = [
+            "version": WiFiDirectEnvelopeVersion.current,
+            "messageType": "private",
+            "senderPeerID": "peer-rate-reset",
+            "recipientPeerID": mesh.myPeerID.id,
+            "recipientNickname": "self",
+            "messageID": "mid-rate-reset-blocked",
+            "content": "hello",
+            "createdAtMs": UInt64(now.timeIntervalSince1970 * 1000)
+        ]
+        let blockedData = try JSONSerialization.data(withJSONObject: blockedPayload, options: [])
+        backend.simulateIncoming(blockedData, from: "peer-rate-reset")
+
+        now = now.addingTimeInterval(TransportConfig.messageRouterInboundWiFiSenderRateWindowSeconds + 1)
+
+        // After the window expires this should pass.
+        let allowedPayload: [String: Any] = [
+            "version": WiFiDirectEnvelopeVersion.current,
+            "messageType": "private",
+            "senderPeerID": "peer-rate-reset",
+            "recipientPeerID": mesh.myPeerID.id,
+            "recipientNickname": "self",
+            "messageID": "mid-rate-reset-allowed",
+            "content": "hello",
+            "createdAtMs": UInt64(now.timeIntervalSince1970 * 1000)
+        ]
+        let allowedData = try JSONSerialization.data(withJSONObject: allowedPayload, options: [])
+        backend.simulateIncoming(allowedData, from: "peer-rate-reset")
+
+        let expect = expectation(description: "rate-limit reset notifications settle")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+        NotificationCenter.default.removeObserver(token)
+
+        XCTAssertEqual(receivedCount, maxEvents + 1)
+    }
+
+    @MainActor
     func testFallsBackFromWiFiReadReceiptWhenPeerLacksAckCapability() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()

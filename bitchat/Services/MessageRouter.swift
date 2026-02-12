@@ -23,10 +23,13 @@ final class MessageRouter {
     private let inboundWiFiDedupMaxAgeSeconds: TimeInterval
     private let inboundWiFiTimestampMaxAgeSeconds: TimeInterval
     private let inboundWiFiTimestampFutureSkewSeconds: TimeInterval
+    private let inboundWiFiSenderRateWindowSeconds: TimeInterval
+    private let inboundWiFiSenderRateMaxEvents: Int
     private let nowProvider: () -> Date
     private var favoriteStatusObserver: NSObjectProtocol?
     private var inboundWiFiDedupByKey: [String: Date] = [:]
     private var inboundWiFiDedupOrder: [String] = []
+    private var inboundWiFiSenderEventTimestamps: [String: [Date]] = [:]
     private var outbox: [PeerID: [QueuedPrivateMessage]] = [:] // peerID -> queued messages
 
     init(
@@ -49,6 +52,8 @@ final class MessageRouter {
         self.inboundWiFiDedupMaxAgeSeconds = TransportConfig.messageRouterInboundWiFiDedupMaxAgeSeconds
         self.inboundWiFiTimestampMaxAgeSeconds = TransportConfig.messageRouterInboundWiFiTimestampMaxAgeSeconds
         self.inboundWiFiTimestampFutureSkewSeconds = TransportConfig.messageRouterInboundWiFiTimestampFutureSkewSeconds
+        self.inboundWiFiSenderRateWindowSeconds = TransportConfig.messageRouterInboundWiFiSenderRateWindowSeconds
+        self.inboundWiFiSenderRateMaxEvents = TransportConfig.messageRouterInboundWiFiSenderRateMaxEvents
         self.nowProvider = nowProvider
         self.nostr.senderPeerID = mesh.myPeerID
         self.wifiTransport?.delegate = self
@@ -491,6 +496,20 @@ final class MessageRouter {
         }
         return true
     }
+
+    private func allowInboundWiFiEvent(from senderID: String) -> Bool {
+        let now = nowProvider()
+        let cutoff = now.addingTimeInterval(-inboundWiFiSenderRateWindowSeconds)
+        var events = inboundWiFiSenderEventTimestamps[senderID] ?? []
+        events.removeAll { $0 < cutoff }
+        if events.count >= inboundWiFiSenderRateMaxEvents {
+            inboundWiFiSenderEventTimestamps[senderID] = events
+            return false
+        }
+        events.append(now)
+        inboundWiFiSenderEventTimestamps[senderID] = events
+        return true
+    }
 }
 
 extension MessageRouter: WiFiDirectTransportDelegate {
@@ -507,6 +526,10 @@ extension MessageRouter: WiFiDirectTransportDelegate {
             guard let self else { return }
             guard data.count <= self.inboundWiFiPayloadMaxBytes else {
                 SecureLogger.debug("Dropped oversized WiFi payload from \(peerID.prefix(8))… bytes=\(data.count)", category: .session)
+                return
+            }
+            guard self.allowInboundWiFiEvent(from: peerID) else {
+                SecureLogger.debug("Dropped rate-limited WiFi payload from \(peerID.prefix(8))…", category: .session)
                 return
             }
             if let envelope = try? JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: data),
