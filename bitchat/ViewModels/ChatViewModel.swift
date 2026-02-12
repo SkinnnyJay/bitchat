@@ -1829,7 +1829,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     private func handleDelivered(_ payload: NoisePayload, senderPubkey: String, convKey: String) {
-        guard let messageID = String(data: payload.data, encoding: .utf8) else { return }
+        guard let rawMessageID = String(data: payload.data, encoding: .utf8),
+              let messageID = InputValidator.validateMessageID(rawMessageID) else { return }
         
         if let idx = privateChats[convKey]?.firstIndex(where: { $0.id == messageID }) {
             privateChats[convKey]?[idx].deliveryStatus = .delivered(to: displayNameForNostrPubkey(senderPubkey), at: Date())
@@ -1841,7 +1842,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     private func handleReadReceipt(_ payload: NoisePayload, senderPubkey: String, convKey: String) {
-        guard let messageID = String(data: payload.data, encoding: .utf8) else { return }
+        guard let rawMessageID = String(data: payload.data, encoding: .utf8),
+              let messageID = InputValidator.validateMessageID(rawMessageID) else { return }
         
         if let idx = privateChats[convKey]?.firstIndex(where: { $0.id == messageID }) {
             privateChats[convKey]?[idx].deliveryStatus = .read(by: displayNameForNostrPubkey(senderPubkey), at: Date())
