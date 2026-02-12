@@ -39,4 +39,9 @@ final class WiFiPeerIdentityTests: XCTestCase {
         XCTAssertTrue(candidates.contains(full.id))
         XCTAssertTrue(candidates.contains(short.id))
     }
+
+    func testIsEquivalentMatchesPrefixedAndBarePeerIDs() {
+        XCTAssertTrue(WiFiPeerIdentity.isEquivalent("mesh:peerabc000000000", "peerabc000000000"))
+        XCTAssertTrue(WiFiPeerIdentity.isEquivalent("name:peerabc000000000", "peerabc000000000"))
+    }
 }
