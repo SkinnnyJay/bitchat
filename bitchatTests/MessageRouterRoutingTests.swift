@@ -540,6 +540,43 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testOutboxDeduplicatesQueuedMessageIDsPerPeer() throws {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: false)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = false
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setCapabilities(["pm", "ack"], for: recipient.id)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 8),
+            wifiTransport: wifi
+        )
+
+        router.sendPrivate("old-content", to: recipient, recipientNickname: "peer", messageID: "mid-dup")
+        router.sendPrivate("new-content", to: recipient, recipientNickname: "peer", messageID: "mid-dup")
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 1)
+
+        let expect = expectation(description: "deduped message flushed once")
+        backend.setPeers([recipient.id])
+        backend.simulateAvailability(true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        let envelope = try JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: backend.sentPayloads[0].0)
+        XCTAssertEqual(envelope.messageID, "mid-dup")
+        XCTAssertEqual(envelope.content, "new-content")
+    }
+
+    @MainActor
     func testRoutesReadReceiptViaWiFiWhenPeerIsAvailable() throws {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()

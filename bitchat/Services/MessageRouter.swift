@@ -117,6 +117,7 @@ final class MessageRouter {
             // Queue for later (when mesh connects or Nostr mapping appears)
             pruneExpiredOutboxMessages(for: peerID)
             if outbox[peerID] == nil { outbox[peerID] = [] }
+            outbox[peerID]?.removeAll { $0.messageID == messageID }
             outbox[peerID]?.append(
                 QueuedPrivateMessage(
                     content: content,
