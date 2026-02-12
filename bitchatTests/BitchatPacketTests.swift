@@ -42,4 +42,19 @@ final class BitchatPacketTests: XCTestCase {
 
         XCTAssertEqual(packet.senderID.hexEncodedString(), "abcdef0123456789")
     }
+
+    func testConvenienceInitAcceptsPrefixedFullNoiseSenderIDByDerivingShort() {
+        let noiseKey = Data(repeating: 0x2A, count: 32)
+        let prefixedFullNoise = PeerID(str: "mesh:\(noiseKey.hexEncodedString())")
+        let expectedShort = PeerID(publicKey: noiseKey).bare
+
+        let packet = BitchatPacket(
+            type: MessageType.message.rawValue,
+            ttl: 3,
+            senderID: prefixedFullNoise,
+            payload: Data("hello".utf8)
+        )
+
+        XCTAssertEqual(packet.senderID.hexEncodedString(), expectedShort)
+    }
 }

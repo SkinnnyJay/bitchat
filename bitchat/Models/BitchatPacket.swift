@@ -39,7 +39,7 @@ struct BitchatPacket: Codable {
         self.type = type
         let canonicalSenderID = senderID.toShort()
         if canonicalSenderID.isShort,
-           let senderData = Data(hexString: canonicalSenderID.id),
+           let senderData = Data(hexString: canonicalSenderID.bare),
            senderData.count == 8 {
             self.senderID = senderData
         } else {
