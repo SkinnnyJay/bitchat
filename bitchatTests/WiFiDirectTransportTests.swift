@@ -100,6 +100,7 @@ final class WiFiDirectTransportTests: XCTestCase {
         transport.delegate = delegate
 
         transport.startDiscovery()
+        transport.startDiscovery()
 
         let expect = expectation(description: "unavailable discovery publishes false availability")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
