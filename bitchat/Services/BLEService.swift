@@ -1662,6 +1662,10 @@ extension BLEService {
     }
     
     private func sendNoisePayload(_ typedPayload: Data, to peerID: String) {
+        guard let recipientData = Self.routingPeerIDData(for: PeerID(str: peerID)) else {
+            SecureLogger.warning("Dropping Noise payload for non-routable recipient", category: .session)
+            return
+        }
         guard noiseService.hasSession(with: PeerID(str: peerID)) else {
             // Lazy-handshake path: queue? For now, initiate handshake and drop
             initiateNoiseHandshake(with: peerID)
@@ -1672,7 +1676,7 @@ extension BLEService {
             let packet = BitchatPacket(
                 type: MessageType.noiseEncrypted.rawValue,
                 senderID: myPeerIDData,
-                recipientID: Data(hexString: peerID),
+                recipientID: recipientData,
                 timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
                 payload: encrypted,
                 signature: nil,
@@ -2346,7 +2350,9 @@ extension BLEService {
             
             // Choose recipient for the fragment: directed override if provided
             let fragmentRecipient: Data? = {
-                if let only = directedOnlyPeer { return Data(hexString: only) }
+                if let only = directedOnlyPeer {
+                    return Self.routingPeerIDData(for: PeerID(str: only)) ?? packet.recipientID
+                }
                 return packet.recipientID
             }()
 
@@ -2833,11 +2839,15 @@ extension BLEService {
             // Handshake is for us
             do {
                 if let response = try noiseService.processHandshakeMessage(from: PeerID(str: peerID), message: packet.payload) {
+                    guard let recipientData = Self.routingPeerIDData(for: PeerID(str: peerID)) else {
+                        SecureLogger.warning("Dropping Noise handshake response for non-routable recipient", category: .session)
+                        return
+                    }
                     // Send response
                     let responsePacket = BitchatPacket(
                         type: MessageType.noiseHandshake.rawValue,
                         senderID: myPeerIDData,
-                        recipientID: Data(hexString: peerID),
+                        recipientID: recipientData,
                         timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
                         payload: response,
                         signature: nil,

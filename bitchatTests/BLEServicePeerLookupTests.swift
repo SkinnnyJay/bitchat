@@ -58,6 +58,16 @@ final class BLEServicePeerLookupTests: XCTestCase {
         XCTAssertEqual(data?.hexEncodedString(), "abcdef0123456789")
     }
 
+    func testRoutingPeerIDDataDerivesEightByteFingerprintFromFullNoisePeerID() {
+        let fullNoiseID = PeerID(str: String(repeating: "ab", count: 32))
+        let expected = fullNoiseID.toShort().bare
+
+        let data = BLEService.routingPeerIDData(for: fullNoiseID)
+
+        XCTAssertEqual(data?.count, 8)
+        XCTAssertEqual(data?.hexEncodedString(), expected)
+    }
+
     func testIsReachableReturnsTrueWhenAnyCandidateIsConnected() {
         let now = Date()
         let states: [(Bool, Bool, Date)] = [
