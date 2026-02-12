@@ -38,6 +38,17 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertEqual(resolved, "fp-1")
     }
 
+    func testResolveCachedFingerprintFallsBackToNormalizedKeyMatch() {
+        let cache = ["mesh:abcdef0123456789": "fp-2"]
+
+        let resolved = UnifiedPeerService.resolveCachedFingerprint(
+            from: cache,
+            peerID: "abcdef0123456789"
+        )
+
+        XCTAssertEqual(resolved, "fp-2")
+    }
+
     func testLookupKeysForGeoDMPeerIDDoNotIncludeBareMeshCandidate() {
         let keys = UnifiedPeerService.lookupKeys(for: "nostr_abcdef0123456789")
 

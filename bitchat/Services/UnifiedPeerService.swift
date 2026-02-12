@@ -250,7 +250,11 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
                 return fingerprint
             }
         }
-        return nil
+        let normalizedTarget = WiFiPeerIdentity.normalizedKey(peerID)
+        guard !normalizedTarget.isEmpty else { return nil }
+        return cache.first { key, _ in
+            WiFiPeerIdentity.normalizedKey(key) == normalizedTarget
+        }?.value
     }
     
     /// Get peer by ID
