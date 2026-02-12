@@ -4461,6 +4461,25 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             WiFiPeerIdentity.normalizedKey($0.peerID.id) == normalizedTarget
         }
     }
+
+    static func hasPrivateMessages(
+        in privateChats: [String: [BitchatMessage]],
+        for peerID: String
+    ) -> Bool {
+        let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+
+        if let messages = privateChats[trimmed], !messages.isEmpty {
+            return true
+        }
+
+        let normalizedTarget = WiFiPeerIdentity.normalizedKey(trimmed)
+        guard !normalizedTarget.isEmpty else { return false }
+        return privateChats.contains { key, messages in
+            guard !messages.isEmpty else { return false }
+            return WiFiPeerIdentity.normalizedKey(key) == normalizedTarget
+        }
+    }
     
     @MainActor
     func getFingerprint(for peerID: String) -> String? {
@@ -5004,23 +5023,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         if !staleIDs.isEmpty {
             var idsToRemove: [String] = []
             for staleID in staleIDs {
-                // Don't remove temporary Nostr peer IDs that have messages
-                if staleID.hasPrefix("nostr_") {
-                    // Check if we have messages from this temporary peer
-                    if let messages = privateChats[staleID], !messages.isEmpty {
-                        // Keep this ID - it has messages
-                        continue
-                    }
-                }
-                
-                // Don't remove stable Noise key hexes (64 char hex strings) that have messages
-                // These are used for Nostr messages when peer is offline
-                if staleID.count == 64, staleID.allSatisfy({ $0.isHexDigit }) {
-                    if let messages = privateChats[staleID], !messages.isEmpty {
-                        // Keep this ID - it's a stable key with messages
-                        continue
-                    }
-                }
+                // Keep any stale-equivalent peer identifiers that still map to a non-empty DM thread
+                if Self.hasPrivateMessages(in: privateChats, for: staleID) { continue }
                 
                 // Remove this stale ID
                 idsToRemove.append(staleID)
