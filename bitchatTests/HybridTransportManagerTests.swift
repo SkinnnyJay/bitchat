@@ -214,6 +214,30 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testSendPrivateSanitizesRecipientNicknameOnMeshFallback() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: true)
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["ack"], for: recipient.id) // force mesh fallback
+
+        let manager = HybridTransportManager(
+            meshTransport: mesh,
+            wifiTransport: wifi,
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 1)
+        )
+
+        let invalidNickname = String(repeating: "x", count: InputValidator.Limits.maxNicknameLength + 10)
+        let route = manager.sendPrivate("hello", to: recipient, recipientNickname: invalidNickname, messageID: "mid-mesh-sanitize")
+
+        XCTAssertEqual(route, .mesh)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 1)
+        XCTAssertEqual(mesh.sentPrivateMessages[0].nickname, "user")
+    }
+
+    @MainActor
     func testSendPrivateDropsWhenMessageIDIsEmptyForWiFiPath() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()

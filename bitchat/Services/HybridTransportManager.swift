@@ -165,10 +165,10 @@ final class HybridTransportManager {
         guard content.utf8.count <= InputValidator.Limits.maxMessageLength else {
             return .dropped
         }
-        let safeMessageID = InputValidator.validateMessageID(messageID)
-        guard safeMessageID != nil else {
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else {
             return .dropped
         }
+        let safeRecipientNickname = InputValidator.validateNickname(recipientNickname) ?? "user"
         let canUseWiFiPayload = true
         let recipientID = peerID.id
         let resolvedRecipientID = resolveWiFiPeerIdentifier(for: peerID, requiredCapability: "pm")
@@ -181,8 +181,7 @@ final class HybridTransportManager {
         )
         let shouldFallbackToWiFi = !meshReachable && resolvedRecipientID != nil && canUseWiFiPayload
 
-        if canUseWiFiPayload, (shouldUseWiFi || shouldFallbackToWiFi), let resolvedRecipientID, let safeMessageID {
-            let safeRecipientNickname = InputValidator.validateNickname(recipientNickname) ?? "user"
+        if canUseWiFiPayload, (shouldUseWiFi || shouldFallbackToWiFi), let resolvedRecipientID {
             let envelope = WiFiDirectPrivateEnvelope(
                 senderPeerID: meshTransport.myPeerID.id,
                 recipientPeerID: resolvedRecipientID,
@@ -196,7 +195,7 @@ final class HybridTransportManager {
             }
         }
 
-        meshTransport.sendPrivateMessage(content, to: peerID, recipientNickname: recipientNickname, messageID: messageID)
+        meshTransport.sendPrivateMessage(content, to: peerID, recipientNickname: safeRecipientNickname, messageID: safeMessageID)
         return .mesh
     }
 
