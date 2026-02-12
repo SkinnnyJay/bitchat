@@ -940,6 +940,61 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testFavoriteKeyUpdateMigrationPrefersExistingDestinationMessageOnDuplicateID() throws {
+        let oldKey = Data(repeating: 0x61, count: 32)
+        let newKey = Data(repeating: 0x62, count: 32)
+        let oldPeer = PeerID(publicKey: oldKey)
+        let newPeer = PeerID(publicKey: newKey)
+
+        let mesh = MockTransport()
+        mesh.setReachable(oldPeer, isReachable: false)
+        mesh.setReachable(newPeer, isReachable: false)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = false
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setCapabilities(["pm", "ack"], for: newPeer.id)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 8),
+            wifiTransport: wifi
+        )
+
+        router.sendPrivate("old-content", to: oldPeer, recipientNickname: "peer", messageID: "mid-dup-migrate")
+        router.sendPrivate("new-content", to: newPeer, recipientNickname: "peer", messageID: "mid-dup-migrate")
+        XCTAssertEqual(router.queuedMessageCount(for: oldPeer), 1)
+        XCTAssertEqual(router.queuedMessageCount(for: newPeer), 1)
+
+        backend.isAvailable = true
+        backend.setPeers([newPeer.id])
+
+        let expect = expectation(description: "migration duplicate resolution settles")
+        NotificationCenter.default.post(
+            name: .favoriteStatusChanged,
+            object: nil,
+            userInfo: [
+                "peerPublicKey": newKey,
+                "oldPeerPublicKey": oldKey,
+                "isKeyUpdate": true
+            ]
+        )
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(router.queuedMessageCount(for: oldPeer), 0)
+        XCTAssertEqual(router.queuedMessageCount(for: newPeer), 0)
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        let envelope = try JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: backend.sentPayloads[0].0)
+        XCTAssertEqual(envelope.messageID, "mid-dup-migrate")
+        XCTAssertEqual(envelope.content, "new-content")
+    }
+
+    @MainActor
     func testPrunesExpiredOutboxMessagesBeforeFlush() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
