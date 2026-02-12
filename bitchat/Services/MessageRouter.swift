@@ -4,26 +4,36 @@ import Foundation
 /// Routes messages between BLE and Nostr transports
 @MainActor
 final class MessageRouter {
+    private struct QueuedPrivateMessage {
+        let content: String
+        let recipientNickname: String
+        let messageID: String
+        let enqueuedAt: Date
+    }
+
     private let mesh: Transport
     private let nostr: NostrTransport
     private let routingPolicy: TransportRoutingPolicy
     private let wifiRoutingPolicy: WiFiDirectRoutingPolicy
     private let wifiTransport: WiFiDirectTransport?
     private let outboxPerPeerCap: Int
+    private let outboxMaxAgeSeconds: TimeInterval
     private let inboundWiFiPayloadMaxBytes: Int
     private let inboundWiFiDedupMaxCount: Int
     private let inboundWiFiDedupMaxAgeSeconds: TimeInterval
+    private let nowProvider: () -> Date
     private var favoriteStatusObserver: NSObjectProtocol?
     private var inboundWiFiDedupByKey: [String: Date] = [:]
     private var inboundWiFiDedupOrder: [String] = []
-    private var outbox: [PeerID: [(content: String, nickname: String, messageID: String)]] = [:] // peerID -> queued messages
+    private var outbox: [PeerID: [QueuedPrivateMessage]] = [:] // peerID -> queued messages
 
     init(
         mesh: Transport,
         nostr: NostrTransport,
         routingPolicy: TransportRoutingPolicy = TransportRoutingPolicy(),
         wifiRoutingPolicy: WiFiDirectRoutingPolicy = WiFiDirectRoutingPolicy(),
-        wifiTransport: WiFiDirectTransport? = nil
+        wifiTransport: WiFiDirectTransport? = nil,
+        nowProvider: @escaping () -> Date = Date.init
     ) {
         self.mesh = mesh
         self.nostr = nostr
@@ -31,9 +41,11 @@ final class MessageRouter {
         self.wifiRoutingPolicy = wifiRoutingPolicy
         self.wifiTransport = wifiTransport ?? WiFiDirectTransport(localPeerID: mesh.myPeerID.id)
         self.outboxPerPeerCap = TransportConfig.messageRouterOutboxPerPeerCap
+        self.outboxMaxAgeSeconds = TransportConfig.messageRouterOutboxMessageMaxAgeSeconds
         self.inboundWiFiPayloadMaxBytes = TransportConfig.messageRouterInboundWiFiPayloadMaxBytes
         self.inboundWiFiDedupMaxCount = TransportConfig.messageRouterInboundWiFiDedupMaxCount
         self.inboundWiFiDedupMaxAgeSeconds = TransportConfig.messageRouterInboundWiFiDedupMaxAgeSeconds
+        self.nowProvider = nowProvider
         self.nostr.senderPeerID = mesh.myPeerID
         self.wifiTransport?.delegate = self
         self.wifiTransport?.startDiscovery()
@@ -99,8 +111,16 @@ final class MessageRouter {
             nostr.sendPrivateMessage(content, to: peerID, recipientNickname: recipientNickname, messageID: messageID)
         case nil:
             // Queue for later (when mesh connects or Nostr mapping appears)
+            pruneExpiredOutboxMessages(for: peerID)
             if outbox[peerID] == nil { outbox[peerID] = [] }
-            outbox[peerID]?.append((content, recipientNickname, messageID))
+            outbox[peerID]?.append(
+                QueuedPrivateMessage(
+                    content: content,
+                    recipientNickname: recipientNickname,
+                    messageID: messageID,
+                    enqueuedAt: nowProvider()
+                )
+            )
             if let count = outbox[peerID]?.count, count > outboxPerPeerCap {
                 let overflow = count - outboxPerPeerCap
                 outbox[peerID]?.removeFirst(overflow)
@@ -175,11 +195,18 @@ final class MessageRouter {
     }
 
     func flushOutbox(for peerID: PeerID) {
+        pruneExpiredOutboxMessages(for: peerID)
         guard let queued = outbox[peerID], !queued.isEmpty else { return }
         SecureLogger.debug("Flushing outbox for \(peerID.id.prefix(8))… count=\(queued.count)", category: .session)
-        var remaining: [(content: String, nickname: String, messageID: String)] = []
+        var remaining: [QueuedPrivateMessage] = []
         // Re-evaluate route for each message as transport availability may have changed.
-        for (content, nickname, messageID) in queued {
+        for message in queued {
+            if nowProvider().timeIntervalSince(message.enqueuedAt) > outboxMaxAgeSeconds {
+                continue
+            }
+            let content = message.content
+            let nickname = message.recipientNickname
+            let messageID = message.messageID
             if routePrivateViaWiFiIfPreferred(content, to: peerID, recipientNickname: nickname, messageID: messageID) {
                 continue
             }
@@ -199,7 +226,7 @@ final class MessageRouter {
                 nostr.sendPrivateMessage(content, to: peerID, recipientNickname: nickname, messageID: messageID)
             case nil:
                 // Keep unsent items queued
-                remaining.append((content, nickname, messageID))
+                remaining.append(message)
             }
         }
         // Persist only items we could not send
@@ -287,6 +314,22 @@ final class MessageRouter {
 
     func queuedMessageCount(for peerID: PeerID) -> Int {
         outbox[peerID]?.count ?? 0
+    }
+
+    private func pruneExpiredOutboxMessages(for peerID: PeerID) {
+        guard var queued = outbox[peerID], !queued.isEmpty else { return }
+        let now = nowProvider()
+        let originalCount = queued.count
+        queued.removeAll { now.timeIntervalSince($0.enqueuedAt) > outboxMaxAgeSeconds }
+        if queued.isEmpty {
+            outbox.removeValue(forKey: peerID)
+        } else {
+            outbox[peerID] = queued
+        }
+        let removed = originalCount - queued.count
+        if removed > 0 {
+            SecureLogger.debug("Pruned \(removed) expired queued PM(s) for \(peerID.id.prefix(8))…", category: .session)
+        }
     }
 
     private func shouldAcceptInboundWiFiEnvelope(dedupKey: String) -> Bool {
