@@ -107,6 +107,31 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertEqual(delegate.availability, [false])
     }
 
+    func testStartDiscoveryRecoversWhenBackendBecomesAvailable() {
+        let backend = MockBackend(localPeerID: "self")
+        backend.isAvailable = false
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let delegate = MockDelegate()
+        transport.delegate = delegate
+
+        transport.startDiscovery()
+        XCTAssertFalse(transport.isDiscovering)
+        XCTAssertEqual(backend.startDiscoveryCount, 0)
+
+        backend.isAvailable = true
+        transport.startDiscovery()
+
+        let expect = expectation(description: "availability updates after backend recovers")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertTrue(transport.isDiscovering)
+        XCTAssertEqual(backend.startDiscoveryCount, 1)
+        XCTAssertEqual(delegate.availability, [false, true])
+    }
+
     func testSendIsForwardedToBackend() throws {
         let backend = MockBackend(localPeerID: "self")
         let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
