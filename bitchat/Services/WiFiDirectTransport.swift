@@ -258,6 +258,8 @@ extension MPCWiFiDirectTransportImplementation: MCNearbyServiceBrowserDelegate {
         }
         if let caps = info?["caps"] {
             capabilitiesByPeerID[peerID.displayName] = WiFiDirectCapabilityNegotiator.parseCapabilities(caps)
+        } else {
+            capabilitiesByPeerID.removeValue(forKey: peerID.displayName)
         }
 
         let peerKey = peerID.displayName
