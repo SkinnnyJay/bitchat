@@ -116,6 +116,27 @@ final class ReadReceiptTests: XCTestCase {
         XCTAssertEqual(decoded?.readerNickname, nickname)
     }
 
+    func testBinaryDecodeLegacyFallbackWhenFirstByteMatchesV1Marker() {
+        let originalMessageID = "01000000-0000-0000-0000-000000000000"
+        let receiptID = UUID().uuidString
+        let readerID = "abcdef0123456789"
+        let nickname = "alice"
+        let timestamp = Date()
+
+        var data = Data()
+        data.appendUUID(originalMessageID)
+        data.appendUUID(receiptID)
+        data.append(Data(hexString: readerID)!)
+        data.appendDate(timestamp)
+        data.appendString(nickname)
+
+        let decoded = ReadReceipt.fromBinaryData(data)
+
+        XCTAssertEqual(decoded?.originalMessageID, originalMessageID.uppercased())
+        XCTAssertEqual(decoded?.readerID, readerID)
+        XCTAssertEqual(decoded?.readerNickname, nickname)
+    }
+
     func testBinaryDecodeRejectsInvalidV1MessageID() {
         var data = Data()
         data.append(0x01) // version

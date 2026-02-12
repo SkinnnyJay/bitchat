@@ -175,8 +175,9 @@ struct ReadReceipt: Codable {
         let dataCopy = Data(data)
         guard !dataCopy.isEmpty else { return nil }
         
-        if dataCopy.first == BinaryVersion.v1.rawValue {
-            return decodeV1BinaryData(dataCopy)
+        if dataCopy.first == BinaryVersion.v1.rawValue,
+           let decoded = decodeV1BinaryData(dataCopy) {
+            return decoded
         }
         
         return decodeLegacyBinaryData(dataCopy)
