@@ -56,8 +56,12 @@ enum WiFiPeerIdentity {
         }
 
         var unique: [String] = []
-        for candidate in candidates where !unique.contains(candidate) {
-            unique.append(candidate)
+        for candidate in candidates {
+            let normalizedCandidate = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !normalizedCandidate.isEmpty else { continue }
+            if !unique.contains(normalizedCandidate) {
+                unique.append(normalizedCandidate)
+            }
         }
         return unique
     }

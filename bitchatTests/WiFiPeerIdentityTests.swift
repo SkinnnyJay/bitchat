@@ -39,6 +39,12 @@ final class WiFiPeerIdentityTests: XCTestCase {
         XCTAssertTrue(candidates.contains("peerabc000000000"))
     }
 
+    func testCandidateIDsDropBlankVariants() {
+        let prefixedBlank = PeerID(str: "mesh:   ")
+        let candidates = WiFiPeerIdentity.candidateIDs(for: prefixedBlank)
+        XCTAssertTrue(candidates.isEmpty)
+    }
+
     func testCandidateIDsAreUnique() {
         let short = PeerID(str: "peerabc000000000")
         let candidates = WiFiPeerIdentity.candidateIDs(for: short)
