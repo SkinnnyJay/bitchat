@@ -1425,6 +1425,52 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testRateLimitsInboundWiFiAckEventsPerSenderWithinWindow() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let fixedNow = Date()
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { fixedNow })
+
+        var receivedCount = 0
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectAckEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            receivedCount += 1
+        }
+
+        let maxEvents = TransportConfig.messageRouterInboundWiFiSenderRateMaxEvents
+        let createdAtMs = UInt64(fixedNow.timeIntervalSince1970 * 1000)
+        for idx in 0..<(maxEvents + 3) {
+            let payloadObject: [String: Any] = [
+                "version": WiFiDirectEnvelopeVersion.current,
+                "messageType": "ack",
+                "ackType": "read",
+                "senderPeerID": "peer-rate-ack",
+                "recipientPeerID": mesh.myPeerID.id,
+                "messageID": "mid-rate-ack-\(idx)",
+                "senderNickname": "peer",
+                "createdAtMs": createdAtMs
+            ]
+            let payload = try JSONSerialization.data(withJSONObject: payloadObject, options: [])
+            backend.simulateIncoming(payload, from: "peer-rate-ack")
+        }
+
+        let expect = expectation(description: "ack rate-limited notifications settle")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+        NotificationCenter.default.removeObserver(token)
+
+        XCTAssertEqual(receivedCount, maxEvents)
+    }
+
+    @MainActor
     func testFallsBackFromWiFiReadReceiptWhenPeerLacksAckCapability() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
