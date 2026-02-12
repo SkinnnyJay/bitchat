@@ -257,7 +257,18 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         let matches = peerIndex.values.filter {
             WiFiPeerIdentity.normalizedKey($0.peerID.id) == normalizedTarget
         }
-        return matches.min { $0.peerID.id < $1.peerID.id }
+        guard !matches.isEmpty else { return nil }
+
+        var dedupedByPeerID: [String: BitchatPeer] = [:]
+        for peer in matches where dedupedByPeerID[peer.peerID.id] == nil {
+            dedupedByPeerID[peer.peerID.id] = peer
+        }
+
+        return dedupedByPeerID.values.sorted { lhs, rhs in
+            if shouldSortPeer(lhs, rhs) { return true }
+            if shouldSortPeer(rhs, lhs) { return false }
+            return lhs.peerID.id < rhs.peerID.id
+        }.first
     }
 
     static func resolveCachedFingerprint(from cache: [String: String], peerID: String) -> String? {

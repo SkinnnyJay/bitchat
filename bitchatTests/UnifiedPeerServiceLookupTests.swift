@@ -126,6 +126,31 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertEqual(resolved?.peerID.id, "aaaaaaaaaaaaaaaa")
     }
 
+    func testResolvePeerFallbackPrefersConnectedEquivalentPeer() {
+        let disconnected = BitchatPeer(
+            peerID: PeerID(str: "aaaaaaaaaaaaaaaa"),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "offline",
+            isConnected: false,
+            isReachable: false
+        )
+        let connected = BitchatPeer(
+            peerID: PeerID(str: "mesh:aaaaaaaaaaaaaaaa"),
+            noisePublicKey: Data(repeating: 0x22, count: 32),
+            nickname: "online",
+            isConnected: true,
+            isReachable: true
+        )
+        let index = [
+            "k1": disconnected,
+            "k2": connected
+        ]
+
+        let resolved = UnifiedPeerService.resolvePeer(from: index, peerID: "name:aaaaaaaaaaaaaaaa")
+
+        XCTAssertEqual(resolved?.peerID.id, connected.peerID.id)
+    }
+
     func testResolveCachedFingerprintMatchesEquivalentIdentifierVariants() {
         let fingerprint = String(repeating: "a1", count: 32)
         let cache = ["abcdef0123456789": fingerprint]
