@@ -51,4 +51,17 @@ final class WiFiPeerIdentityTests: XCTestCase {
         XCTAssertFalse(WiFiPeerIdentity.isEquivalent("   ", "peerabc000000000"))
         XCTAssertFalse(WiFiPeerIdentity.isEquivalent("peerabc000000000", "   "))
     }
+
+    func testNormalizedOutboxPeerIDUsesShortForFullNoiseKey() {
+        let noiseKey = Data(repeating: 0x7F, count: 32)
+        let full = PeerID(hexData: noiseKey)
+        let normalized = WiFiPeerIdentity.normalizedOutboxPeerID(for: full)
+        XCTAssertEqual(normalized, PeerID(publicKey: noiseKey))
+    }
+
+    func testNormalizedOutboxPeerIDStripsPrefixes() {
+        let prefixed = PeerID(str: "mesh:peerabc000000000")
+        let normalized = WiFiPeerIdentity.normalizedOutboxPeerID(for: prefixed)
+        XCTAssertEqual(normalized, PeerID(str: "peerabc000000000"))
+    }
 }

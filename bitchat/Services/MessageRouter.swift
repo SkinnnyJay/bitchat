@@ -462,13 +462,7 @@ final class MessageRouter {
     }
 
     private func normalizedOutboxPeerID(for peerID: PeerID) -> PeerID {
-        if let noiseKey = peerID.noiseKey {
-            return PeerID(publicKey: noiseKey)
-        }
-        if peerID.prefix != .empty {
-            return PeerID(str: peerID.bare)
-        }
-        return peerID
+        WiFiPeerIdentity.normalizedOutboxPeerID(for: peerID)
     }
 
     private func migrateOutbox(from oldPeerID: PeerID, to newPeerID: PeerID) {

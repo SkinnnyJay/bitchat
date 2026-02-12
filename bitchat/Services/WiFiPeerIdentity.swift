@@ -42,4 +42,14 @@ enum WiFiPeerIdentity {
         }
         return unique
     }
+
+    static func normalizedOutboxPeerID(for peerID: PeerID) -> PeerID {
+        if let noiseKey = peerID.noiseKey {
+            return PeerID(publicKey: noiseKey)
+        }
+        if peerID.prefix != .empty {
+            return PeerID(str: peerID.bare)
+        }
+        return peerID
+    }
 }
