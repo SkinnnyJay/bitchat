@@ -224,4 +224,25 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
 
         XCTAssertNil(UnifiedPeerService.peerID(for: "   ", in: [peer]))
     }
+
+    func testFingerprintFromPeerRejectsNon32ByteNoiseKey() {
+        let peer = BitchatPeer(
+            peerID: PeerID(str: "abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x11, count: 8),
+            nickname: "short-key"
+        )
+
+        XCTAssertNil(UnifiedPeerService.fingerprintFromPeer(peer))
+    }
+
+    func testFingerprintFromPeerAccepts32ByteNoiseKey() {
+        let key = Data(repeating: 0x22, count: 32)
+        let peer = BitchatPeer(
+            peerID: PeerID(str: "abcdef0123456789"),
+            noisePublicKey: key,
+            nickname: "valid-key"
+        )
+
+        XCTAssertEqual(UnifiedPeerService.fingerprintFromPeer(peer), key.sha256Fingerprint())
+    }
 }

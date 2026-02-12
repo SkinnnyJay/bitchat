@@ -313,6 +313,11 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
 
         return true
     }
+
+    static func fingerprintFromPeer(_ peer: BitchatPeer) -> String? {
+        guard peer.noisePublicKey.count == 32 else { return nil }
+        return peer.noisePublicKey.sha256Fingerprint()
+    }
     
     /// Get peer by ID
     func getPeer(by id: String) -> BitchatPeer? {
@@ -474,11 +479,12 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         
         // Try to get from peer's public key
         if let peer = getPeer(by: peerID) {
-            let fingerprint = peer.noisePublicKey.sha256Fingerprint()
-            for key in Self.lookupKeys(for: peerID) {
-                fingerprintCache[key] = fingerprint
+            if let fingerprint = Self.fingerprintFromPeer(peer) {
+                for key in Self.lookupKeys(for: peerID) {
+                    fingerprintCache[key] = fingerprint
+                }
+                return fingerprint
             }
-            return fingerprint
         }
         
         return nil
