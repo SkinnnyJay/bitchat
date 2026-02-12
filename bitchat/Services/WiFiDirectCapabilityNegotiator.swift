@@ -73,11 +73,15 @@ struct WiFiDirectCapabilityNegotiator {
     }
 
     static func parseCapabilities(_ capabilityString: String) -> Set<String> {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
         Set(
             capabilityString
                 .split(separator: ",")
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-                .filter { !$0.isEmpty }
+                .filter {
+                    !$0.isEmpty &&
+                    $0.rangeOfCharacter(from: allowed.inverted) == nil
+                }
         )
     }
 

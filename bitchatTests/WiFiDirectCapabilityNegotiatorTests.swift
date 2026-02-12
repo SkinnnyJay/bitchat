@@ -41,6 +41,11 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
         XCTAssertEqual(parsed, ["pm", "ack"])
     }
 
+    func testParseCapabilitiesDropsInvalidTokens() {
+        let parsed = WiFiDirectCapabilityNegotiator.parseCapabilities("pm,ack,../bad,emoji🙂,relay")
+        XCTAssertEqual(parsed, ["pm", "ack", "relay"])
+    }
+
     func testInvitationContextRoundTripsDiscoveryInfo() throws {
         let negotiator = WiFiDirectCapabilityNegotiator()
         let context = negotiator.invitationContextData()
