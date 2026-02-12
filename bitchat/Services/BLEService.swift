@@ -1864,19 +1864,38 @@ extension BLEService {
     private func sendPendingMessagesAfterHandshake(for peerID: String) {
         let canonicalPeerID = PeerID(str: peerID).toShort()
         guard canonicalPeerID.isShort else {
+            collectionsQueue.sync(flags: .barrier) {
+                pendingMessagesAfterHandshake.removeValue(forKey: peerID)
+            }
             SecureLogger.warning("Dropping pending PM queue for invalid peer ID", category: .session)
             return
         }
         let routingPeerID = canonicalPeerID.bare
         guard let recipientData = Data(hexString: routingPeerID), recipientData.count == 8 else {
+            collectionsQueue.sync(flags: .barrier) {
+                pendingMessagesAfterHandshake.removeValue(forKey: routingPeerID)
+                pendingMessagesAfterHandshake.removeValue(forKey: peerID)
+            }
             SecureLogger.warning("Dropping pending PM queue for non-routable peer ID", category: .session)
             return
         }
         // Get and clear pending messages for this peer
         let pendingMessages = collectionsQueue.sync(flags: .barrier) { () -> [(content: String, messageID: String)]? in
-            let messages = pendingMessagesAfterHandshake[routingPeerID]
+            let canonicalMessages = pendingMessagesAfterHandshake[routingPeerID] ?? []
+            let legacyMessages = pendingMessagesAfterHandshake[peerID] ?? []
             pendingMessagesAfterHandshake.removeValue(forKey: routingPeerID)
-            return messages
+            pendingMessagesAfterHandshake.removeValue(forKey: peerID)
+            let merged = canonicalMessages + legacyMessages
+            guard !merged.isEmpty else { return nil }
+            var seenIDs: Set<String> = []
+            var deduped: [(content: String, messageID: String)] = []
+            for item in merged {
+                if seenIDs.insert(item.messageID).inserted {
+                    deduped.append(item)
+                }
+            }
+            let bounded = Array(deduped.prefix(TransportConfig.outboxPerPeerCap))
+            return bounded
         }
         
         guard let messages = pendingMessages, !messages.isEmpty else { return }
