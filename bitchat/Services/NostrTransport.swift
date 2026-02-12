@@ -258,8 +258,10 @@ extension NostrTransport {
     }
 
     private func decodeRecipientHex(fromNpub recipientNpub: String) -> String? {
+        let normalizedNpub = recipientNpub.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedNpub.isEmpty else { return nil }
         do {
-            let (hrp, data) = try Bech32.decode(recipientNpub)
+            let (hrp, data) = try Bech32.decode(normalizedNpub)
             guard hrp == "npub", data.count == 32 else { return nil }
             return data.hexEncodedString()
         } catch {
@@ -296,7 +298,9 @@ extension NostrTransport {
     }
 
     private func isValidNpub(_ npub: String) -> Bool {
-        guard let (hrp, data) = try? Bech32.decode(npub) else { return false }
+        let normalized = npub.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return false }
+        guard let (hrp, data) = try? Bech32.decode(normalized) else { return false }
         return hrp == "npub" && data.count == 32
     }
 }
