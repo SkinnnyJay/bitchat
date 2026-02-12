@@ -1039,6 +1039,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         guard let (content, senderPubkey, rumorTs) = try? NostrProtocol.decryptPrivateMessage(giftWrap: giftWrap, recipientIdentity: id),
               content.hasPrefix("bitchat1:"),
+              Data(hexString: senderPubkey)?.count == 32,
               let packetData = Self.base64URLDecode(String(content.dropFirst("bitchat1:".count))),
               let packet = BitchatPacket.from(packetData),
               packet.type == MessageType.noiseEncrypted.rawValue,
