@@ -77,4 +77,17 @@ final class TransportRoutingPolicyTests: XCTestCase {
         )
         XCTAssertNil(decision)
     }
+
+    func testRespectsCustomMeshPayloadLimitConfiguration() {
+        let policy = TransportRoutingPolicy(
+            nostrPreferredPayloadBytes: 100,
+            maxMeshPayloadBytes: 64,
+            maxNostrPayloadBytes: 255
+        )
+        let decision = policy.routePrivateMessage(
+            .init(payloadBytes: 80, meshReachable: true, nostrAvailable: false)
+        )
+
+        XCTAssertNil(decision)
+    }
 }
