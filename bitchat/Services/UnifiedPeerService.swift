@@ -105,15 +105,13 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         // Phase 2: Add offline favorites that we actively favorite
         for (favoriteKey, favorite) in favorites where favorite.isFavorite {
             let peerID = PeerID(hexData: favoriteKey)
-            
-            // Skip if already added (connected peer)
-            if addedPeerIDs.contains(peerID) { continue }
-            
-            // Skip if connected under different ID but same nickname
-            let isConnectedByNickname = enrichedPeers.contains { 
-                $0.nickname == favorite.peerNickname && $0.isConnected 
-            }
-            if isConnectedByNickname { continue }
+            let shouldInclude = Self.shouldIncludeFavoriteAsOfflinePeer(
+                favoriteNoiseKey: favoriteKey,
+                favoriteNickname: favorite.peerNickname,
+                existingPeers: enrichedPeers,
+                addedPeerIDs: addedPeerIDs
+            )
+            if !shouldInclude { continue }
             
             let peer = buildPeerFromFavorite(favorite: favorite, peerID: peerID.id)
             enrichedPeers.append(peer)
@@ -287,6 +285,33 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         let normalized = WiFiPeerIdentity.normalizedKey(peerID)
         guard !normalized.isEmpty else { return false }
         return connectedPeerLookupKeys.contains(normalized)
+    }
+
+    static func shouldIncludeFavoriteAsOfflinePeer(
+        favoriteNoiseKey: Data,
+        favoriteNickname: String,
+        existingPeers: [BitchatPeer],
+        addedPeerIDs: Set<PeerID>
+    ) -> Bool {
+        let favoritePeerID = PeerID(hexData: favoriteNoiseKey)
+        if addedPeerIDs.contains(favoritePeerID) {
+            return false
+        }
+
+        if existingPeers.contains(where: { WiFiPeerIdentity.isEquivalent($0.peerID.id, favoritePeerID.id) }) {
+            return false
+        }
+
+        if !favoriteNickname.isEmpty {
+            let isConnectedByNickname = existingPeers.contains {
+                $0.isConnected && $0.nickname == favoriteNickname
+            }
+            if isConnectedByNickname {
+                return false
+            }
+        }
+
+        return true
     }
     
     /// Get peer by ID

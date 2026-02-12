@@ -159,4 +159,46 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
             )
         )
     }
+
+    func testShouldIncludeFavoriteAsOfflinePeerRejectsEquivalentExistingPeer() {
+        let fullNoiseHex = String(repeating: "ab", count: 32)
+        let shortID = PeerID(str: fullNoiseHex).toShort().bare
+        let existingPeer = BitchatPeer(
+            peerID: PeerID(str: shortID),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "alice",
+            isConnected: true,
+            isReachable: true
+        )
+        let favoriteNoise = Data(hexString: fullNoiseHex) ?? Data()
+
+        let shouldInclude = UnifiedPeerService.shouldIncludeFavoriteAsOfflinePeer(
+            favoriteNoiseKey: favoriteNoise,
+            favoriteNickname: "alice",
+            existingPeers: [existingPeer],
+            addedPeerIDs: []
+        )
+
+        XCTAssertFalse(shouldInclude)
+    }
+
+    func testShouldIncludeFavoriteAsOfflinePeerAllowsDistinctFavorite() {
+        let existingPeer = BitchatPeer(
+            peerID: PeerID(str: "abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x22, count: 32),
+            nickname: "alice",
+            isConnected: true,
+            isReachable: true
+        )
+        let favoriteNoise = Data(repeating: 0x33, count: 32)
+
+        let shouldInclude = UnifiedPeerService.shouldIncludeFavoriteAsOfflinePeer(
+            favoriteNoiseKey: favoriteNoise,
+            favoriteNickname: "bob",
+            existingPeers: [existingPeer],
+            addedPeerIDs: []
+        )
+
+        XCTAssertTrue(shouldInclude)
+    }
 }
