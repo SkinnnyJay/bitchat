@@ -166,7 +166,7 @@ extension NostrTransport {
     // MARK: Geohash ACK helpers
     func sendDeliveryAckGeohash(for messageID: String, toRecipientHex recipientHex: String, from identity: NostrIdentity) {
         guard InputValidator.validateMessageID(messageID) != nil else { return }
-        guard Data(hexString: recipientHex) != nil else { return }
+        guard Data(hexString: recipientHex)?.count == 32 else { return }
         Task { @MainActor in
             SecureLogger.debug("GeoDM: send DELIVERED -> recip=\(recipientHex.prefix(8))… mid=\(messageID.prefix(8))… from=\(identity.publicKeyHex.prefix(8))…", category: .session)
             guard let embedded = NostrEmbeddedBitChat.encodeAckForNostrNoRecipient(type: .delivered, messageID: messageID, senderPeerID: senderPeerID.id) else { return }
@@ -178,7 +178,7 @@ extension NostrTransport {
 
     func sendReadReceiptGeohash(_ messageID: String, toRecipientHex recipientHex: String, from identity: NostrIdentity) {
         guard InputValidator.validateMessageID(messageID) != nil else { return }
-        guard Data(hexString: recipientHex) != nil else { return }
+        guard Data(hexString: recipientHex)?.count == 32 else { return }
         Task { @MainActor in
             SecureLogger.debug("GeoDM: send READ -> recip=\(recipientHex.prefix(8))… mid=\(messageID.prefix(8))… from=\(identity.publicKeyHex.prefix(8))…", category: .session)
             guard let embedded = NostrEmbeddedBitChat.encodeAckForNostrNoRecipient(type: .readReceipt, messageID: messageID, senderPeerID: senderPeerID.id) else { return }
@@ -191,7 +191,7 @@ extension NostrTransport {
     // MARK: Geohash DMs (per-geohash identity)
     func sendPrivateMessageGeohash(content: String, toRecipientHex recipientHex: String, from identity: NostrIdentity, messageID: String) {
         guard !recipientHex.isEmpty else { return }
-        guard Data(hexString: recipientHex) != nil else { return }
+        guard Data(hexString: recipientHex)?.count == 32 else { return }
         guard content.utf8.count <= InputValidator.Limits.maxMessageLength else { return }
         guard InputValidator.validateMessageID(messageID) != nil else { return }
         Task { @MainActor in
