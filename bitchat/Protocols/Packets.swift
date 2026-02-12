@@ -15,6 +15,7 @@ struct AnnouncementPacket {
 
     func encode() -> Data? {
         guard let safeNickname = InputValidator.validateNickname(nickname) else { return nil }
+        guard noisePublicKey.count == 32, signingPublicKey.count == 32 else { return nil }
         var data = Data()
         // Reserve: TLVs for nickname (2 + n), noise key (2 + 32), signing key (2 + 32)
         data.reserveCapacity(2 + min(safeNickname.utf8.count, 255) + 2 + noisePublicKey.count + 2 + signingPublicKey.count)
@@ -74,7 +75,9 @@ struct AnnouncementPacket {
         guard let nickname = nickname,
               let safeNickname = InputValidator.validateNickname(nickname),
               let noisePublicKey = noisePublicKey,
-              let signingPublicKey = signingPublicKey else { return nil }
+              let signingPublicKey = signingPublicKey,
+              noisePublicKey.count == 32,
+              signingPublicKey.count == 32 else { return nil }
         return AnnouncementPacket(
             nickname: safeNickname,
             noisePublicKey: noisePublicKey,

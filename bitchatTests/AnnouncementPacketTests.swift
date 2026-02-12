@@ -51,6 +51,38 @@ final class AnnouncementPacketTests: XCTestCase {
         XCTAssertEqual(decoded.nickname, "alice")
     }
 
+    func testEncodeRejectsInvalidNoiseOrSigningKeyLengths() {
+        let invalidNoise = AnnouncementPacket(
+            nickname: "alice",
+            noisePublicKey: Data(repeating: 0x11, count: 31),
+            signingPublicKey: Data(repeating: 0x22, count: 32)
+        )
+        XCTAssertNil(invalidNoise.encode())
+
+        let invalidSigning = AnnouncementPacket(
+            nickname: "alice",
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            signingPublicKey: Data(repeating: 0x22, count: 33)
+        )
+        XCTAssertNil(invalidSigning.encode())
+    }
+
+    func testDecodeRejectsInvalidNoiseOrSigningKeyLengths() throws {
+        let invalidNoise = try encodedAnnouncementData(
+            nickname: "alice",
+            noisePublicKey: Data(repeating: 0x11, count: 31),
+            signingPublicKey: Data(repeating: 0x22, count: 32)
+        )
+        XCTAssertNil(AnnouncementPacket.decode(from: invalidNoise))
+
+        let invalidSigning = try encodedAnnouncementData(
+            nickname: "alice",
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            signingPublicKey: Data(repeating: 0x22, count: 31)
+        )
+        XCTAssertNil(AnnouncementPacket.decode(from: invalidSigning))
+    }
+
     private func encodedAnnouncementData(
         nickname: String,
         noisePublicKey: Data,
