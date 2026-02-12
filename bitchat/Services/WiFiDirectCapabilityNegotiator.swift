@@ -2,6 +2,7 @@ import Foundation
 
 struct WiFiDirectCapabilityNegotiator {
     private enum Limits {
+        static let maxContextBytes = 4 * 1024
         static let maxVersionLength = 16
         static let maxCapabilitiesLength = 512
         static let maxCapabilityTokenLength = 32
@@ -42,6 +43,7 @@ struct WiFiDirectCapabilityNegotiator {
 
     func parseDiscoveryInfo(from context: Data?) -> [String: String]? {
         guard let context, !context.isEmpty else { return nil }
+        guard context.count <= Limits.maxContextBytes else { return nil }
         guard let rawObject = try? JSONSerialization.jsonObject(with: context, options: []),
               let dictionary = rawObject as? [String: Any] else {
             return nil

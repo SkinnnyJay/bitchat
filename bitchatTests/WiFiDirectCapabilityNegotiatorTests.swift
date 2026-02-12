@@ -183,6 +183,15 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
         XCTAssertFalse(negotiator.isPeerCompatible(discoveryInfo: parsed))
     }
 
+    func testParseDiscoveryInfoRejectsOversizedContextPayload() throws {
+        let negotiator = WiFiDirectCapabilityNegotiator()
+        let oversized = String(repeating: "x", count: 5000)
+        let raw: [String: Any] = ["v": "1", "caps": "pm,ack", "junk": oversized]
+        let context = try JSONSerialization.data(withJSONObject: raw, options: [])
+
+        XCTAssertNil(negotiator.parseDiscoveryInfo(from: context))
+    }
+
     func testParseDiscoveryInfoTrimsVersionAndCapabilitiesValues() throws {
         let negotiator = WiFiDirectCapabilityNegotiator()
         let raw: [String: Any] = ["v": " 1 ", "caps": " pm,ack "]
