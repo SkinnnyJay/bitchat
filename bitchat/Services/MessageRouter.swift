@@ -328,7 +328,7 @@ extension MessageRouter: WiFiDirectTransportDelegate {
             }
             if let envelope = try? JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: data),
                envelope.messageType == "private",
-               envelope.version == 1,
+               envelope.version == WiFiDirectEnvelopeVersion.current,
                envelope.senderPeerID == peerID,
                envelope.recipientPeerID == self.mesh.myPeerID.id,
                !envelope.messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -345,7 +345,7 @@ extension MessageRouter: WiFiDirectTransportDelegate {
 
             if let envelope = try? JSONDecoder().decode(WiFiDirectAckEnvelope.self, from: data),
                envelope.messageType == "ack",
-               envelope.version == 1,
+               envelope.version == WiFiDirectEnvelopeVersion.current,
                envelope.senderPeerID == peerID,
                envelope.recipientPeerID == self.mesh.myPeerID.id,
                !envelope.messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

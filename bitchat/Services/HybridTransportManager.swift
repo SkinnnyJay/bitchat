@@ -24,6 +24,10 @@ enum HybridOutboundRoute: Equatable {
     case wifiDirect
 }
 
+enum WiFiDirectEnvelopeVersion {
+    static let current = 1
+}
+
 enum WiFiDirectAckType: String, Codable, Equatable {
     case delivered
     case read
@@ -46,7 +50,7 @@ struct WiFiDirectPrivateEnvelope: Codable, Equatable {
         messageID: String,
         content: String
     ) {
-        self.version = 1
+        self.version = WiFiDirectEnvelopeVersion.current
         self.messageType = "private"
         self.senderPeerID = senderPeerID
         self.recipientPeerID = recipientPeerID
@@ -74,7 +78,7 @@ struct WiFiDirectAckEnvelope: Codable, Equatable {
         messageID: String,
         senderNickname: String? = nil
     ) {
-        self.version = 1
+        self.version = WiFiDirectEnvelopeVersion.current
         self.messageType = "ack"
         self.ackType = ackType
         self.senderPeerID = senderPeerID
