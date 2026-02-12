@@ -245,6 +245,33 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testFallsBackToMeshWhenWiFiPrivateMessageIDExceedsLimit() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: true)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm", "ack"], for: recipient.id)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 1),
+            wifiTransport: wifi
+        )
+
+        let oversizedMessageID = String(repeating: "m", count: InputValidator.Limits.maxMessageIDLength + 1)
+        router.sendPrivate("hello", to: recipient, recipientNickname: "peer", messageID: oversizedMessageID)
+
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 1)
+        XCTAssertEqual(mesh.sentPrivateMessages[0].messageID, oversizedMessageID)
+    }
+
+    @MainActor
     func testRoutesViaWiFiBelowThresholdWhenNoOtherRouteExists() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
@@ -1900,6 +1927,72 @@ final class MessageRouterRoutingTests: XCTestCase {
             senderPeerID: "peer-1",
             recipientPeerID: mesh.myPeerID.id,
             messageID: "   ",
+            senderNickname: "peer"
+        )
+        let payload = try JSONEncoder().encode(envelope)
+        backend.simulateIncoming(payload, from: "peer-1")
+
+        wait(for: [expect], timeout: 0.2)
+        NotificationCenter.default.removeObserver(token)
+    }
+
+    @MainActor
+    func testIgnoresIncomingWiFiPrivateEnvelopeWithOversizedMessageID() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "should not receive private notification with oversized message id")
+        expect.isInverted = true
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expect.fulfill()
+        }
+
+        let envelope = WiFiDirectPrivateEnvelope(
+            senderPeerID: "peer-1",
+            recipientPeerID: mesh.myPeerID.id,
+            recipientNickname: "self",
+            messageID: String(repeating: "p", count: InputValidator.Limits.maxMessageIDLength + 1),
+            content: "hello"
+        )
+        let payload = try JSONEncoder().encode(envelope)
+        backend.simulateIncoming(payload, from: "peer-1")
+
+        wait(for: [expect], timeout: 0.2)
+        NotificationCenter.default.removeObserver(token)
+    }
+
+    @MainActor
+    func testIgnoresIncomingWiFiAckEnvelopeWithOversizedMessageID() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "should not receive ack with oversized message id")
+        expect.isInverted = true
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectAckEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expect.fulfill()
+        }
+
+        let envelope = WiFiDirectAckEnvelope(
+            ackType: .read,
+            senderPeerID: "peer-1",
+            recipientPeerID: mesh.myPeerID.id,
+            messageID: String(repeating: "a", count: InputValidator.Limits.maxMessageIDLength + 1),
             senderNickname: "peer"
         )
         let payload = try JSONEncoder().encode(envelope)

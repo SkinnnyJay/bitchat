@@ -11,6 +11,8 @@ struct InputValidator {
         // BinaryProtocol caps payload length at UInt16.max (65_535). Leave headroom
         // for headers/padding by limiting user content to 60_000 bytes.
         static let maxMessageLength = 60_000
+        // Packet/message identifier fields are encoded as UInt8 length in several paths.
+        static let maxMessageIDLength = 255
     }
     
     // MARK: - String Content Validation
@@ -44,6 +46,15 @@ struct InputValidator {
     /// Validates nickname
     static func validateNickname(_ nickname: String) -> String? {
         return validateUserString(nickname, maxLength: Limits.maxNicknameLength)
+    }
+
+    /// Validates message identifiers across transports.
+    static func validateMessageID(_ messageID: String) -> String? {
+        let trimmed = messageID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        guard trimmed.count <= Limits.maxMessageIDLength else { return nil }
+        guard trimmed.data(using: .utf8) != nil else { return nil }
+        return trimmed
     }
     
     // MARK: - Protocol Field Validation

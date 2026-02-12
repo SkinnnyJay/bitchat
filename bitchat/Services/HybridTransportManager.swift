@@ -161,7 +161,8 @@ final class HybridTransportManager {
         recipientNickname: String,
         messageID: String
     ) -> HybridOutboundRoute {
-        let canUseWiFiPayload = !messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let safeMessageID = InputValidator.validateMessageID(messageID)
+        let canUseWiFiPayload = safeMessageID != nil
             && content.utf8.count <= InputValidator.Limits.maxMessageLength
         let recipientID = peerID.id
         let resolvedRecipientID = resolveWiFiPeerIdentifier(for: peerID, requiredCapability: "pm")
@@ -174,13 +175,13 @@ final class HybridTransportManager {
         )
         let shouldFallbackToWiFi = !meshReachable && resolvedRecipientID != nil && canUseWiFiPayload
 
-        if canUseWiFiPayload, (shouldUseWiFi || shouldFallbackToWiFi), let resolvedRecipientID {
+        if canUseWiFiPayload, (shouldUseWiFi || shouldFallbackToWiFi), let resolvedRecipientID, let safeMessageID {
             let safeRecipientNickname = InputValidator.validateNickname(recipientNickname) ?? "user"
             let envelope = WiFiDirectPrivateEnvelope(
                 senderPeerID: meshTransport.myPeerID.id,
                 recipientPeerID: resolvedRecipientID,
                 recipientNickname: safeRecipientNickname,
-                messageID: messageID,
+                messageID: safeMessageID,
                 content: content
             )
             if let data = try? JSONEncoder().encode(envelope),
@@ -317,11 +318,11 @@ extension HybridTransportManager: WiFiDirectTransportDelegate {
                   self.senderMatchesTransportPeerID(claimedSenderID: envelope.senderPeerID, transportPeerID: peerID),
                   self.recipientMatchesLocalPeerID(envelope.recipientPeerID),
                   self.isInboundTimestampAcceptable(envelope.createdAtMs),
-                  !envelope.messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  let safeMessageID = InputValidator.validateMessageID(envelope.messageID),
                   envelope.content.utf8.count <= InputValidator.Limits.maxMessageLength else {
                 return
             }
-            let dedupKey = "pm:\(self.normalizedIdentityKey(envelope.senderPeerID)):\(envelope.messageID)"
+            let dedupKey = "pm:\(self.normalizedIdentityKey(envelope.senderPeerID)):\(safeMessageID)"
             guard self.shouldAcceptInboundEnvelope(dedupKey: dedupKey) else { return }
             self.delegate?.hybridTransportManager(self, didReceivePrivateEnvelope: envelope)
         }

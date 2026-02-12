@@ -237,6 +237,30 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testSendPrivateFallsBackToMeshWhenMessageIDExceedsLimitForWiFiPath() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: false)
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm"], for: recipient.id)
+
+        let manager = HybridTransportManager(
+            meshTransport: mesh,
+            wifiTransport: wifi,
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 1)
+        )
+
+        let oversizedMessageID = String(repeating: "m", count: InputValidator.Limits.maxMessageIDLength + 1)
+        let route = manager.sendPrivate("hello", to: recipient, recipientNickname: "peer", messageID: oversizedMessageID)
+
+        XCTAssertEqual(route, .mesh)
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 1)
+    }
+
+    @MainActor
     func testSendPrivateFallsBackToMeshWhenContentExceedsMaxMessageLengthForWiFiPath() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
@@ -627,6 +651,34 @@ final class HybridTransportManagerTests: XCTestCase {
         backend.simulateIncoming(payload, from: "peer-empty-id")
 
         let expect = expectation(description: "empty-message-id envelope ignored")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertTrue(delegate.receivedEnvelopes.isEmpty)
+    }
+
+    @MainActor
+    func testRejectsInboundPrivateEnvelopeWhenMessageIDExceedsLimit() throws {
+        let mesh = MockTransport()
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let manager = HybridTransportManager(meshTransport: mesh, wifiTransport: wifi)
+        let delegate = MockDelegate()
+        manager.delegate = delegate
+
+        let envelope = WiFiDirectPrivateEnvelope(
+            senderPeerID: "peer-long-id",
+            recipientPeerID: mesh.myPeerID.id,
+            recipientNickname: "self",
+            messageID: String(repeating: "x", count: InputValidator.Limits.maxMessageIDLength + 1),
+            content: "hello"
+        )
+        let payload = try JSONEncoder().encode(envelope)
+        backend.simulateIncoming(payload, from: "peer-long-id")
+
+        let expect = expectation(description: "oversized-message-id envelope ignored")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             expect.fulfill()
         }

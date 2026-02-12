@@ -296,7 +296,7 @@ final class MessageRouter {
         messageID: String,
         requirePolicyThreshold: Bool
     ) -> Bool {
-        guard !messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return false }
         guard content.utf8.count <= InputValidator.Limits.maxMessageLength else { return false }
         guard let wifiTransport else { return false }
         guard let targetPeerID = resolveWiFiPeerIdentifier(
@@ -319,17 +319,17 @@ final class MessageRouter {
             senderPeerID: mesh.myPeerID.id,
             recipientPeerID: targetPeerID,
             recipientNickname: safeRecipientNickname,
-            messageID: messageID,
+            messageID: safeMessageID,
             content: content
         )
         guard let payload = try? JSONEncoder().encode(envelope) else { return false }
 
         do {
             try wifiTransport.send(payload, to: targetPeerID)
-            SecureLogger.debug("Routing PM via WiFi Direct to \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
+            SecureLogger.debug("Routing PM via WiFi Direct to \(peerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…", category: .session)
             return true
         } catch {
-            SecureLogger.debug("WiFi Direct PM route failed for \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…, falling back", category: .session)
+            SecureLogger.debug("WiFi Direct PM route failed for \(peerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…, falling back", category: .session)
             return false
         }
     }
@@ -340,7 +340,7 @@ final class MessageRouter {
         to peerID: PeerID,
         senderNickname: String?
     ) -> Bool {
-        guard !messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return false }
         guard let wifiTransport else { return false }
         guard let targetPeerID = resolveWiFiPeerIdentifier(
             for: peerID,
@@ -352,17 +352,17 @@ final class MessageRouter {
             ackType: ackType,
             senderPeerID: mesh.myPeerID.id,
             recipientPeerID: targetPeerID,
-            messageID: messageID,
+            messageID: safeMessageID,
             senderNickname: senderNickname.flatMap { InputValidator.validateNickname($0) }
         )
         guard let payload = try? JSONEncoder().encode(envelope) else { return false }
 
         do {
             try wifiTransport.send(payload, to: targetPeerID)
-            SecureLogger.debug("Routing \(ackType.rawValue.uppercased()) ack via WiFi Direct to \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
+            SecureLogger.debug("Routing \(ackType.rawValue.uppercased()) ack via WiFi Direct to \(peerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…", category: .session)
             return true
         } catch {
-            SecureLogger.debug("WiFi Direct \(ackType.rawValue.uppercased()) ack route failed for \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…, falling back", category: .session)
+            SecureLogger.debug("WiFi Direct \(ackType.rawValue.uppercased()) ack route failed for \(peerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…, falling back", category: .session)
             return false
         }
     }
@@ -600,10 +600,10 @@ extension MessageRouter: WiFiDirectTransportDelegate {
                envelope.version == WiFiDirectEnvelopeVersion.current,
                self.senderMatchesTransportPeerID(claimedSenderID: envelope.senderPeerID, transportPeerID: peerID),
                self.recipientMatchesLocalPeerID(envelope.recipientPeerID),
-               !envelope.messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let safeMessageID = InputValidator.validateMessageID(envelope.messageID),
                self.isInboundWiFiTimestampAcceptable(envelope.createdAtMs),
                envelope.content.utf8.count <= InputValidator.Limits.maxMessageLength {
-                let dedupKey = "pm:\(self.normalizedWiFiIdentityKey(envelope.senderPeerID)):\(envelope.messageID)"
+                let dedupKey = "pm:\(self.normalizedWiFiIdentityKey(envelope.senderPeerID)):\(safeMessageID)"
                 guard self.shouldAcceptInboundWiFiEnvelope(dedupKey: dedupKey) else { return }
                 NotificationCenter.default.post(
                     name: .wifiDirectPrivateEnvelopeReceived,
@@ -619,8 +619,8 @@ extension MessageRouter: WiFiDirectTransportDelegate {
                self.senderMatchesTransportPeerID(claimedSenderID: envelope.senderPeerID, transportPeerID: peerID),
                self.recipientMatchesLocalPeerID(envelope.recipientPeerID),
                self.isInboundWiFiTimestampAcceptable(envelope.createdAtMs),
-               !envelope.messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                let dedupKey = "ack:\(envelope.ackType.rawValue):\(self.normalizedWiFiIdentityKey(envelope.senderPeerID)):\(envelope.messageID)"
+               let safeMessageID = InputValidator.validateMessageID(envelope.messageID) {
+                let dedupKey = "ack:\(envelope.ackType.rawValue):\(self.normalizedWiFiIdentityKey(envelope.senderPeerID)):\(safeMessageID)"
                 guard self.shouldAcceptInboundWiFiEnvelope(dedupKey: dedupKey) else { return }
                 NotificationCenter.default.post(
                     name: .wifiDirectAckEnvelopeReceived,
