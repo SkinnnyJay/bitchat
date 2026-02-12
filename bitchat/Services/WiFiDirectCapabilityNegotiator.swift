@@ -91,7 +91,8 @@ struct WiFiDirectCapabilityNegotiator {
             stringValue = nil
         }
         guard let stringValue else { return nil }
-        guard !stringValue.isEmpty, stringValue.utf8.count <= maxLength else { return nil }
-        return stringValue
+        let trimmed = stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.utf8.count <= maxLength else { return nil }
+        return trimmed
     }
 }
