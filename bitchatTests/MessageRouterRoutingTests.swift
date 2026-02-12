@@ -361,6 +361,40 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testWiFiPeerUpdateFlushesQueuedOutboxMessages() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: false)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = true
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 8),
+            wifiTransport: wifi
+        )
+
+        router.sendPrivate("queued message body", to: recipient, recipientNickname: "peer", messageID: "mid-queued-wifi")
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 1)
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+
+        let expect = expectation(description: "queued outbox flushed when WiFi peer appears")
+        backend.setCapabilities(["pm", "ack"], for: recipient.id)
+        backend.setPeers([recipient.id])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 0)
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+    }
+
+    @MainActor
     func testRoutesReadReceiptViaWiFiWhenPeerIsAvailable() throws {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
