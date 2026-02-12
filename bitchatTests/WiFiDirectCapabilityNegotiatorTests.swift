@@ -138,6 +138,14 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
         XCTAssertNil(negotiator.parseDiscoveryInfo(from: context))
     }
 
+    func testParseDiscoveryInfoRejectsBooleanFields() throws {
+        let negotiator = WiFiDirectCapabilityNegotiator()
+        let raw: [String: Any] = ["v": true, "caps": false]
+        let context = try JSONSerialization.data(withJSONObject: raw, options: [])
+
+        XCTAssertNil(negotiator.parseDiscoveryInfo(from: context))
+    }
+
     func testParseDiscoveryInfoTrimsVersionAndCapabilitiesValues() throws {
         let negotiator = WiFiDirectCapabilityNegotiator()
         let raw: [String: Any] = ["v": " 1 ", "caps": " pm,ack "]
