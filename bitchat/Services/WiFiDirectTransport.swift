@@ -63,10 +63,17 @@ final class WiFiDirectTransport: NSObject {
     }
 
     func send(_ data: Data, to peerID: String? = nil) throws {
-        if let peerID, peerID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            throw WiFiDirectTransportError.peerNotFound
+        let normalizedPeerID: String?
+        if let peerID {
+            let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else {
+                throw WiFiDirectTransportError.peerNotFound
+            }
+            normalizedPeerID = trimmed
+        } else {
+            normalizedPeerID = nil
         }
-        try impl.send(data, to: peerID)
+        try impl.send(data, to: normalizedPeerID)
     }
 
     func peerCapabilities(peerID: String) -> Set<String>? {

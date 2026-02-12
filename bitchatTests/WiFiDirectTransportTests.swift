@@ -167,6 +167,16 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertTrue(backend.sentPayloads.isEmpty)
     }
 
+    func testSendTrimsPeerIDBeforeBackendSend() throws {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+
+        try transport.send(Data("hello".utf8), to: "  peer-a  ")
+
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        XCTAssertEqual(backend.sentPayloads[0].peerID, "peer-a")
+    }
+
     func testDelegateReceivesPeerAndMessageEvents() {
         let backend = MockBackend(localPeerID: "self")
         let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
