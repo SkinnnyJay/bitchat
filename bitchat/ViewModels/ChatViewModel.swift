@@ -4430,20 +4430,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
 
     static func resolvePeer(from peerIndex: [String: BitchatPeer], peerID: String) -> BitchatPeer? {
-        let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-
-        for key in WiFiPeerIdentity.lookupKeys(for: trimmed) {
-            if let peer = peerIndex[key] {
-                return peer
-            }
-        }
-
-        let normalizedTarget = WiFiPeerIdentity.normalizedKey(trimmed)
-        guard !normalizedTarget.isEmpty else { return nil }
-        return peerIndex.values.first {
-            WiFiPeerIdentity.normalizedKey($0.peerID.id) == normalizedTarget
-        }
+        UnifiedPeerService.resolvePeer(from: peerIndex, peerID: peerID)
     }
 
     static func hasPrivateMessages(
