@@ -127,4 +127,15 @@ final class NostrEmbeddedBitChatTests: XCTestCase {
         XCTAssertNotNil(result)
         XCTAssertTrue(result?.hasPrefix("bitchat1:") == true)
     }
+
+    func testEncodePMForNostrRejectsNonRoutableInternalPeerIDs() {
+        let result = NostrEmbeddedBitChat.encodePMForNostr(
+            content: "hello",
+            messageID: "mid-internal-peer",
+            recipientPeerID: "peer_recipient",
+            senderPeerID: "peer_sender"
+        )
+
+        XCTAssertNil(result)
+    }
 }
