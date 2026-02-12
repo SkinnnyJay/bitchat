@@ -1336,6 +1336,11 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         guard let data = Data(hexString: trimmed), data.count == 32 else { return nil }
         return data
     }
+
+    @MainActor
+    private func resolveNoisePublicKey(for peerID: String) -> Data? {
+        Self.decodeNoisePublicKey(from: peerID) ?? unifiedPeerService.getPeer(by: peerID)?.noisePublicKey
+    }
     
     // MARK: - Public Key and Identity Management
     
@@ -2318,8 +2323,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Determine routing method and recipient nickname
-        let noiseKey = Self.decodeNoisePublicKey(from: peerID)
-            ?? unifiedPeerService.getPeer(by: peerID)?.noisePublicKey
+        let noiseKey = resolveNoisePublicKey(for: peerID)
         let isConnected = meshService.isPeerConnected(PeerID(str: peerID))
         let isReachable = meshService.isPeerReachable(PeerID(str: peerID))
         let favoriteStatus = noiseKey.flatMap { FavoritesPersistenceService.shared.getFavoriteStatus(for: $0) }
@@ -3213,7 +3217,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         var peerNostrPubkey: String? = nil
         
         // First check if peerID is already a hex Noise key
-        if let noiseKey = Self.decodeNoisePublicKey(from: peerID),
+        if let noiseKey = resolveNoisePublicKey(for: peerID),
            let favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: noiseKey) {
             noiseKeyHex = noiseKey.hexEncodedString()
             peerNostrPubkey = favoriteStatus.peerNostrPublicKey
@@ -5642,7 +5646,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Try both ephemeral ID and if that fails, get from peer service
         var noiseKey: Data? = nil
         
-        noiseKey = Self.decodeNoisePublicKey(from: peerID)
+        noiseKey = resolveNoisePublicKey(for: peerID)
         
         // If not a hex key, get from peer service (ephemeral ID)
         if noiseKey == nil, let peer = unifiedPeerService.getPeer(by: peerID) {
@@ -5834,17 +5838,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     @MainActor
     func sendFavoriteNotification(to peerID: String, isFavorite: Bool) {
         // Handle both ephemeral peer IDs and Noise key hex strings
-        var noiseKey: Data?
-        
-        // First check if peerID is a hex-encoded Noise key
-        if let hexKey = Self.decodeNoisePublicKey(from: peerID) {
-            noiseKey = hexKey
-        } else {
-            // It's an ephemeral peer ID, get the Noise key from UnifiedPeerService
-            if let peer = unifiedPeerService.getPeer(by: peerID) {
-                noiseKey = peer.noisePublicKey
-            }
-        }
+        let noiseKey = resolveNoisePublicKey(for: peerID)
         
         // Try mesh first for connected peers
         if meshService.isPeerConnected(PeerID(str: peerID)) {
@@ -6126,7 +6120,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 
                 Task { @MainActor in
                     var originalTransport: String? = nil
-                    if let noiseKey = Data(hexString: recipientID),
+                    if let noiseKey = self.resolveNoisePublicKey(for: recipientID),
                        let favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: noiseKey),
                        favoriteStatus.peerNostrPublicKey != nil,
                        self.meshService.peerNickname(peerID: PeerID(str: recipientID)) == nil {
