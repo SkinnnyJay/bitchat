@@ -104,6 +104,20 @@ final class NostrEmbeddedBitChatTests: XCTestCase {
         XCTAssertTrue(result?.hasPrefix("bitchat1:") == true)
     }
 
+    func testEncodePMForNostrAcceptsPrefixedFullNoisePeerIDs() {
+        let noiseRecipient = "mesh:" + String(repeating: "a1", count: 32)
+        let noiseSender = "noise:" + String(repeating: "b2", count: 32)
+        let result = NostrEmbeddedBitChat.encodePMForNostr(
+            content: "hello",
+            messageID: "mid-prefixed-noise-peers",
+            recipientPeerID: noiseRecipient,
+            senderPeerID: noiseSender
+        )
+
+        XCTAssertNotNil(result)
+        XCTAssertTrue(result?.hasPrefix("bitchat1:") == true)
+    }
+
     func testEncodeAckForNostrAcceptsPrefixedShortPeerIDs() {
         let result = NostrEmbeddedBitChat.encodeAckForNostr(
             type: .delivered,
@@ -126,6 +140,16 @@ final class NostrEmbeddedBitChatTests: XCTestCase {
 
         XCTAssertNotNil(result)
         XCTAssertTrue(result?.hasPrefix("bitchat1:") == true)
+    }
+
+    func testEncodeAckForNostrNoRecipientRejectsNonRoutableSenderPeerID() {
+        let result = NostrEmbeddedBitChat.encodeAckForNostrNoRecipient(
+            type: .delivered,
+            messageID: "mid-invalid-sender",
+            senderPeerID: "peer_sender"
+        )
+
+        XCTAssertNil(result)
     }
 
     func testEncodePMForNostrRejectsNonRoutableInternalPeerIDs() {
