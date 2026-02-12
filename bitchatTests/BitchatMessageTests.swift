@@ -235,6 +235,26 @@ final class BitchatMessageTests: XCTestCase {
         XCTAssertThrowsError(try JSONEncoder().encode(message))
     }
 
+    func testCodableEncodeCapsMentionCount() throws {
+        let mentions = (0..<300).map { "user\($0)" }
+        let message = BitchatMessage(
+            id: "mid-codable-mentions",
+            sender: "alice",
+            content: "hello",
+            timestamp: Date(),
+            isRelay: false,
+            mentions: mentions
+        )
+
+        let data = try JSONEncoder().encode(message)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let encodedMentions = json?["mentions"] as? [String]
+
+        XCTAssertEqual(encodedMentions?.count, 255)
+        XCTAssertEqual(encodedMentions?.first, "user0")
+        XCTAssertEqual(encodedMentions?.last, "user254")
+    }
+
     func testCleanedAndDedupedDropsEmptyAndOversizedMessages() {
         let now = Date()
         let oversizedContent = String(repeating: "x", count: InputValidator.Limits.maxMessageLength + 1)
