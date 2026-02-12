@@ -34,6 +34,8 @@ enum TransportConfig {
 
     // Nostr
     static let nostrReadAckInterval: TimeInterval = 0.35 // ~3 per second
+    // Prefer Nostr for larger private payloads when both mesh and Nostr are available.
+    static let nostrPreferredPayloadBytes: Int = 8_192
 
     // UI thresholds
     static let uiLateInsertThreshold: TimeInterval = 15.0

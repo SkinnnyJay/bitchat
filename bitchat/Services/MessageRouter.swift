@@ -6,11 +6,13 @@ import Foundation
 final class MessageRouter {
     private let mesh: Transport
     private let nostr: NostrTransport
+    private let routingPolicy: TransportRoutingPolicy
     private var outbox: [PeerID: [(content: String, nickname: String, messageID: String)]] = [:] // peerID -> queued messages
 
-    init(mesh: Transport, nostr: NostrTransport) {
+    init(mesh: Transport, nostr: NostrTransport, routingPolicy: TransportRoutingPolicy = TransportRoutingPolicy()) {
         self.mesh = mesh
         self.nostr = nostr
+        self.routingPolicy = routingPolicy
         self.nostr.senderPeerID = mesh.myPeerID
 
         // Observe favorites changes to learn Nostr mapping and flush queued messages
@@ -39,14 +41,22 @@ final class MessageRouter {
 
     func sendPrivate(_ content: String, to peerID: PeerID, recipientNickname: String, messageID: String) {
         let reachableMesh = mesh.isPeerReachable(peerID)
-        if reachableMesh {
+        let nostrAvailable = canSendViaNostr(peerID: peerID)
+        let context = TransportRoutingPolicy.Context(
+            payloadBytes: content.utf8.count,
+            meshReachable: reachableMesh,
+            nostrAvailable: nostrAvailable
+        )
+
+        switch routingPolicy.routePrivateMessage(context) {
+        case .mesh?:
             SecureLogger.debug("Routing PM via mesh (reachable) to \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
             // BLEService will initiate a handshake if needed and queue the message
             mesh.sendPrivateMessage(content, to: peerID, recipientNickname: recipientNickname, messageID: messageID)
-        } else if canSendViaNostr(peerID: peerID) {
+        case .nostr?:
             SecureLogger.debug("Routing PM via Nostr to \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
             nostr.sendPrivateMessage(content, to: peerID, recipientNickname: recipientNickname, messageID: messageID)
-        } else {
+        case nil:
             // Queue for later (when mesh connects or Nostr mapping appears)
             if outbox[peerID] == nil { outbox[peerID] = [] }
             outbox[peerID]?.append((content, recipientNickname, messageID))
@@ -106,15 +116,22 @@ final class MessageRouter {
         guard let queued = outbox[peerID], !queued.isEmpty else { return }
         SecureLogger.debug("Flushing outbox for \(peerID.id.prefix(8))… count=\(queued.count)", category: .session)
         var remaining: [(content: String, nickname: String, messageID: String)] = []
-        // Prefer mesh if connected; else try Nostr if mapping exists
+        // Re-evaluate route for each message as transport availability may have changed.
         for (content, nickname, messageID) in queued {
-            if mesh.isPeerReachable(peerID) {
+            let context = TransportRoutingPolicy.Context(
+                payloadBytes: content.utf8.count,
+                meshReachable: mesh.isPeerReachable(peerID),
+                nostrAvailable: canSendViaNostr(peerID: peerID)
+            )
+
+            switch routingPolicy.routePrivateMessage(context) {
+            case .mesh?:
                 SecureLogger.debug("Outbox -> mesh for \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
                 mesh.sendPrivateMessage(content, to: peerID, recipientNickname: nickname, messageID: messageID)
-            } else if canSendViaNostr(peerID: peerID) {
+            case .nostr?:
                 SecureLogger.debug("Outbox -> Nostr for \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
                 nostr.sendPrivateMessage(content, to: peerID, recipientNickname: nickname, messageID: messageID)
-            } else {
+            case nil:
                 // Keep unsent items queued
                 remaining.append((content, nickname, messageID))
             }
