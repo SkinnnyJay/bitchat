@@ -247,6 +247,51 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         )
     }
 
+    func testMeshDedupKeyUsesNormalizedIdentity() {
+        XCTAssertEqual(
+            UnifiedPeerService.meshDedupKey(for: PeerID(str: "mesh:ABCDEF0123456789")),
+            "abcdef0123456789"
+        )
+    }
+
+    func testShouldPreferMeshPeerPrefersConnectedPeer() {
+        let existing = BitchatPeer(
+            peerID: PeerID(str: "abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "peer",
+            isConnected: false,
+            isReachable: true
+        )
+        let candidate = BitchatPeer(
+            peerID: PeerID(str: "abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "peer",
+            isConnected: true,
+            isReachable: true
+        )
+
+        XCTAssertTrue(UnifiedPeerService.shouldPreferMeshPeer(candidate, over: existing))
+    }
+
+    func testShouldPreferMeshPeerPrefersValidNoiseKeyWhenConnectivityEqual() {
+        let existing = BitchatPeer(
+            peerID: PeerID(str: "abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x11, count: 8),
+            nickname: "peer",
+            isConnected: false,
+            isReachable: false
+        )
+        let candidate = BitchatPeer(
+            peerID: PeerID(str: "abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x22, count: 32),
+            nickname: "peer",
+            isConnected: false,
+            isReachable: false
+        )
+
+        XCTAssertTrue(UnifiedPeerService.shouldPreferMeshPeer(candidate, over: existing))
+    }
+
     func testShouldIncludeFavoriteAsOfflinePeerRejectsEquivalentExistingPeer() {
         let fullNoiseHex = String(repeating: "ab", count: 32)
         let shortID = PeerID(str: fullNoiseHex).toShort().bare

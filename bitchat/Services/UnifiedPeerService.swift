@@ -80,6 +80,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         var enrichedPeers: [BitchatPeer] = []
         var connected: Set<PeerID> = []
         var addedPeerIDs: Set<PeerID> = []
+        var meshPeersByDedupKey: [String: BitchatPeer] = [:]
         
         // Phase 1: Add all mesh peers (connected and reachable)
         for peerInfo in meshPeers {
@@ -93,14 +94,24 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
                 favorites: favorites,
                 meshAttached: hasAnyConnected
             )
-            
-            enrichedPeers.append(peer)
-            if peer.isConnected { connected.insert(peerID) }
-            addedPeerIDs.insert(peerID)
-            
-            // Update fingerprint cache
-            if let publicKey = resolvedNoisePublicKey {
-                Self.cacheFingerprint(publicKey.sha256Fingerprint(), for: peerID.id, in: &fingerprintCache)
+
+            let dedupKey = Self.meshDedupKey(for: peer.peerID)
+            if let existing = meshPeersByDedupKey[dedupKey] {
+                if Self.shouldPreferMeshPeer(peer, over: existing) {
+                    meshPeersByDedupKey[dedupKey] = peer
+                }
+            } else {
+                meshPeersByDedupKey[dedupKey] = peer
+            }
+        }
+
+        let dedupedMeshPeers = Array(meshPeersByDedupKey.values)
+        enrichedPeers.append(contentsOf: dedupedMeshPeers)
+        for peer in dedupedMeshPeers {
+            if peer.isConnected { connected.insert(peer.peerID) }
+            addedPeerIDs.insert(peer.peerID)
+            if let fingerprint = Self.fingerprintFromPeer(peer) {
+                Self.cacheFingerprint(fingerprint, for: peer.peerID.id, in: &fingerprintCache)
             }
         }
         
@@ -333,6 +344,34 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         let normalized = WiFiPeerIdentity.normalizedKey(peerID)
         guard !normalized.isEmpty else { return false }
         return connectedPeerLookupKeys.contains(normalized)
+    }
+
+    static func meshDedupKey(for peerID: PeerID) -> String {
+        let normalized = WiFiPeerIdentity.normalizedKey(peerID.id)
+        if !normalized.isEmpty {
+            return normalized
+        }
+        return peerID.id.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    static func shouldPreferMeshPeer(_ candidate: BitchatPeer, over existing: BitchatPeer) -> Bool {
+        if candidate.isConnected != existing.isConnected {
+            return candidate.isConnected
+        }
+        if candidate.isReachable != existing.isReachable {
+            return candidate.isReachable
+        }
+
+        let candidateHasNoiseKey = candidate.noisePublicKey.count == 32
+        let existingHasNoiseKey = existing.noisePublicKey.count == 32
+        if candidateHasNoiseKey != existingHasNoiseKey {
+            return candidateHasNoiseKey
+        }
+
+        if candidate.lastSeen != existing.lastSeen {
+            return candidate.lastSeen > existing.lastSeen
+        }
+        return candidate.peerID.id < existing.peerID.id
     }
 
     static func shouldIncludeFavoriteAsOfflinePeer(
