@@ -197,4 +197,37 @@ final class MessageRouterRoutingTests: XCTestCase {
         XCTAssertEqual(receivedEnvelope?.messageID, "msg-3")
         XCTAssertEqual(receivedEnvelope?.recipientPeerID, mesh.myPeerID.id)
     }
+
+    @MainActor
+    func testDoesNotPostNotificationForEnvelopeTargetingDifferentPeer() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "should not receive notification")
+        expect.isInverted = true
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expect.fulfill()
+        }
+
+        let envelope = WiFiDirectPrivateEnvelope(
+            senderPeerID: "peer-1",
+            recipientPeerID: "not-self",
+            recipientNickname: "other",
+            messageID: "msg-4",
+            content: "hello"
+        )
+        let payload = try JSONEncoder().encode(envelope)
+        backend.simulateIncoming(payload, from: "peer-1")
+
+        wait(for: [expect], timeout: 0.2)
+        NotificationCenter.default.removeObserver(token)
+    }
 }
