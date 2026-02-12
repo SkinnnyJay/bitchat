@@ -25,6 +25,7 @@ final class MessageRouter {
     private let inboundWiFiTimestampFutureSkewSeconds: TimeInterval
     private let inboundWiFiSenderRateWindowSeconds: TimeInterval
     private let inboundWiFiSenderRateMaxEvents: Int
+    private let inboundWiFiSenderRateMaxTrackedSenders: Int
     private let nowProvider: () -> Date
     private var favoriteStatusObserver: NSObjectProtocol?
     private var inboundWiFiDedupByKey: [String: Date] = [:]
@@ -54,6 +55,7 @@ final class MessageRouter {
         self.inboundWiFiTimestampFutureSkewSeconds = TransportConfig.messageRouterInboundWiFiTimestampFutureSkewSeconds
         self.inboundWiFiSenderRateWindowSeconds = TransportConfig.messageRouterInboundWiFiSenderRateWindowSeconds
         self.inboundWiFiSenderRateMaxEvents = TransportConfig.messageRouterInboundWiFiSenderRateMaxEvents
+        self.inboundWiFiSenderRateMaxTrackedSenders = TransportConfig.messageRouterInboundWiFiSenderRateMaxTrackedSenders
         self.nowProvider = nowProvider
         self.nostr.senderPeerID = mesh.myPeerID
         self.wifiTransport?.delegate = self
@@ -500,6 +502,10 @@ final class MessageRouter {
     private func allowInboundWiFiEvent(from senderID: String) -> Bool {
         let now = nowProvider()
         cleanupInboundWiFiSenderRate(now: now)
+        if inboundWiFiSenderEventTimestamps[senderID] == nil,
+           inboundWiFiSenderEventTimestamps.count >= inboundWiFiSenderRateMaxTrackedSenders {
+            return false
+        }
         let cutoff = now.addingTimeInterval(-inboundWiFiSenderRateWindowSeconds)
         var events = inboundWiFiSenderEventTimestamps[senderID] ?? []
         events.removeAll { $0 < cutoff }
