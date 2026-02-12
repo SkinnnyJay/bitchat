@@ -22,6 +22,12 @@ final class PrivateMessagePacketTests: XCTestCase {
         XCTAssertNil(packet.encode())
     }
 
+    func testEncodeRejectsContentExceedingPacketLimit() {
+        let oversized = String(repeating: "x", count: TransportConfig.privateMessagePacketContentMaxBytes + 1)
+        let packet = PrivateMessagePacket(messageID: "mid-content-oversized", content: oversized)
+        XCTAssertNil(packet.encode())
+    }
+
     func testDecodeRejectsMessageIDWithSurroundingWhitespace() throws {
         let data = try encodedPacketData(messageID: "  bad-id  ", content: "hello")
         XCTAssertNil(PrivateMessagePacket.decode(from: data))
@@ -31,6 +37,22 @@ final class PrivateMessagePacketTests: XCTestCase {
         let oversized = String(repeating: "m", count: InputValidator.Limits.maxMessageIDLength + 1)
         let data = try encodedPacketData(messageID: oversized, content: "hello")
         XCTAssertNil(PrivateMessagePacket.decode(from: data))
+    }
+
+    func testDecodeRejectsContentExceedingPacketLimit() throws {
+        let oversized = String(repeating: "x", count: TransportConfig.privateMessagePacketContentMaxBytes + 1)
+        let data = try encodedPacketData(messageID: "mid-content-oversized", content: oversized)
+        XCTAssertNil(PrivateMessagePacket.decode(from: data))
+    }
+
+    func testEncodeDecodeAcceptsContentAtPacketLimitBoundary() throws {
+        let boundary = String(repeating: "x", count: TransportConfig.privateMessagePacketContentMaxBytes)
+        let packet = PrivateMessagePacket(messageID: "mid-content-boundary", content: boundary)
+        let encoded = try XCTUnwrap(packet.encode())
+        let decoded = try XCTUnwrap(PrivateMessagePacket.decode(from: encoded))
+
+        XCTAssertEqual(decoded.messageID, "mid-content-boundary")
+        XCTAssertEqual(decoded.content.utf8.count, TransportConfig.privateMessagePacketContentMaxBytes)
     }
 
     func testDecodeSkipsUnknownTLVs() throws {

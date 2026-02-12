@@ -90,6 +90,7 @@ struct AnnouncementPacket {
 struct PrivateMessagePacket {
     let messageID: String
     let content: String
+    private static let maxContentBytes = TransportConfig.privateMessagePacketContentMaxBytes
 
     private enum TLVType: UInt8 {
         case messageID = 0x00
@@ -98,8 +99,9 @@ struct PrivateMessagePacket {
 
     func encode() -> Data? {
         guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return nil }
+        guard content.utf8.count <= Self.maxContentBytes else { return nil }
         var data = Data()
-        data.reserveCapacity(2 + min(safeMessageID.utf8.count, 255) + 2 + min(content.utf8.count, 255))
+        data.reserveCapacity(2 + min(safeMessageID.utf8.count, 255) + 2 + min(content.utf8.count, Self.maxContentBytes))
 
         // TLV for messageID
         guard let messageIDData = safeMessageID.data(using: .utf8), messageIDData.count <= 255 else { return nil }
@@ -108,7 +110,7 @@ struct PrivateMessagePacket {
         data.append(messageIDData)
 
         // TLV for content
-        guard let contentData = content.data(using: .utf8), contentData.count <= 255 else { return nil }
+        guard let contentData = content.data(using: .utf8), contentData.count <= Self.maxContentBytes else { return nil }
         data.append(TLVType.content.rawValue)
         data.append(UInt8(contentData.count))
         data.append(contentData)
@@ -148,7 +150,8 @@ struct PrivateMessagePacket {
         guard offset == data.count else { return nil }
         guard let messageID = messageID,
               let safeMessageID = InputValidator.validateMessageID(messageID),
-              let content = content else { return nil }
+              let content = content,
+              content.utf8.count <= Self.maxContentBytes else { return nil }
         return PrivateMessagePacket(messageID: safeMessageID, content: content)
     }
 }
