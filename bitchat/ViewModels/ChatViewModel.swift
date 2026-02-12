@@ -1337,9 +1337,17 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         return data
     }
 
+    static func validatedNoisePublicKey(_ value: Data?) -> Data? {
+        guard let value, value.count == 32 else { return nil }
+        return value
+    }
+
     @MainActor
     private func resolveNoisePublicKey(for peerID: String) -> Data? {
-        Self.decodeNoisePublicKey(from: peerID) ?? unifiedPeerService.getPeer(by: peerID)?.noisePublicKey
+        if let decoded = Self.decodeNoisePublicKey(from: peerID) {
+            return decoded
+        }
+        return Self.validatedNoisePublicKey(unifiedPeerService.getPeer(by: peerID)?.noisePublicKey)
     }
     
     // MARK: - Public Key and Identity Management

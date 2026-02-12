@@ -40,4 +40,13 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
 
         XCTAssertEqual(decoded?.hexEncodedString(), fullNoise)
     }
+
+    func testValidatedNoisePublicKeyAcceptsOnly32ByteKeys() {
+        let validKey = Data(repeating: 0x11, count: 32)
+        let invalidKey = Data(repeating: 0x22, count: 8)
+
+        XCTAssertEqual(ChatViewModel.validatedNoisePublicKey(validKey), validKey)
+        XCTAssertNil(ChatViewModel.validatedNoisePublicKey(invalidKey))
+        XCTAssertNil(ChatViewModel.validatedNoisePublicKey(nil))
+    }
 }
