@@ -81,6 +81,26 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertEqual(backend.stopDiscoveryCount, 1)
     }
 
+    func testStartDiscoveryWhenUnavailableDoesNotEnterDiscoveringState() {
+        let backend = MockBackend(localPeerID: "self")
+        backend.isAvailable = false
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let delegate = MockDelegate()
+        transport.delegate = delegate
+
+        transport.startDiscovery()
+
+        let expect = expectation(description: "unavailable discovery publishes false availability")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertFalse(transport.isDiscovering)
+        XCTAssertEqual(backend.startDiscoveryCount, 0)
+        XCTAssertEqual(delegate.availability, [false])
+    }
+
     func testSendIsForwardedToBackend() throws {
         let backend = MockBackend(localPeerID: "self")
         let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)

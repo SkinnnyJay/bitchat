@@ -45,6 +45,10 @@ final class WiFiDirectTransport: NSObject {
 
     func startDiscovery() {
         guard !isDiscovering else { return }
+        guard impl.isAvailable else {
+            didChangeAvailability(false)
+            return
+        }
         isDiscovering = true
         impl.startDiscovery()
     }
