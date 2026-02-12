@@ -104,9 +104,13 @@ final class HybridTransportManager {
     private let inboundDedupMaxCount: Int
     private let inboundDedupMaxAgeSeconds: TimeInterval
     private let inboundPayloadMaxBytes: Int
+    private let inboundSenderRateWindowSeconds: TimeInterval
+    private let inboundSenderRateMaxEvents: Int
+    private let inboundSenderRateMaxTrackedSenders: Int
     private let nowProvider: () -> Date
     private var inboundDedupByKey: [String: Date] = [:]
     private var inboundDedupOrder: [String] = []
+    private var inboundSenderEventTimestamps: [String: [Date]] = [:]
 
     weak var delegate: HybridTransportManagerDelegate?
 
@@ -124,6 +128,9 @@ final class HybridTransportManager {
         self.inboundDedupMaxCount = TransportConfig.messageRouterInboundWiFiDedupMaxCount
         self.inboundDedupMaxAgeSeconds = TransportConfig.messageRouterInboundWiFiDedupMaxAgeSeconds
         self.inboundPayloadMaxBytes = TransportConfig.messageRouterInboundWiFiPayloadMaxBytes
+        self.inboundSenderRateWindowSeconds = TransportConfig.messageRouterInboundWiFiSenderRateWindowSeconds
+        self.inboundSenderRateMaxEvents = TransportConfig.messageRouterInboundWiFiSenderRateMaxEvents
+        self.inboundSenderRateMaxTrackedSenders = TransportConfig.messageRouterInboundWiFiSenderRateMaxTrackedSenders
         self.nowProvider = nowProvider
         self.wifiTransport.delegate = self
     }
@@ -257,6 +264,43 @@ final class HybridTransportManager {
             inboundDedupByKey.removeValue(forKey: first)
         }
     }
+
+    private func normalizedIdentityKey(_ peerID: String) -> String {
+        PeerID(str: peerID).toShort().id
+    }
+
+    private func allowInboundEvent(from senderID: String) -> Bool {
+        let normalizedSenderID = normalizedIdentityKey(senderID)
+        let now = nowProvider()
+        cleanupInboundSenderRate(now: now)
+        if inboundSenderEventTimestamps[normalizedSenderID] == nil,
+           inboundSenderEventTimestamps.count >= inboundSenderRateMaxTrackedSenders {
+            return false
+        }
+        let cutoff = now.addingTimeInterval(-inboundSenderRateWindowSeconds)
+        var events = inboundSenderEventTimestamps[normalizedSenderID] ?? []
+        events.removeAll { $0 < cutoff }
+        if events.count >= inboundSenderRateMaxEvents {
+            inboundSenderEventTimestamps[normalizedSenderID] = events
+            return false
+        }
+        events.append(now)
+        inboundSenderEventTimestamps[normalizedSenderID] = events
+        return true
+    }
+
+    private func cleanupInboundSenderRate(now: Date) {
+        let cutoff = now.addingTimeInterval(-inboundSenderRateWindowSeconds)
+        guard !inboundSenderEventTimestamps.isEmpty else { return }
+        for (sender, events) in inboundSenderEventTimestamps {
+            let filtered = events.filter { $0 >= cutoff }
+            if filtered.isEmpty {
+                inboundSenderEventTimestamps.removeValue(forKey: sender)
+            } else if filtered.count != events.count {
+                inboundSenderEventTimestamps[sender] = filtered
+            }
+        }
+    }
 }
 
 extension HybridTransportManager: WiFiDirectTransportDelegate {
@@ -271,6 +315,7 @@ extension HybridTransportManager: WiFiDirectTransportDelegate {
         Task { @MainActor [weak self] in
             guard let self else { return }
             guard data.count <= self.inboundPayloadMaxBytes else { return }
+            guard self.allowInboundEvent(from: peerID) else { return }
             guard let envelope = try? JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: data),
                   envelope.messageType == "private",
                   envelope.version == WiFiDirectEnvelopeVersion.current,
@@ -279,7 +324,7 @@ extension HybridTransportManager: WiFiDirectTransportDelegate {
                   self.isInboundTimestampAcceptable(envelope.createdAtMs) else {
                 return
             }
-            let dedupKey = "pm:\(envelope.senderPeerID):\(envelope.messageID)"
+            let dedupKey = "pm:\(self.normalizedIdentityKey(envelope.senderPeerID)):\(envelope.messageID)"
             guard self.shouldAcceptInboundEnvelope(dedupKey: dedupKey) else { return }
             self.delegate?.hybridTransportManager(self, didReceivePrivateEnvelope: envelope)
         }

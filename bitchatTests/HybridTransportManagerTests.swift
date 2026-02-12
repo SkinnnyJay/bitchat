@@ -246,6 +246,82 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testDeduplicatesInboundPrivateEnvelopesAcrossFullAndShortSenderIDs() throws {
+        let senderNoise = Data(repeating: 0x2F, count: 32)
+        let senderFull = PeerID(hexData: senderNoise)
+        let senderShort = PeerID(publicKey: senderNoise)
+
+        let mesh = MockTransport()
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let manager = HybridTransportManager(meshTransport: mesh, wifiTransport: wifi)
+        let delegate = MockDelegate()
+        manager.delegate = delegate
+
+        let envelopeFull = WiFiDirectPrivateEnvelope(
+            senderPeerID: senderFull.id,
+            recipientPeerID: mesh.myPeerID.id,
+            recipientNickname: "self",
+            messageID: "mid-cross-dedup",
+            content: "hello"
+        )
+        let envelopeShort = WiFiDirectPrivateEnvelope(
+            senderPeerID: senderShort.id,
+            recipientPeerID: mesh.myPeerID.id,
+            recipientNickname: "self",
+            messageID: "mid-cross-dedup",
+            content: "hello"
+        )
+        backend.simulateIncoming(try JSONEncoder().encode(envelopeFull), from: senderShort.id)
+        backend.simulateIncoming(try JSONEncoder().encode(envelopeShort), from: senderFull.id)
+
+        let expect = expectation(description: "cross-id duplicate envelopes settle")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(delegate.receivedEnvelopes.count, 1)
+        XCTAssertEqual(delegate.receivedEnvelopes[0].messageID, "mid-cross-dedup")
+    }
+
+    @MainActor
+    func testRateLimitsInboundPrivateEnvelopesPerSender() throws {
+        let mesh = MockTransport()
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let fixedNow = Date()
+        let manager = HybridTransportManager(meshTransport: mesh, wifiTransport: wifi, nowProvider: { fixedNow })
+        let delegate = MockDelegate()
+        manager.delegate = delegate
+
+        let maxEvents = TransportConfig.messageRouterInboundWiFiSenderRateMaxEvents
+        let createdAtMs = UInt64(fixedNow.timeIntervalSince1970 * 1000)
+        for idx in 0..<(maxEvents + 5) {
+            let payloadObject: [String: Any] = [
+                "version": WiFiDirectEnvelopeVersion.current,
+                "messageType": "private",
+                "senderPeerID": "peer-rate",
+                "recipientPeerID": mesh.myPeerID.id,
+                "recipientNickname": "self",
+                "messageID": "mid-rate-\(idx)",
+                "content": "hello",
+                "createdAtMs": createdAtMs
+            ]
+            let payload = try JSONSerialization.data(withJSONObject: payloadObject, options: [])
+            backend.simulateIncoming(payload, from: "peer-rate")
+        }
+
+        let expect = expectation(description: "rate-limited hybrid envelopes settle")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(delegate.receivedEnvelopes.count, maxEvents)
+    }
+
+    @MainActor
     func testRejectsInboundPrivateEnvelopeWhenPayloadExceedsMaxBytes() {
         let mesh = MockTransport()
         let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
