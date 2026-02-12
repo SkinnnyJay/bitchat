@@ -4499,6 +4499,26 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         return trimmed.allSatisfy { $0.isHexDigit }
     }
+
+    static func resolveMeshNickname(
+        from peerNicknames: [PeerID: String],
+        for peerID: String
+    ) -> String? {
+        let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        for key in WiFiPeerIdentity.lookupKeys(for: trimmed) {
+            if let nickname = peerNicknames[PeerID(str: key)] {
+                return nickname
+            }
+        }
+
+        let normalizedTarget = WiFiPeerIdentity.normalizedKey(trimmed)
+        guard !normalizedTarget.isEmpty else { return nil }
+        return peerNicknames.first { candidate, _ in
+            WiFiPeerIdentity.normalizedKey(candidate.id) == normalizedTarget
+        }?.value
+    }
     
     @MainActor
     func getFingerprint(for peerID: String) -> String? {
@@ -4525,7 +4545,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // First try direct peer nicknames from mesh service
         let peerNicknames = meshService.getPeerNicknames()
-        if let nickname = peerNicknames[PeerID(str: trimmedPeerID)] {
+        if let nickname = Self.resolveMeshNickname(from: peerNicknames, for: trimmedPeerID) {
             return nickname
         }
         

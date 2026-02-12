@@ -24,4 +24,26 @@ final class ChatViewModelNicknameLookupTests: XCTestCase {
         XCTAssertTrue(ChatViewModel.shouldResolveNicknameLookup(for: "  mesh:abcdef0123456789  "))
         XCTAssertFalse(ChatViewModel.shouldResolveNicknameLookup(for: "  alice  "))
     }
+
+    func testResolveMeshNicknameMatchesPrefixedIdentifierToBarePeerKey() {
+        let peerNicknames: [PeerID: String] = [PeerID(str: "abcdef0123456789"): "alice"]
+
+        let resolved = ChatViewModel.resolveMeshNickname(
+            from: peerNicknames,
+            for: "mesh:abcdef0123456789"
+        )
+
+        XCTAssertEqual(resolved, "alice")
+    }
+
+    func testResolveMeshNicknameRespectsGeoPrefixIsolation() {
+        let peerNicknames: [PeerID: String] = [PeerID(str: "abcdef0123456789"): "alice"]
+
+        let resolved = ChatViewModel.resolveMeshNickname(
+            from: peerNicknames,
+            for: "nostr_abcdef0123456789"
+        )
+
+        XCTAssertNil(resolved)
+    }
 }
