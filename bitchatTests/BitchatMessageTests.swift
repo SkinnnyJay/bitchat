@@ -138,4 +138,73 @@ final class BitchatMessageTests: XCTestCase {
 
         XCTAssertNil(BitchatMessage(payload))
     }
+
+    func testCodableDecodeRejectsInvalidMessageID() {
+        let raw: [String: Any] = [
+            "id": "invalid message id",
+            "sender": "alice",
+            "content": "hello",
+            "timestamp": Date().timeIntervalSinceReferenceDate,
+            "isRelay": false,
+            "isPrivate": false
+        ]
+        let data = try! JSONSerialization.data(withJSONObject: raw, options: [])
+
+        XCTAssertThrowsError(try JSONDecoder().decode(BitchatMessage.self, from: data))
+    }
+
+    func testCodableDecodeSanitizesOptionalFields() {
+        let raw: [String: Any] = [
+            "id": "mid-codable-sanitize",
+            "sender": "   ",
+            "content": "hello",
+            "timestamp": Date().timeIntervalSinceReferenceDate,
+            "isRelay": false,
+            "originalSender": "\n",
+            "isPrivate": true,
+            "recipientNickname": "   ",
+            "senderPeerID": "invalid peer id",
+            "mentions": ["alice", "  ", "b\nob"]
+        ]
+        let data = try! JSONSerialization.data(withJSONObject: raw, options: [])
+
+        let decoded = try? JSONDecoder().decode(BitchatMessage.self, from: data)
+
+        XCTAssertEqual(decoded?.sender, "unknown")
+        XCTAssertNil(decoded?.originalSender)
+        XCTAssertNil(decoded?.recipientNickname)
+        XCTAssertNil(decoded?.senderPeerID)
+        XCTAssertEqual(decoded?.mentions, ["alice", "bob"])
+    }
+
+    func testCodableEncodeOmitsInvalidSenderPeerID() throws {
+        let message = BitchatMessage(
+            id: "mid-codable-encode",
+            sender: "alice",
+            content: "hello",
+            timestamp: Date(),
+            isRelay: false,
+            isPrivate: true,
+            senderPeerID: PeerID(str: "invalid peer id")
+        )
+
+        let data = try JSONEncoder().encode(message)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+
+        XCTAssertNotNil(json)
+        XCTAssertNil(json?["senderPeerID"])
+    }
+
+    func testCodableEncodeRejectsOversizedContent() {
+        let oversizedContent = String(repeating: "x", count: InputValidator.Limits.maxMessageLength + 1)
+        let message = BitchatMessage(
+            id: "mid-codable-oversized",
+            sender: "alice",
+            content: oversizedContent,
+            timestamp: Date(),
+            isRelay: false
+        )
+
+        XCTAssertThrowsError(try JSONEncoder().encode(message))
+    }
 }

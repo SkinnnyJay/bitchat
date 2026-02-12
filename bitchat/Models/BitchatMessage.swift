@@ -71,6 +71,86 @@ final class BitchatMessage: Codable {
         self.mentions = mentions
         self.deliveryStatus = deliveryStatus ?? (isPrivate ? .sending : nil)
     }
+
+    required init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        let rawID = try container.decode(String.self, forKey: .id)
+        guard let safeID = InputValidator.validateMessageID(rawID) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .id,
+                in: container,
+                debugDescription: "Invalid message ID"
+            )
+        }
+
+        let rawSender = try container.decode(String.self, forKey: .sender)
+        let safeSender = InputValidator.validateNickname(rawSender) ?? "unknown"
+
+        let safeContent = try container.decode(String.self, forKey: .content)
+        guard safeContent.utf8.count <= InputValidator.Limits.maxMessageLength else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .content,
+                in: container,
+                debugDescription: "Message content exceeds max length"
+            )
+        }
+
+        let timestamp = try container.decode(Date.self, forKey: .timestamp)
+        let isRelay = try container.decode(Bool.self, forKey: .isRelay)
+        let originalSenderRaw = try container.decodeIfPresent(String.self, forKey: .originalSender)
+        let isPrivate = try container.decode(Bool.self, forKey: .isPrivate)
+        let recipientNicknameRaw = try container.decodeIfPresent(String.self, forKey: .recipientNickname)
+        let senderPeerIDRaw = try container.decodeIfPresent(PeerID.self, forKey: .senderPeerID)
+        let mentionsRaw = try container.decodeIfPresent([String].self, forKey: .mentions)
+        let deliveryStatus = try container.decodeIfPresent(DeliveryStatus.self, forKey: .deliveryStatus)
+
+        self.id = safeID
+        self.sender = safeSender
+        self.content = safeContent
+        self.timestamp = timestamp
+        self.isRelay = isRelay
+        self.originalSender = originalSenderRaw.flatMap(InputValidator.validateNickname)
+        self.isPrivate = isPrivate
+        self.recipientNickname = recipientNicknameRaw.flatMap(InputValidator.validateNickname)
+        self.senderPeerID = senderPeerIDRaw?.isValid == true ? senderPeerIDRaw : nil
+        self.mentions = mentionsRaw?
+            .compactMap(InputValidator.validateNickname)
+            .filter { !$0.isEmpty }
+        self.deliveryStatus = deliveryStatus
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        guard let safeID = InputValidator.validateMessageID(id) else {
+            throw EncodingError.invalidValue(
+                id,
+                EncodingError.Context(codingPath: [CodingKeys.id], debugDescription: "Invalid message ID")
+            )
+        }
+        guard content.utf8.count <= InputValidator.Limits.maxMessageLength else {
+            throw EncodingError.invalidValue(
+                content,
+                EncodingError.Context(codingPath: [CodingKeys.content], debugDescription: "Message content exceeds max length")
+            )
+        }
+
+        try container.encode(safeID, forKey: .id)
+        try container.encode(InputValidator.validateNickname(sender) ?? "unknown", forKey: .sender)
+        try container.encode(content, forKey: .content)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(isRelay, forKey: .isRelay)
+        try container.encodeIfPresent(originalSender.flatMap(InputValidator.validateNickname), forKey: .originalSender)
+        try container.encode(isPrivate, forKey: .isPrivate)
+        try container.encodeIfPresent(recipientNickname.flatMap(InputValidator.validateNickname), forKey: .recipientNickname)
+        try container.encodeIfPresent(senderPeerID?.isValid == true ? senderPeerID : nil, forKey: .senderPeerID)
+        let safeMentions = mentions?
+            .compactMap(InputValidator.validateNickname)
+            .filter { !$0.isEmpty }
+        try container.encodeIfPresent(safeMentions?.isEmpty == true ? nil : safeMentions, forKey: .mentions)
+        try container.encodeIfPresent(deliveryStatus, forKey: .deliveryStatus)
+    }
 }
 
 // MARK: - Equatable Conformance
