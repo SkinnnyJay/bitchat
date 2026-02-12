@@ -1426,7 +1426,8 @@ struct ContentView: View {
                             if !privatePeerID.hasPrefix("nostr_") {
                                 // Use short peer ID if available for encryption status (sessions keyed by short ID)
                                 let statusPeerID: String = {
-                                    if privatePeerID.count == 64, let short = viewModel.getShortIDForNoiseKey(privatePeerID) {
+                                    if let noiseKey = ChatViewModel.decodeNoisePublicKey(from: privatePeerID),
+                                       let short = viewModel.getShortIDForNoiseKey(noiseKey.hexEncodedString()) {
                                         return short
                                     }
                                     return headerPeerID
