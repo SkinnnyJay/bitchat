@@ -1744,6 +1744,18 @@ extension BLEService {
     // MARK: Private Message Handling
     
     private func sendPrivateMessage(_ content: String, to recipientID: String, messageID: String) {
+        guard PeerID(str: recipientID).isValid else {
+            SecureLogger.warning("Dropping PM with invalid recipient ID", category: .session)
+            return
+        }
+        guard content.utf8.count <= maxMessageLength else {
+            SecureLogger.warning("Dropping PM with oversized payload for \(recipientID.prefix(8))…", category: .session)
+            return
+        }
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else {
+            SecureLogger.warning("Dropping PM with invalid message ID for \(recipientID.prefix(8))…", category: .session)
+            return
+        }
         SecureLogger.debug("📨 Sending PM to \(recipientID): \(content.prefix(30))...", category: .session)
         
         // Check if we have an established Noise session
@@ -1751,7 +1763,7 @@ extension BLEService {
             // Encrypt and send
             do {
                 // Create TLV-encoded private message
-                let privateMessage = PrivateMessagePacket(messageID: messageID, content: content)
+                let privateMessage = PrivateMessagePacket(messageID: safeMessageID, content: content)
                 guard let tlvData = privateMessage.encode() else {
                     SecureLogger.error("Failed to encode private message with TLV")
                     return
@@ -1799,7 +1811,7 @@ extension BLEService {
                 
                 // Notify delegate that message was sent
                 notifyUI { [weak self] in
-                    self?.delegate?.didUpdateMessageDeliveryStatus(messageID, status: .sent)
+                    self?.delegate?.didUpdateMessageDeliveryStatus(safeMessageID, status: .sent)
                 }
             } catch {
                 SecureLogger.error("Failed to encrypt message: \(error)")
@@ -1813,14 +1825,14 @@ extension BLEService {
                 if pendingMessagesAfterHandshake[recipientID] == nil {
                     pendingMessagesAfterHandshake[recipientID] = []
                 }
-                pendingMessagesAfterHandshake[recipientID]?.append((content, messageID))
+                pendingMessagesAfterHandshake[recipientID]?.append((content, safeMessageID))
             }
             
             initiateNoiseHandshake(with: recipientID)
             
             // Notify delegate that message is pending
             notifyUI { [weak self] in
-                self?.delegate?.didUpdateMessageDeliveryStatus(messageID, status: .sending)
+                self?.delegate?.didUpdateMessageDeliveryStatus(safeMessageID, status: .sending)
             }
         }
     }
