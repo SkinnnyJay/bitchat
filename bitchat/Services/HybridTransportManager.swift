@@ -198,7 +198,7 @@ final class HybridTransportManager {
                 messageID: safeMessageID,
                 content: content
             )
-            if let data = try? JSONEncoder().encode(envelope),
+            if let data = encodedWiFiPrivateEnvelopeData(envelope),
                (try? wifiTransport.send(data, to: resolvedRecipientID)) != nil {
                 return .wifiDirect
             }
@@ -220,6 +220,12 @@ final class HybridTransportManager {
             return candidate
         }
         return nil
+    }
+
+    private func encodedWiFiPrivateEnvelopeData(_ envelope: WiFiDirectPrivateEnvelope) -> Data? {
+        guard let data = try? JSONEncoder().encode(envelope) else { return nil }
+        guard data.count <= inboundPayloadMaxBytes else { return nil }
+        return data
     }
 
     private func wifiPeerIDCandidates(for peerID: PeerID) -> [String] {
