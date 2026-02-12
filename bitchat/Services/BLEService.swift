@@ -317,8 +317,8 @@ final class BLEService: NSObject {
         messageQueue.async { [weak self] in
             guard let self = self else { return }
             
-            guard content.count <= self.maxMessageLength else {
-                SecureLogger.error("Message too long: \(content.count) chars", category: .session)
+            guard content.utf8.count <= self.maxMessageLength else {
+                SecureLogger.error("Message too long: \(content.utf8.count) bytes", category: .session)
                 return
             }
             
@@ -562,16 +562,36 @@ final class BLEService: NSObject {
     }
     
     func sendPrivateMessage(_ content: String, to peerID: PeerID, recipientNickname: String, messageID: String) {
-        sendPrivateMessage(content, to: peerID.id, messageID: messageID)
+        guard peerID.isValid else {
+            SecureLogger.warning("Dropping PM to invalid peer ID", category: .session)
+            return
+        }
+        guard content.utf8.count <= maxMessageLength else {
+            SecureLogger.warning("Dropping PM with oversized content for \(peerID.id.prefix(8))…", category: .session)
+            return
+        }
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else {
+            SecureLogger.warning("Dropping PM with invalid message ID for \(peerID.id.prefix(8))…", category: .session)
+            return
+        }
+        sendPrivateMessage(content, to: peerID.id, messageID: safeMessageID)
     }
     
     func sendReadReceipt(_ receipt: ReadReceipt, to peerID: PeerID) {
+        guard peerID.isValid else {
+            SecureLogger.warning("Dropping READ receipt for invalid peer ID", category: .session)
+            return
+        }
+        guard let safeMessageID = InputValidator.validateMessageID(receipt.originalMessageID) else {
+            SecureLogger.warning("Dropping READ receipt with invalid message ID for \(peerID.id.prefix(8))…", category: .session)
+            return
+        }
         // Create typed payload: [type byte] + [message ID]
         var payload = Data([NoisePayloadType.readReceipt.rawValue])
-        payload.append(contentsOf: receipt.originalMessageID.utf8)
+        payload.append(contentsOf: safeMessageID.utf8)
 
         if noiseService.hasEstablishedSession(with: peerID) {
-            SecureLogger.debug("📤 Sending READ receipt for message \(receipt.originalMessageID) to \(peerID)", category: .session)
+            SecureLogger.debug("📤 Sending READ receipt for message \(safeMessageID) to \(peerID)", category: .session)
             do {
                 let encrypted = try noiseService.encrypt(payload, for: peerID)
                 let packet = BitchatPacket(
@@ -623,9 +643,17 @@ final class BLEService: NSObject {
     }
     
     func sendDeliveryAck(for messageID: String, to peerID: PeerID) {
+        guard peerID.isValid else {
+            SecureLogger.warning("Dropping DELIVERED ack for invalid peer ID", category: .session)
+            return
+        }
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else {
+            SecureLogger.warning("Dropping DELIVERED ack with invalid message ID for \(peerID.id.prefix(8))…", category: .session)
+            return
+        }
         // Create typed payload: [type byte] + [message ID]
         var payload = Data([NoisePayloadType.delivered.rawValue])
-        payload.append(contentsOf: messageID.utf8)
+        payload.append(contentsOf: safeMessageID.utf8)
 
         if noiseService.hasEstablishedSession(with: peerID) {
             do {
