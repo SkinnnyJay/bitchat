@@ -127,9 +127,10 @@ final class MessageRouter {
             SecureLogger.debug("Routing PM via Nostr to \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
             nostr.sendPrivateMessage(content, to: peerID, recipientNickname: recipientNickname, messageID: messageID)
         case nil:
+            let outboxPeerID = normalizedOutboxPeerID(for: peerID)
             if routePrivateViaWiFi(
                 content,
-                to: peerID,
+                to: outboxPeerID,
                 recipientNickname: recipientNickname,
                 messageID: messageID,
                 requirePolicyThreshold: false
@@ -137,10 +138,10 @@ final class MessageRouter {
                 return
             }
             // Queue for later (when mesh connects or Nostr mapping appears)
-            pruneExpiredOutboxMessages(for: peerID)
-            if outbox[peerID] == nil { outbox[peerID] = [] }
-            outbox[peerID]?.removeAll { $0.messageID == messageID }
-            outbox[peerID]?.append(
+            pruneExpiredOutboxMessages(for: outboxPeerID)
+            if outbox[outboxPeerID] == nil { outbox[outboxPeerID] = [] }
+            outbox[outboxPeerID]?.removeAll { $0.messageID == messageID }
+            outbox[outboxPeerID]?.append(
                 QueuedPrivateMessage(
                     content: content,
                     recipientNickname: recipientNickname,
@@ -148,12 +149,12 @@ final class MessageRouter {
                     enqueuedAt: nowProvider()
                 )
             )
-            if let count = outbox[peerID]?.count, count > outboxPerPeerCap {
+            if let count = outbox[outboxPeerID]?.count, count > outboxPerPeerCap {
                 let overflow = count - outboxPerPeerCap
-                outbox[peerID]?.removeFirst(overflow)
-                SecureLogger.debug("Trimmed outbox for \(peerID.id.prefix(8))… by \(overflow) entries to cap \(outboxPerPeerCap)", category: .session)
+                outbox[outboxPeerID]?.removeFirst(overflow)
+                SecureLogger.debug("Trimmed outbox for \(outboxPeerID.id.prefix(8))… by \(overflow) entries to cap \(outboxPerPeerCap)", category: .session)
             }
-            SecureLogger.debug("Queued PM for \(peerID.id.prefix(8))… (no mesh, no Nostr mapping) id=\(messageID.prefix(8))…", category: .session)
+            SecureLogger.debug("Queued PM for \(outboxPeerID.id.prefix(8))… (no mesh, no Nostr mapping) id=\(messageID.prefix(8))…", category: .session)
         }
     }
 
@@ -225,9 +226,10 @@ final class MessageRouter {
     }
 
     func flushOutbox(for peerID: PeerID) {
-        pruneExpiredOutboxMessages(for: peerID)
-        guard let queued = outbox[peerID], !queued.isEmpty else { return }
-        SecureLogger.debug("Flushing outbox for \(peerID.id.prefix(8))… count=\(queued.count)", category: .session)
+        let outboxPeerID = normalizedOutboxPeerID(for: peerID)
+        pruneExpiredOutboxMessages(for: outboxPeerID)
+        guard let queued = outbox[outboxPeerID], !queued.isEmpty else { return }
+        SecureLogger.debug("Flushing outbox for \(outboxPeerID.id.prefix(8))… count=\(queued.count)", category: .session)
         var remaining: [QueuedPrivateMessage] = []
         // Re-evaluate route for each message as transport availability may have changed.
         for message in queued {
@@ -239,31 +241,31 @@ final class MessageRouter {
             let messageID = message.messageID
             if routePrivateViaWiFi(
                 content,
-                to: peerID,
+                to: outboxPeerID,
                 recipientNickname: nickname,
                 messageID: messageID,
                 requirePolicyThreshold: true
             ) {
                 continue
             }
-            let reachableMesh = mesh.isPeerReachable(peerID)
+            let reachableMesh = mesh.isPeerReachable(outboxPeerID)
             let context = TransportRoutingPolicy.Context(
                 payloadBytes: content.utf8.count,
                 meshReachable: reachableMesh,
-                nostrAvailable: canSendViaNostr(peerID: peerID)
+                nostrAvailable: canSendViaNostr(peerID: outboxPeerID)
             )
 
             switch routingPolicy.routePrivateMessage(context) {
             case .mesh?:
-                SecureLogger.debug("Outbox -> mesh for \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
-                mesh.sendPrivateMessage(content, to: peerID, recipientNickname: nickname, messageID: messageID)
+                SecureLogger.debug("Outbox -> mesh for \(outboxPeerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
+                mesh.sendPrivateMessage(content, to: outboxPeerID, recipientNickname: nickname, messageID: messageID)
             case .nostr?:
-                SecureLogger.debug("Outbox -> Nostr for \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
-                nostr.sendPrivateMessage(content, to: peerID, recipientNickname: nickname, messageID: messageID)
+                SecureLogger.debug("Outbox -> Nostr for \(outboxPeerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
+                nostr.sendPrivateMessage(content, to: outboxPeerID, recipientNickname: nickname, messageID: messageID)
             case nil:
                 if routePrivateViaWiFi(
                     content,
-                    to: peerID,
+                    to: outboxPeerID,
                     recipientNickname: nickname,
                     messageID: messageID,
                     requirePolicyThreshold: false
@@ -276,9 +278,9 @@ final class MessageRouter {
         }
         // Persist only items we could not send
         if remaining.isEmpty {
-            outbox.removeValue(forKey: peerID)
+            outbox.removeValue(forKey: outboxPeerID)
         } else {
-            outbox[peerID] = remaining
+            outbox[outboxPeerID] = remaining
         }
     }
 
@@ -459,7 +461,7 @@ final class MessageRouter {
     }
 
     func queuedMessageCount(for peerID: PeerID) -> Int {
-        outbox[peerID]?.count ?? 0
+        outbox[normalizedOutboxPeerID(for: peerID)]?.count ?? 0
     }
 
     private func pruneExpiredOutboxMessages(for peerID: PeerID) {
@@ -476,6 +478,16 @@ final class MessageRouter {
         if removed > 0 {
             SecureLogger.debug("Pruned \(removed) expired queued PM(s) for \(peerID.id.prefix(8))…", category: .session)
         }
+    }
+
+    private func normalizedOutboxPeerID(for peerID: PeerID) -> PeerID {
+        if let noiseKey = peerID.noiseKey {
+            return PeerID(publicKey: noiseKey)
+        }
+        if peerID.prefix != .empty {
+            return PeerID(str: peerID.bare)
+        }
+        return peerID
     }
 
     private func shouldAcceptInboundWiFiEnvelope(dedupKey: String) -> Bool {

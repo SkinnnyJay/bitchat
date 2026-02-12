@@ -859,6 +859,74 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testOutboxNormalizesFullAndShortPeerIDsToSingleQueue() {
+        let noiseKey = Data(repeating: 0x31, count: 32)
+        let recipientFull = PeerID(hexData: noiseKey)
+        let recipientShort = PeerID(publicKey: noiseKey)
+        let mesh = MockTransport()
+        mesh.setReachable(recipientFull, isReachable: false)
+        mesh.setReachable(recipientShort, isReachable: false)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = false
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 8),
+            wifiTransport: wifi
+        )
+
+        router.sendPrivate("full-id-queued", to: recipientFull, recipientNickname: "peer", messageID: "mid-full")
+        XCTAssertEqual(router.queuedMessageCount(for: recipientFull), 1)
+        XCTAssertEqual(router.queuedMessageCount(for: recipientShort), 1)
+
+        router.sendPrivate("short-id-queued", to: recipientShort, recipientNickname: "peer", messageID: "mid-short")
+        XCTAssertEqual(router.queuedMessageCount(for: recipientFull), 2)
+        XCTAssertEqual(router.queuedMessageCount(for: recipientShort), 2)
+    }
+
+    @MainActor
+    func testFlushOutboxWithShortPeerIDSendsMessagesQueuedByFullPeerID() {
+        let noiseKey = Data(repeating: 0x2B, count: 32)
+        let recipientFull = PeerID(hexData: noiseKey)
+        let recipientShort = PeerID(publicKey: noiseKey)
+        let mesh = MockTransport()
+        mesh.setReachable(recipientFull, isReachable: false)
+        mesh.setReachable(recipientShort, isReachable: false)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = false
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setCapabilities(["pm", "ack"], for: recipientShort.id)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 8),
+            wifiTransport: wifi
+        )
+
+        router.sendPrivate("queued-by-full", to: recipientFull, recipientNickname: "peer", messageID: "mid-full-queue")
+        XCTAssertEqual(router.queuedMessageCount(for: recipientShort), 1)
+
+        backend.setPeers([recipientShort.id])
+        backend.simulateAvailability(true)
+
+        let expect = expectation(description: "full-id queued message flushed via short-id route")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(router.queuedMessageCount(for: recipientFull), 0)
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+    }
+
+    @MainActor
     func testRoutesReadReceiptViaWiFiWhenPeerIsAvailable() throws {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
