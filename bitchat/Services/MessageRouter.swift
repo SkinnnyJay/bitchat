@@ -18,6 +18,7 @@ final class MessageRouter {
     private let wifiTransport: WiFiDirectTransport?
     private let outboxPerPeerCap: Int
     private let outboxMaxAgeSeconds: TimeInterval
+    private let privatePacketPayloadMaxBytes: Int
     private let inboundWiFiPayloadMaxBytes: Int
     private let inboundWiFiDedupMaxCount: Int
     private let inboundWiFiDedupMaxAgeSeconds: TimeInterval
@@ -49,6 +50,7 @@ final class MessageRouter {
         self.wifiTransport = wifiTransport ?? WiFiDirectTransport(localPeerID: mesh.myPeerID.id)
         self.outboxPerPeerCap = TransportConfig.messageRouterOutboxPerPeerCap
         self.outboxMaxAgeSeconds = TransportConfig.messageRouterOutboxMessageMaxAgeSeconds
+        self.privatePacketPayloadMaxBytes = TransportConfig.privateMessagePacketContentMaxBytes
         self.inboundWiFiPayloadMaxBytes = TransportConfig.messageRouterInboundWiFiPayloadMaxBytes
         self.inboundWiFiDedupMaxCount = TransportConfig.messageRouterInboundWiFiDedupMaxCount
         self.inboundWiFiDedupMaxAgeSeconds = TransportConfig.messageRouterInboundWiFiDedupMaxAgeSeconds
@@ -121,24 +123,29 @@ final class MessageRouter {
             return
         }
         let safeRecipientNickname = InputValidator.validateNickname(recipientNickname) ?? "user"
+        let payloadBytes = content.utf8.count
+        let requiresWiFiForPayload = payloadBytes > privatePacketPayloadMaxBytes
         if routePrivateViaWiFi(
             content,
             to: peerID,
             recipientNickname: safeRecipientNickname,
             messageID: safeMessageID,
-            requirePolicyThreshold: true
+            requirePolicyThreshold: !requiresWiFiForPayload
         ) {
             return
         }
         let reachableMesh = mesh.isPeerReachable(peerID)
         let nostrAvailable = canSendViaNostr(peerID: peerID)
         let context = TransportRoutingPolicy.Context(
-            payloadBytes: content.utf8.count,
+            payloadBytes: payloadBytes,
             meshReachable: reachableMesh,
             nostrAvailable: nostrAvailable
         )
+        let selectedRoute: TransportRoutingPolicy.PrivateRoute? = requiresWiFiForPayload
+            ? nil
+            : routingPolicy.routePrivateMessage(context)
 
-        switch routingPolicy.routePrivateMessage(context) {
+        switch selectedRoute {
         case .mesh?:
             SecureLogger.debug("Routing PM via mesh (reachable) to \(peerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…", category: .session)
             // BLEService will initiate a handshake if needed and queue the message
@@ -291,23 +298,28 @@ final class MessageRouter {
                 )
                 continue
             }
+            let payloadBytes = content.utf8.count
+            let requiresWiFiForPayload = payloadBytes > privatePacketPayloadMaxBytes
             if routePrivateViaWiFi(
                 content,
                 to: outboxPeerID,
                 recipientNickname: nickname,
                 messageID: safeMessageID,
-                requirePolicyThreshold: true
+                requirePolicyThreshold: !requiresWiFiForPayload
             ) {
                 continue
             }
             let reachableMesh = mesh.isPeerReachable(outboxPeerID)
             let context = TransportRoutingPolicy.Context(
-                payloadBytes: content.utf8.count,
+                payloadBytes: payloadBytes,
                 meshReachable: reachableMesh,
                 nostrAvailable: canSendViaNostr(peerID: outboxPeerID)
             )
+            let selectedRoute: TransportRoutingPolicy.PrivateRoute? = requiresWiFiForPayload
+                ? nil
+                : routingPolicy.routePrivateMessage(context)
 
-            switch routingPolicy.routePrivateMessage(context) {
+            switch selectedRoute {
             case .mesh?:
                 SecureLogger.debug("Outbox -> mesh for \(outboxPeerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…", category: .session)
                 mesh.sendPrivateMessage(content, to: outboxPeerID, recipientNickname: nickname, messageID: safeMessageID)

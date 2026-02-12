@@ -25,6 +25,7 @@ final class BLEService: NSObject {
     // Default per-fragment chunk size when link limits are unknown
     private let defaultFragmentSize = TransportConfig.bleDefaultFragmentSize
     private let maxMessageLength = InputValidator.Limits.maxMessageLength
+    private let maxPrivatePacketPayloadBytes = TransportConfig.privateMessagePacketContentMaxBytes
     private let messageTTL: UInt8 = TransportConfig.messageTTLDefault
     // Flood/battery controls
     private let maxInFlightAssemblies = TransportConfig.bleMaxInFlightAssemblies // cap concurrent fragment assemblies
@@ -566,7 +567,7 @@ final class BLEService: NSObject {
             SecureLogger.warning("Dropping PM to invalid peer ID", category: .session)
             return
         }
-        guard content.utf8.count <= maxMessageLength else {
+        guard content.utf8.count <= maxPrivatePacketPayloadBytes else {
             SecureLogger.warning("Dropping PM with oversized content for \(peerID.id.prefix(8))…", category: .session)
             return
         }
@@ -1766,7 +1767,7 @@ extension BLEService {
             return
         }
         let recipientHex = canonicalRecipient.bare
-        guard content.utf8.count <= maxMessageLength else {
+        guard content.utf8.count <= maxPrivatePacketPayloadBytes else {
             SecureLogger.warning("Dropping PM with oversized payload for \(recipientID.prefix(8))…", category: .session)
             return
         }
@@ -1920,7 +1921,7 @@ extension BLEService {
         
         // Send each pending message directly (we know session is established)
         for (content, messageID) in messages {
-            guard content.utf8.count <= maxMessageLength else {
+            guard content.utf8.count <= maxPrivatePacketPayloadBytes else {
                 SecureLogger.warning("Dropping oversized pending PM for \(routingPeerID.prefix(8))…", category: .session)
                 continue
             }

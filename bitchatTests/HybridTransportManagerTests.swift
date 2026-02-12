@@ -449,6 +449,53 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testSendPrivateRoutesPacketOversizedPayloadViaWiFiEvenBelowThreshold() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: true)
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm"], for: recipient.id)
+
+        let manager = HybridTransportManager(
+            meshTransport: mesh,
+            wifiTransport: wifi,
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 10_000)
+        )
+
+        let oversizedForPacket = String(repeating: "x", count: TransportConfig.privateMessagePacketContentMaxBytes + 1)
+        let route = manager.sendPrivate(oversizedForPacket, to: recipient, recipientNickname: "peer", messageID: "mid-packet-oversized")
+
+        XCTAssertEqual(route, .wifiDirect)
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        XCTAssertTrue(mesh.sentPrivateMessages.isEmpty)
+    }
+
+    @MainActor
+    func testSendPrivateDropsPacketOversizedPayloadWhenWiFiUnavailable() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: true)
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = false
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        let manager = HybridTransportManager(
+            meshTransport: mesh,
+            wifiTransport: wifi,
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 10_000)
+        )
+
+        let oversizedForPacket = String(repeating: "x", count: TransportConfig.privateMessagePacketContentMaxBytes + 1)
+        let route = manager.sendPrivate(oversizedForPacket, to: recipient, recipientNickname: "peer", messageID: "mid-packet-oversized-drop")
+
+        XCTAssertEqual(route, .dropped)
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 0)
+    }
+
+    @MainActor
     func testSendPrivateRoutesViaWiFiUsingBarePeerIDFromPrefixedRecipientID() throws {
         let recipientBare = "peerabc000000000"
         let recipientPrefixed = PeerID(str: "mesh:\(recipientBare)")

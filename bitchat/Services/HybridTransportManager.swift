@@ -109,6 +109,7 @@ final class HybridTransportManager {
     private let inboundSenderRateMaxEvents: Int
     private let inboundSenderRateMaxTrackedSenders: Int
     private let inboundSenderIDMaxBytes: Int
+    private let privatePacketPayloadMaxBytes: Int
     private let nowProvider: () -> Date
     private var inboundDedupByKey: [String: Date] = [:]
     private var inboundDedupOrder: [String] = []
@@ -135,6 +136,7 @@ final class HybridTransportManager {
         self.inboundSenderRateMaxEvents = TransportConfig.messageRouterInboundWiFiSenderRateMaxEvents
         self.inboundSenderRateMaxTrackedSenders = TransportConfig.messageRouterInboundWiFiSenderRateMaxTrackedSenders
         self.inboundSenderIDMaxBytes = TransportConfig.messageRouterInboundWiFiSenderIDMaxBytes
+        self.privatePacketPayloadMaxBytes = TransportConfig.privateMessagePacketContentMaxBytes
         self.nowProvider = nowProvider
         self.wifiTransport.delegate = self
     }
@@ -174,12 +176,14 @@ final class HybridTransportManager {
             return .dropped
         }
         let safeRecipientNickname = InputValidator.validateNickname(recipientNickname) ?? "user"
+        let payloadBytes = content.utf8.count
+        let requiresWiFiForPayload = payloadBytes > privatePacketPayloadMaxBytes
         let canUseWiFiPayload = true
         let recipientID = peerID.id
         let resolvedRecipientID = resolveWiFiPeerIdentifier(for: peerID, requiredCapability: "pm")
         let meshReachable = meshTransport.isPeerReachable(peerID)
-        let shouldUseWiFi = wifiRoutingPolicy.shouldUseWiFi(
-            payloadBytes: content.utf8.count,
+        let shouldUseWiFi = requiresWiFiForPayload || wifiRoutingPolicy.shouldUseWiFi(
+            payloadBytes: payloadBytes,
             recipientPeerID: resolvedRecipientID ?? recipientID,
             wifiAvailable: wifiTransport.isAvailable,
             wifiPeerIDs: Set(wifiTransport.currentPeers)
@@ -200,6 +204,7 @@ final class HybridTransportManager {
             }
         }
 
+        guard !requiresWiFiForPayload else { return .dropped }
         meshTransport.sendPrivateMessage(content, to: peerID, recipientNickname: safeRecipientNickname, messageID: safeMessageID)
         return .mesh
     }

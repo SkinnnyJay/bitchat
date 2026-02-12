@@ -21,22 +21,24 @@ struct TransportRoutingPolicy {
     }
 
     private let nostrPreferredPayloadBytes: Int
+    private let maxMeshPayloadBytes: Int
     private let maxNostrPayloadBytes: Int
 
     init(
         nostrPreferredPayloadBytes: Int = TransportConfig.nostrPreferredPayloadBytes,
+        maxMeshPayloadBytes: Int = TransportConfig.privateMessagePacketContentMaxBytes,
         maxNostrPayloadBytes: Int = TransportConfig.nostrEmbeddedPayloadMaxBytes
     ) {
         self.nostrPreferredPayloadBytes = max(1, nostrPreferredPayloadBytes)
+        self.maxMeshPayloadBytes = max(1, maxMeshPayloadBytes)
         self.maxNostrPayloadBytes = max(1, maxNostrPayloadBytes)
     }
 
     func routePrivateMessage(_ context: Context) -> PrivateRoute? {
-        if context.nostrAvailable && context.payloadBytes > maxNostrPayloadBytes {
-            return context.meshReachable ? .mesh : nil
-        }
+        let meshAvailable = context.meshReachable && context.payloadBytes <= maxMeshPayloadBytes
+        let nostrAvailable = context.nostrAvailable && context.payloadBytes <= maxNostrPayloadBytes
 
-        switch (context.meshReachable, context.nostrAvailable) {
+        switch (meshAvailable, nostrAvailable) {
         case (false, false):
             return nil
         case (true, false):

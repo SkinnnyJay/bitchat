@@ -13,7 +13,7 @@ final class TransportRoutingPolicyTests: XCTestCase {
     func testPrefersMeshWhenOnlyMeshIsAvailable() {
         let policy = TransportRoutingPolicy(nostrPreferredPayloadBytes: 1024)
         let decision = policy.routePrivateMessage(
-            .init(payloadBytes: 5000, meshReachable: true, nostrAvailable: false)
+            .init(payloadBytes: 200, meshReachable: true, nostrAvailable: false)
         )
         XCTAssertEqual(decision, .mesh)
     }
@@ -29,7 +29,7 @@ final class TransportRoutingPolicyTests: XCTestCase {
     func testPrefersMeshForSmallPayloadWhenBothAreAvailable() {
         let policy = TransportRoutingPolicy(nostrPreferredPayloadBytes: 1024)
         let decision = policy.routePrivateMessage(
-            .init(payloadBytes: 1000, meshReachable: true, nostrAvailable: true)
+            .init(payloadBytes: 200, meshReachable: true, nostrAvailable: true)
         )
         XCTAssertEqual(decision, .mesh)
     }
@@ -42,16 +42,16 @@ final class TransportRoutingPolicyTests: XCTestCase {
         XCTAssertEqual(decision, .nostr)
     }
 
-    func testPrefersMeshWhenPayloadExceedsNostrLimitEvenIfNostrPreferred() {
+    func testReturnsNilWhenPayloadExceedsPrivatePacketLimitEvenIfBothAvailable() {
         let policy = TransportRoutingPolicy(nostrPreferredPayloadBytes: 100)
         let decision = policy.routePrivateMessage(
             .init(
-                payloadBytes: TransportConfig.nostrEmbeddedPayloadMaxBytes + 1,
+                payloadBytes: TransportConfig.privateMessagePacketContentMaxBytes + 1,
                 meshReachable: true,
                 nostrAvailable: true
             )
         )
-        XCTAssertEqual(decision, .mesh)
+        XCTAssertNil(decision)
     }
 
     func testReturnsNilWhenOnlyNostrAvailableAndPayloadExceedsNostrLimit() {
@@ -61,6 +61,18 @@ final class TransportRoutingPolicyTests: XCTestCase {
                 payloadBytes: TransportConfig.nostrEmbeddedPayloadMaxBytes + 1,
                 meshReachable: false,
                 nostrAvailable: true
+            )
+        )
+        XCTAssertNil(decision)
+    }
+
+    func testReturnsNilWhenOnlyMeshAvailableAndPayloadExceedsMeshLimit() {
+        let policy = TransportRoutingPolicy(nostrPreferredPayloadBytes: 100)
+        let decision = policy.routePrivateMessage(
+            .init(
+                payloadBytes: TransportConfig.privateMessagePacketContentMaxBytes + 1,
+                meshReachable: true,
+                nostrAvailable: false
             )
         )
         XCTAssertNil(decision)

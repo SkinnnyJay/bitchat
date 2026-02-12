@@ -483,6 +483,60 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testRoutesOversizedPacketPayloadViaWiFiEvenBelowPolicyThreshold() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: true)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = true
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm"], for: recipient.id)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 10_000),
+            wifiTransport: wifi
+        )
+
+        let oversizedForPacket = String(repeating: "x", count: TransportConfig.privateMessagePacketContentMaxBytes + 1)
+        router.sendPrivate(oversizedForPacket, to: recipient, recipientNickname: "peer", messageID: "msg-packet-oversized")
+
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        XCTAssertTrue(mesh.sentPrivateMessages.isEmpty)
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 0)
+    }
+
+    @MainActor
+    func testQueuesPacketOversizedPayloadWhenWiFiUnavailable() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: true)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = false
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 10_000),
+            wifiTransport: wifi
+        )
+
+        let oversizedForPacket = String(repeating: "x", count: TransportConfig.privateMessagePacketContentMaxBytes + 1)
+        router.sendPrivate(oversizedForPacket, to: recipient, recipientNickname: "peer", messageID: "msg-packet-oversized-queued")
+
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 0)
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 1)
+    }
+
+    @MainActor
     func testRoutesViaWiFiUsingShortDerivedPeerIDForNoiseKeyRecipient() throws {
         let noiseKey = Data(repeating: 0x42, count: 32)
         let recipientFull = PeerID(hexData: noiseKey)
