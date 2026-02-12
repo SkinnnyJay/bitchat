@@ -96,6 +96,12 @@ extension BitchatMessage: Equatable {
 extension BitchatMessage {
     func toBinaryPayload() -> Data? {
         var data = Data()
+        let safeSender = InputValidator.validateNickname(sender) ?? "unknown"
+        let safeRecipientNickname = recipientNickname.flatMap { InputValidator.validateNickname($0) }
+        let safeSenderPeerID = senderPeerID?.isValid == true ? senderPeerID : nil
+        let safeMentions = mentions?
+            .compactMap { InputValidator.validateNickname($0) }
+            .filter { !$0.isEmpty }
         
         // Message format:
         // - Flags: 1 byte (bit 0: isRelay, bit 1: isPrivate, bit 2: hasOriginalSender, bit 3: hasRecipientNickname, bit 4: hasSenderPeerID, bit 5: hasMentions)
@@ -116,9 +122,9 @@ extension BitchatMessage {
         if isRelay { flags |= 0x01 }
         if isPrivate { flags |= 0x02 }
         if originalSender != nil { flags |= 0x04 }
-        if recipientNickname != nil { flags |= 0x08 }
-        if senderPeerID != nil { flags |= 0x10 }
-        if mentions != nil && !mentions!.isEmpty { flags |= 0x20 }
+        if safeRecipientNickname != nil { flags |= 0x08 }
+        if safeSenderPeerID != nil { flags |= 0x10 }
+        if let safeMentions, !safeMentions.isEmpty { flags |= 0x20 }
         
         data.append(flags)
         
@@ -138,7 +144,7 @@ extension BitchatMessage {
         }
         
         // Sender
-        if let senderData = sender.data(using: .utf8) {
+        if let senderData = safeSender.data(using: .utf8) {
             data.append(UInt8(min(senderData.count, 255)))
             data.append(senderData.prefix(255))
         } else {
@@ -162,18 +168,18 @@ extension BitchatMessage {
             data.append(origData.prefix(255))
         }
         
-        if let recipientNickname = recipientNickname, let recipData = recipientNickname.data(using: .utf8) {
+        if let recipientNickname = safeRecipientNickname, let recipData = recipientNickname.data(using: .utf8) {
             data.append(UInt8(min(recipData.count, 255)))
             data.append(recipData.prefix(255))
         }
         
-        if let peerData = senderPeerID?.id.data(using: .utf8) {
+        if let peerData = safeSenderPeerID?.id.data(using: .utf8) {
             data.append(UInt8(min(peerData.count, 255)))
             data.append(peerData.prefix(255))
         }
         
         // Mentions array
-        if let mentions = mentions {
+        if let mentions = safeMentions {
             data.append(UInt8(min(mentions.count, 255))) // Number of mentions
             for mention in mentions.prefix(255) {
                 if let mentionData = mention.data(using: .utf8) {
