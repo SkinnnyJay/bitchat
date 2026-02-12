@@ -79,6 +79,19 @@ final class ReadReceiptTests: XCTestCase {
         XCTAssertEqual(decoded.readerNickname, "alice")
     }
 
+    func testCodableRoundTripNormalizesPrefixedReaderIDToBareHex() throws {
+        let receipt = ReadReceipt(
+            originalMessageID: "mid-roundtrip-prefixed-reader",
+            readerID: "mesh:abcdef0123456789",
+            readerNickname: "alice"
+        )
+
+        let encoded = try JSONEncoder().encode(receipt)
+        let decoded = try JSONDecoder().decode(ReadReceipt.self, from: encoded)
+
+        XCTAssertEqual(decoded.readerID, "abcdef0123456789")
+    }
+
     func testBinaryRoundTripSupportsCanonicalMessageIDs() {
         let receipt = ReadReceipt(
             originalMessageID: "mid-binary-roundtrip",
@@ -92,6 +105,19 @@ final class ReadReceiptTests: XCTestCase {
         XCTAssertEqual(decoded?.originalMessageID, "mid-binary-roundtrip")
         XCTAssertEqual(decoded?.readerID, "abcdef0123456789")
         XCTAssertEqual(decoded?.readerNickname, "alice")
+    }
+
+    func testBinaryRoundTripNormalizesPrefixedReaderIDToBareHex() {
+        let receipt = ReadReceipt(
+            originalMessageID: "mid-binary-prefixed-reader",
+            readerID: "mesh:abcdef0123456789",
+            readerNickname: "alice"
+        )
+
+        let data = receipt.toBinaryData()
+        let decoded = ReadReceipt.fromBinaryData(data)
+
+        XCTAssertEqual(decoded?.readerID, "abcdef0123456789")
     }
 
     func testBinaryEncodingReturnsEmptyDataForInvalidReaderID() {
