@@ -16,8 +16,17 @@ final class HybridTransportManagerTests: XCTestCase {
         var myPeerID = PeerID(str: "selfpeer00000000")
         var myNickname = "self"
         private let noiseService = NoiseEncryptionService(keychain: MockKeychain())
+        private var reachablePeers: Set<PeerID> = []
 
         private(set) var sentPrivateMessages: [(content: String, peerID: PeerID, nickname: String, messageID: String)] = []
+
+        func setReachable(_ peerID: PeerID, isReachable: Bool) {
+            if isReachable {
+                reachablePeers.insert(peerID)
+            } else {
+                reachablePeers.remove(peerID)
+            }
+        }
 
         func setNickname(_ nickname: String) {
             myNickname = nickname
@@ -27,7 +36,7 @@ final class HybridTransportManagerTests: XCTestCase {
         func stopServices() {}
         func emergencyDisconnectAll() {}
         func isPeerConnected(_ peerID: PeerID) -> Bool { false }
-        func isPeerReachable(_ peerID: PeerID) -> Bool { false }
+        func isPeerReachable(_ peerID: PeerID) -> Bool { reachablePeers.contains(peerID) }
         func peerNickname(peerID: PeerID) -> String? { nil }
         func getPeerNicknames() -> [PeerID : String] { [:] }
         func getFingerprint(for peerID: PeerID) -> String? { nil }
@@ -137,6 +146,29 @@ final class HybridTransportManagerTests: XCTestCase {
         XCTAssertEqual(backend.sentPayloads.count, 0)
         XCTAssertEqual(mesh.sentPrivateMessages.count, 1)
         XCTAssertEqual(mesh.sentPrivateMessages[0].messageID, "mid-2")
+    }
+
+    @MainActor
+    func testSendPrivateFallsBackToWiFiWhenMeshUnreachableEvenBelowThreshold() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: false)
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm"], for: recipient.id)
+
+        let manager = HybridTransportManager(
+            meshTransport: mesh,
+            wifiTransport: wifi,
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 10_000) // intentionally above message size
+        )
+
+        let route = manager.sendPrivate("tiny", to: recipient, recipientNickname: "peer", messageID: "mid-fallback-wifi")
+
+        XCTAssertEqual(route, .wifiDirect)
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        XCTAssertTrue(mesh.sentPrivateMessages.isEmpty)
     }
 
     @MainActor

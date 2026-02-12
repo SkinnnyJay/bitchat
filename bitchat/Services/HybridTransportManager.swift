@@ -154,14 +154,16 @@ final class HybridTransportManager {
     ) -> HybridOutboundRoute {
         let recipientID = peerID.id
         let resolvedRecipientID = resolveWiFiPeerIdentifier(for: peerID, requiredCapability: "pm")
+        let meshReachable = meshTransport.isPeerReachable(peerID)
         let shouldUseWiFi = wifiRoutingPolicy.shouldUseWiFi(
             payloadBytes: content.utf8.count,
             recipientPeerID: resolvedRecipientID ?? recipientID,
             wifiAvailable: wifiTransport.isAvailable,
             wifiPeerIDs: Set(wifiTransport.currentPeers)
         )
+        let shouldFallbackToWiFi = !meshReachable && resolvedRecipientID != nil
 
-        if shouldUseWiFi, let resolvedRecipientID {
+        if (shouldUseWiFi || shouldFallbackToWiFi), let resolvedRecipientID {
             let envelope = WiFiDirectPrivateEnvelope(
                 senderPeerID: meshTransport.myPeerID.id,
                 recipientPeerID: resolvedRecipientID,
