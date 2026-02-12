@@ -23,8 +23,10 @@ struct WiFiDirectCapabilityNegotiator {
         defaultCapabilities: Set<String> = WiFiDirectCapabilityNegotiator.defaultCapabilities
     ) {
         self.protocolVersion = max(1, protocolVersion)
-        self.requiredCapabilitiesSet = requiredCapabilities
-        self.defaultCapabilitiesSet = defaultCapabilities
+        let sanitizedRequired = Self.sanitizeCapabilities(requiredCapabilities)
+        let sanitizedDefault = Self.sanitizeCapabilities(defaultCapabilities)
+        self.requiredCapabilitiesSet = sanitizedRequired
+        self.defaultCapabilitiesSet = sanitizedDefault.union(sanitizedRequired)
     }
 
     func discoveryInfo() -> [String: String] {
@@ -78,10 +80,20 @@ struct WiFiDirectCapabilityNegotiator {
     }
 
     static func parseCapabilities(_ capabilityString: String) -> Set<String> {
+        sanitizeCapabilities(
+            Set(
+                capabilityString
+                    .split(separator: ",")
+                    .map { String($0) }
+            )
+        )
+    }
+
+    private static func sanitizeCapabilities(_ capabilities: Set<String>) -> Set<String> {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
         Set(
-            capabilityString
-                .split(separator: ",")
+            capabilities
+                .sorted()
                 .prefix(Limits.maxCapabilityTokenCount)
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
                 .filter {

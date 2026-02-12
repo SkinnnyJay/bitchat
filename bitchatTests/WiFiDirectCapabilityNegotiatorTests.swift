@@ -121,6 +121,24 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
         XCTAssertEqual(info["v"], "1")
     }
 
+    func testConfiguredCapabilitiesAreSanitizedAndIncludeRequiredSet() {
+        let negotiator = WiFiDirectCapabilityNegotiator(
+            requiredCapabilities: [" PM "],
+            defaultCapabilities: [" ACK ", "bad token!", "relay"]
+        )
+
+        let info = negotiator.discoveryInfo()
+
+        XCTAssertEqual(info["caps"], "ack,pm,relay")
+    }
+
+    func testConfiguredRequiredCapabilitiesAreSanitizedForCompatibilityChecks() {
+        let negotiator = WiFiDirectCapabilityNegotiator(requiredCapabilities: [" PM "])
+
+        XCTAssertTrue(negotiator.isPeerCompatible(discoveryInfo: ["v": "1", "caps": "pm"]))
+        XCTAssertFalse(negotiator.isPeerCompatible(discoveryInfo: ["v": "1", "caps": "ack"]))
+    }
+
     func testParseDiscoveryInfoIgnoresUnknownFields() throws {
         let negotiator = WiFiDirectCapabilityNegotiator()
         let raw: [String: Any] = ["v": 1, "caps": "pm,ack", "junk": "value"]
