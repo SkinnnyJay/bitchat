@@ -758,6 +758,48 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testIgnoresIncomingWiFiPrivateEnvelopeWithStaleTimestamp() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let fixedNow = Date()
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { fixedNow })
+
+        let expect = expectation(description: "should not receive stale private envelope")
+        expect.isInverted = true
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expect.fulfill()
+        }
+
+        let staleMs = UInt64(
+            fixedNow
+                .addingTimeInterval(-(TransportConfig.messageRouterInboundWiFiTimestampMaxAgeSeconds + 1))
+                .timeIntervalSince1970 * 1000
+        )
+        let payloadObject: [String: Any] = [
+            "version": WiFiDirectEnvelopeVersion.current,
+            "messageType": "private",
+            "senderPeerID": "peer-1",
+            "recipientPeerID": mesh.myPeerID.id,
+            "recipientNickname": "self",
+            "messageID": "mid-stale-private",
+            "content": "hello",
+            "createdAtMs": staleMs
+        ]
+        let payload = try JSONSerialization.data(withJSONObject: payloadObject, options: [])
+        backend.simulateIncoming(payload, from: "peer-1")
+
+        wait(for: [expect], timeout: 0.2)
+        NotificationCenter.default.removeObserver(token)
+    }
+
+    @MainActor
     func testIgnoresIncomingWiFiAckEnvelopeWithEmptyMessageID() throws {
         let mesh = MockTransport()
         let nostr = NostrTransport(keychain: MockKeychain())
@@ -784,6 +826,48 @@ final class MessageRouterRoutingTests: XCTestCase {
             senderNickname: "peer"
         )
         let payload = try JSONEncoder().encode(envelope)
+        backend.simulateIncoming(payload, from: "peer-1")
+
+        wait(for: [expect], timeout: 0.2)
+        NotificationCenter.default.removeObserver(token)
+    }
+
+    @MainActor
+    func testIgnoresIncomingWiFiAckEnvelopeWithFutureTimestamp() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let fixedNow = Date()
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { fixedNow })
+
+        let expect = expectation(description: "should not receive future ack envelope")
+        expect.isInverted = true
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectAckEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expect.fulfill()
+        }
+
+        let futureMs = UInt64(
+            fixedNow
+                .addingTimeInterval(TransportConfig.messageRouterInboundWiFiTimestampFutureSkewSeconds + 1)
+                .timeIntervalSince1970 * 1000
+        )
+        let payloadObject: [String: Any] = [
+            "version": WiFiDirectEnvelopeVersion.current,
+            "messageType": "ack",
+            "ackType": "read",
+            "senderPeerID": "peer-1",
+            "recipientPeerID": mesh.myPeerID.id,
+            "messageID": "mid-future-ack",
+            "senderNickname": "peer",
+            "createdAtMs": futureMs
+        ]
+        let payload = try JSONSerialization.data(withJSONObject: payloadObject, options: [])
         backend.simulateIncoming(payload, from: "peer-1")
 
         wait(for: [expect], timeout: 0.2)

@@ -21,6 +21,8 @@ final class MessageRouter {
     private let inboundWiFiPayloadMaxBytes: Int
     private let inboundWiFiDedupMaxCount: Int
     private let inboundWiFiDedupMaxAgeSeconds: TimeInterval
+    private let inboundWiFiTimestampMaxAgeSeconds: TimeInterval
+    private let inboundWiFiTimestampFutureSkewSeconds: TimeInterval
     private let nowProvider: () -> Date
     private var favoriteStatusObserver: NSObjectProtocol?
     private var inboundWiFiDedupByKey: [String: Date] = [:]
@@ -45,6 +47,8 @@ final class MessageRouter {
         self.inboundWiFiPayloadMaxBytes = TransportConfig.messageRouterInboundWiFiPayloadMaxBytes
         self.inboundWiFiDedupMaxCount = TransportConfig.messageRouterInboundWiFiDedupMaxCount
         self.inboundWiFiDedupMaxAgeSeconds = TransportConfig.messageRouterInboundWiFiDedupMaxAgeSeconds
+        self.inboundWiFiTimestampMaxAgeSeconds = TransportConfig.messageRouterInboundWiFiTimestampMaxAgeSeconds
+        self.inboundWiFiTimestampFutureSkewSeconds = TransportConfig.messageRouterInboundWiFiTimestampFutureSkewSeconds
         self.nowProvider = nowProvider
         self.nostr.senderPeerID = mesh.myPeerID
         self.wifiTransport?.delegate = self
@@ -359,6 +363,18 @@ final class MessageRouter {
             inboundWiFiDedupByKey.removeValue(forKey: first)
         }
     }
+
+    private func isInboundWiFiTimestampAcceptable(_ createdAtMs: UInt64) -> Bool {
+        let createdAt = Date(timeIntervalSince1970: TimeInterval(createdAtMs) / 1000)
+        let now = nowProvider()
+        if createdAt > now.addingTimeInterval(inboundWiFiTimestampFutureSkewSeconds) {
+            return false
+        }
+        if createdAt < now.addingTimeInterval(-inboundWiFiTimestampMaxAgeSeconds) {
+            return false
+        }
+        return true
+    }
 }
 
 extension MessageRouter: WiFiDirectTransportDelegate {
@@ -383,6 +399,7 @@ extension MessageRouter: WiFiDirectTransportDelegate {
                envelope.senderPeerID == peerID,
                envelope.recipientPeerID == self.mesh.myPeerID.id,
                !envelope.messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               self.isInboundWiFiTimestampAcceptable(envelope.createdAtMs),
                envelope.content.utf8.count <= InputValidator.Limits.maxMessageLength {
                 let dedupKey = "pm:\(envelope.senderPeerID):\(envelope.messageID)"
                 guard self.shouldAcceptInboundWiFiEnvelope(dedupKey: dedupKey) else { return }
@@ -399,6 +416,7 @@ extension MessageRouter: WiFiDirectTransportDelegate {
                envelope.version == WiFiDirectEnvelopeVersion.current,
                envelope.senderPeerID == peerID,
                envelope.recipientPeerID == self.mesh.myPeerID.id,
+               self.isInboundWiFiTimestampAcceptable(envelope.createdAtMs),
                !envelope.messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 let dedupKey = "ack:\(envelope.ackType.rawValue):\(envelope.senderPeerID):\(envelope.messageID)"
                 guard self.shouldAcceptInboundWiFiEnvelope(dedupKey: dedupKey) else { return }

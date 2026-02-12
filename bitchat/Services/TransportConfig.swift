@@ -46,6 +46,8 @@ enum TransportConfig {
     static let messageRouterInboundWiFiPayloadMaxBytes: Int = 64 * 1024
     static let messageRouterInboundWiFiDedupMaxCount: Int = 2_000
     static let messageRouterInboundWiFiDedupMaxAgeSeconds: TimeInterval = 300
+    static let messageRouterInboundWiFiTimestampMaxAgeSeconds: TimeInterval = 24 * 60 * 60
+    static let messageRouterInboundWiFiTimestampFutureSkewSeconds: TimeInterval = 5 * 60
 
     // UI thresholds
     static let uiLateInsertThreshold: TimeInterval = 15.0
