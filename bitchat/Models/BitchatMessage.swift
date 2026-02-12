@@ -284,7 +284,12 @@ extension BitchatMessage {
         if hasSenderPeerID && offset < dataCopy.count {
             let length = Int(dataCopy[offset]); offset += 1
             if offset + length <= dataCopy.count {
-                senderPeerID = PeerID(data: dataCopy[offset..<offset+length])
+                if let candidate = PeerID(data: dataCopy[offset..<offset+length]),
+                   candidate.isValid {
+                    senderPeerID = candidate
+                } else {
+                    senderPeerID = nil
+                }
                 offset += length
             }
         }

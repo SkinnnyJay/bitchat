@@ -38,4 +38,23 @@ final class BitchatMessageTests: XCTestCase {
 
         XCTAssertNotNil(InputValidator.validateMessageID(message.id))
     }
+
+    func testBinaryDecodeDropsInvalidSenderPeerID() {
+        let message = BitchatMessage(
+            id: "mid-binary",
+            sender: "alice",
+            content: "hello",
+            timestamp: Date(),
+            isRelay: false,
+            isPrivate: true,
+            recipientNickname: "bob",
+            senderPeerID: PeerID(str: "invalid peer id")
+        )
+
+        let payload = message.toBinaryPayload()
+        let decoded = payload.flatMap(BitchatMessage.init)
+
+        XCTAssertNotNil(decoded)
+        XCTAssertNil(decoded?.senderPeerID)
+    }
 }
