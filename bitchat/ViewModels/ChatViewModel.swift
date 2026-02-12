@@ -5675,22 +5675,25 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         senderNickname: String? = nil,
         timestamp: Date
     ) {
+        guard let safeMessageID = InputValidator.validateMessageID(messageId) else { return }
+        let canonicalSenderPubkey = senderPubkey.lowercased()
+        guard Data(hexString: canonicalSenderPubkey)?.count == 32 else { return }
         // Check if we already have this message in local storage
         for (_, messages) in privateChats {
-            if messages.contains(where: { $0.id == messageId }) {
+            if messages.contains(where: { $0.id == safeMessageID }) {
                 return // Skipping duplicate message
             }
         }
         
         // Check if we've read this message before (in a previous session)
-        let wasReadBefore = hasSentReadReceipt(messageId)
+        let wasReadBefore = hasSentReadReceipt(safeMessageID)
         
         // Try to find sender by checking all known peers for nickname matches
         // This is a fallback when we receive Nostr messages from someone not in favorites
         
         // For now, create a temporary peer ID based on Nostr pubkey
         // This allows the message to be displayed even without Noise key mapping
-        let tempPeerID = "nostr_" + senderPubkey.prefix(TransportConfig.nostrConvKeyPrefixLength)
+        let tempPeerID = "nostr_" + canonicalSenderPubkey.prefix(TransportConfig.nostrConvKeyPrefixLength)
         
         // Check if we're viewing this unknown sender's chat
         let isViewingThisChat = selectedPrivateChatPeer == tempPeerID
@@ -5705,13 +5708,13 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         let shouldMarkAsUnread = !wasReadBefore && !isViewingThisChat && (isRecentMessage || !isStartupPhase)
         
         // Use provided nickname or try to extract from previous messages
-        var finalSenderNickname = senderNickname ?? "Unknown"
+        var finalSenderNickname = InputValidator.validateNickname(senderNickname ?? "") ?? "Unknown"
         
         // If no nickname provided, check if we have any previous messages from this Nostr key
         if senderNickname == nil {
             for (_, messages) in privateChats {
                 if let previousMessage = messages.first(where: { 
-                    $0.senderPeerID == tempPeerID 
+                    WiFiPeerIdentity.isEquivalent($0.senderPeerID?.id ?? "", tempPeerID)
                 }) {
                     finalSenderNickname = previousMessage.sender
                     break
@@ -5721,7 +5724,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Create the message
         let message = BitchatMessage(
-            id: messageId,
+            id: safeMessageID,
             sender: finalSenderNickname,
             content: content,
             timestamp: timestamp,
