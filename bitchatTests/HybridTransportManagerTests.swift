@@ -214,7 +214,7 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
-    func testSendPrivateFallsBackToMeshWhenMessageIDIsEmptyForWiFiPath() {
+    func testSendPrivateDropsWhenMessageIDIsEmptyForWiFiPath() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
         mesh.setReachable(recipient, isReachable: false)
@@ -231,13 +231,13 @@ final class HybridTransportManagerTests: XCTestCase {
 
         let route = manager.sendPrivate("hello", to: recipient, recipientNickname: "peer", messageID: "   ")
 
-        XCTAssertEqual(route, .mesh)
+        XCTAssertEqual(route, .dropped)
         XCTAssertEqual(backend.sentPayloads.count, 0)
-        XCTAssertEqual(mesh.sentPrivateMessages.count, 1)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 0)
     }
 
     @MainActor
-    func testSendPrivateFallsBackToMeshWhenMessageIDExceedsLimitForWiFiPath() {
+    func testSendPrivateDropsWhenMessageIDExceedsLimitForWiFiPath() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
         mesh.setReachable(recipient, isReachable: false)
@@ -255,13 +255,13 @@ final class HybridTransportManagerTests: XCTestCase {
         let oversizedMessageID = String(repeating: "m", count: InputValidator.Limits.maxMessageIDLength + 1)
         let route = manager.sendPrivate("hello", to: recipient, recipientNickname: "peer", messageID: oversizedMessageID)
 
-        XCTAssertEqual(route, .mesh)
+        XCTAssertEqual(route, .dropped)
         XCTAssertEqual(backend.sentPayloads.count, 0)
-        XCTAssertEqual(mesh.sentPrivateMessages.count, 1)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 0)
     }
 
     @MainActor
-    func testSendPrivateFallsBackToMeshWhenMessageIDHasSurroundingWhitespaceForWiFiPath() {
+    func testSendPrivateDropsWhenMessageIDHasSurroundingWhitespaceForWiFiPath() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
         mesh.setReachable(recipient, isReachable: false)
@@ -279,9 +279,9 @@ final class HybridTransportManagerTests: XCTestCase {
         let whitespaceMessageID = "  mid-hybrid-space  "
         let route = manager.sendPrivate("hello", to: recipient, recipientNickname: "peer", messageID: whitespaceMessageID)
 
-        XCTAssertEqual(route, .mesh)
+        XCTAssertEqual(route, .dropped)
         XCTAssertEqual(backend.sentPayloads.count, 0)
-        XCTAssertEqual(mesh.sentPrivateMessages.count, 1)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 0)
     }
 
     @MainActor

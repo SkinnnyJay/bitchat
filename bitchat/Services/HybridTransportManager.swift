@@ -22,6 +22,7 @@ struct WiFiDirectRoutingPolicy {
 enum HybridOutboundRoute: Equatable {
     case mesh
     case wifiDirect
+    case dropped
 }
 
 enum WiFiDirectEnvelopeVersion {
@@ -162,8 +163,10 @@ final class HybridTransportManager {
         messageID: String
     ) -> HybridOutboundRoute {
         let safeMessageID = InputValidator.validateMessageID(messageID)
-        let canUseWiFiPayload = safeMessageID != nil
-            && content.utf8.count <= InputValidator.Limits.maxMessageLength
+        guard safeMessageID != nil else {
+            return .dropped
+        }
+        let canUseWiFiPayload = content.utf8.count <= InputValidator.Limits.maxMessageLength
         let recipientID = peerID.id
         let resolvedRecipientID = resolveWiFiPeerIdentifier(for: peerID, requiredCapability: "pm")
         let meshReachable = meshTransport.isPeerReachable(peerID)
