@@ -65,6 +65,7 @@ final class BitchatMessageTests: XCTestCase {
             content: "hello",
             timestamp: Date(),
             isRelay: false,
+            originalSender: " \n ",
             isPrivate: true,
             recipientNickname: "   ",
             senderPeerID: PeerID(str: "abcdef0123456789"),
@@ -76,6 +77,7 @@ final class BitchatMessageTests: XCTestCase {
 
         XCTAssertNotNil(decoded)
         XCTAssertEqual(decoded?.sender, "unknown")
+        XCTAssertNil(decoded?.originalSender)
         XCTAssertNil(decoded?.recipientNickname)
         XCTAssertEqual(decoded?.mentions, ["alice", "bob"])
     }

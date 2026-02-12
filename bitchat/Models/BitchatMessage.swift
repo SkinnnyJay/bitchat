@@ -97,6 +97,7 @@ extension BitchatMessage {
     func toBinaryPayload() -> Data? {
         var data = Data()
         let safeSender = InputValidator.validateNickname(sender) ?? "unknown"
+        let safeOriginalSender = originalSender.flatMap { InputValidator.validateNickname($0) }
         let safeRecipientNickname = recipientNickname.flatMap { InputValidator.validateNickname($0) }
         let safeSenderPeerID = senderPeerID?.isValid == true ? senderPeerID : nil
         let safeMentions = mentions?
@@ -121,7 +122,7 @@ extension BitchatMessage {
         var flags: UInt8 = 0
         if isRelay { flags |= 0x01 }
         if isPrivate { flags |= 0x02 }
-        if originalSender != nil { flags |= 0x04 }
+        if safeOriginalSender != nil { flags |= 0x04 }
         if safeRecipientNickname != nil { flags |= 0x08 }
         if safeSenderPeerID != nil { flags |= 0x10 }
         if let safeMentions, !safeMentions.isEmpty { flags |= 0x20 }
@@ -163,7 +164,7 @@ extension BitchatMessage {
         }
         
         // Optional fields
-        if let originalSender = originalSender, let origData = originalSender.data(using: .utf8) {
+        if let originalSender = safeOriginalSender, let origData = originalSender.data(using: .utf8) {
             data.append(UInt8(min(origData.count, 255)))
             data.append(origData.prefix(255))
         }
@@ -276,7 +277,8 @@ extension BitchatMessage {
         if hasOriginalSender && offset < dataCopy.count {
             let length = Int(dataCopy[offset]); offset += 1
             if offset + length <= dataCopy.count {
-                originalSender = String(data: dataCopy[offset..<offset+length], encoding: .utf8)
+                let rawOriginalSender = String(data: dataCopy[offset..<offset+length], encoding: .utf8) ?? ""
+                originalSender = InputValidator.validateNickname(rawOriginalSender)
                 offset += length
             }
         }
