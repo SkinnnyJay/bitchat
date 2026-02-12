@@ -127,4 +127,41 @@ final class ReadReceiptTests: XCTestCase {
 
         XCTAssertNil(ReadReceipt.fromBinaryData(data))
     }
+
+    func testBinaryEncodingUsesVersionedFormatPrefix() {
+        let receipt = ReadReceipt(
+            originalMessageID: "mid-versioned",
+            readerID: "abcdef0123456789",
+            readerNickname: "alice"
+        )
+
+        let data = receipt.toBinaryData()
+
+        XCTAssertEqual(data.first, 0x01)
+    }
+
+    func testBinaryDecodeRejectsTrailingBytesInV1Format() {
+        var data = Data()
+        data.append(0x01)
+        data.appendString("mid-v1-trailing", maxLength: 255)
+        data.appendString("receipt-v1-trailing", maxLength: 255)
+        data.append(Data(hexString: "abcdef0123456789")!)
+        data.appendDate(Date())
+        data.appendString("alice", maxLength: 255)
+        data.append(0x00) // trailing junk
+
+        XCTAssertNil(ReadReceipt.fromBinaryData(data))
+    }
+
+    func testBinaryDecodeRejectsInvalidReaderNicknameInV1Format() {
+        var data = Data()
+        data.append(0x01)
+        data.appendString("mid-v1-invalid-nick", maxLength: 255)
+        data.appendString("receipt-v1-invalid-nick", maxLength: 255)
+        data.append(Data(hexString: "abcdef0123456789")!)
+        data.appendDate(Date())
+        data.appendString("   ", maxLength: 255)
+
+        XCTAssertNil(ReadReceipt.fromBinaryData(data))
+    }
 }
