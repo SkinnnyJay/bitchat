@@ -77,6 +77,32 @@ final class PrivateChatManagerTests: XCTestCase {
         XCTAssertEqual(transport.sentReadReceipts.first?.originalMessageID, "mid-reader-nickname")
         XCTAssertEqual(transport.sentReadReceipts.first?.readerNickname, "user")
     }
+
+    func testMarkAsReadMatchesEquivalentSenderPeerIDVariants() {
+        let manager = PrivateChatManager()
+        let transport = MockTransportForPrivateChatManager()
+        manager.meshService = transport
+
+        let noiseKey = Data(repeating: 0x11, count: 32)
+        let fullNoiseID = noiseKey.hexEncodedString()
+        let shortPeerID = PeerID(publicKey: noiseKey).id
+        manager.privateChats[shortPeerID] = [
+            BitchatMessage(
+                id: "mid-equivalent-id",
+                sender: "peer",
+                content: "hello",
+                timestamp: Date(),
+                isRelay: false,
+                isPrivate: true,
+                senderPeerID: PeerID(str: fullNoiseID)
+            )
+        ]
+
+        manager.markAsRead(from: shortPeerID)
+
+        XCTAssertEqual(transport.sentReadReceipts.count, 1)
+        XCTAssertEqual(transport.sentReadReceipts.first?.originalMessageID, "mid-equivalent-id")
+    }
 }
 
 private final class MockTransportForPrivateChatManager: Transport {

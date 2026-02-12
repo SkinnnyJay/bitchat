@@ -87,7 +87,10 @@ final class PrivateChatManager: ObservableObject {
         // Send read receipts for unread messages that haven't been sent yet
         if let messages = privateChats[peerID] {
             for message in messages {
-                if message.senderPeerID == peerID && !message.isRelay && !hasSentReadReceipt(message.id) {
+                if let senderPeerID = message.senderPeerID,
+                   WiFiPeerIdentity.isEquivalent(senderPeerID.id, peerID),
+                   !message.isRelay,
+                   !hasSentReadReceipt(message.id) {
                     sendReadReceipt(for: message)
                 }
             }
