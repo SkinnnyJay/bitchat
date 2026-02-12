@@ -78,6 +78,10 @@ final class NostrTransport: Transport {
                     SecureLogger.error("NostrTransport: recipient key not npub (hrp=\(hrp))", category: .session)
                     return
                 }
+                guard data.count == 32 else {
+                    SecureLogger.error("NostrTransport: recipient npub payload length invalid", category: .session)
+                    return
+                }
                 recipientHex = data.hexEncodedString()
             } catch {
                 SecureLogger.error("NostrTransport: failed to decode npub -> hex: \(error)", category: .session)
@@ -115,7 +119,7 @@ final class NostrTransport: Transport {
             let recipientHex: String
             do {
                 let (hrp, data) = try Bech32.decode(recipientNpub)
-                guard hrp == "npub" else { return }
+                guard hrp == "npub", data.count == 32 else { return }
                 recipientHex = data.hexEncodedString()
             } catch { return }
             guard let embedded = NostrEmbeddedBitChat.encodePMForNostr(content: content, messageID: UUID().uuidString, recipientPeerID: peerID.id, senderPeerID: senderPeerID.id) else {
@@ -142,7 +146,7 @@ final class NostrTransport: Transport {
             let recipientHex: String
             do {
                 let (hrp, data) = try Bech32.decode(recipientNpub)
-                guard hrp == "npub" else { return }
+                guard hrp == "npub", data.count == 32 else { return }
                 recipientHex = data.hexEncodedString()
             } catch { return }
             guard let ack = NostrEmbeddedBitChat.encodeAckForNostr(type: .delivered, messageID: safeMessageID, recipientPeerID: peerID.id, senderPeerID: senderPeerID.id) else {
@@ -233,7 +237,7 @@ extension NostrTransport {
             let recipientHex: String
             do {
                 let (hrp, data) = try Bech32.decode(recipientNpub)
-                guard hrp == "npub" else { scheduleNextReadAck(); return }
+                guard hrp == "npub", data.count == 32 else { scheduleNextReadAck(); return }
                 recipientHex = data.hexEncodedString()
             } catch { scheduleNextReadAck(); return }
             guard let ack = NostrEmbeddedBitChat.encodeAckForNostr(type: .readReceipt, messageID: item.receipt.originalMessageID, recipientPeerID: item.peerID.id, senderPeerID: senderPeerID.id) else {
