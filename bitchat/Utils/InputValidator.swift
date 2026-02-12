@@ -52,7 +52,16 @@ struct InputValidator {
     static func validateMessageID(_ messageID: String) -> String? {
         let trimmed = messageID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+        // Keep IDs canonical: reject IDs that require trimming.
+        guard trimmed == messageID else { return nil }
         guard trimmed.count <= Limits.maxMessageIDLength else { return nil }
+
+        let controlChars = CharacterSet.controlCharacters
+        guard trimmed.rangeOfCharacter(from: controlChars) == nil else { return nil }
+
+        let invisibleChars = CharacterSet(charactersIn: "\u{200B}\u{200C}\u{200D}\u{FEFF}")
+        guard trimmed.rangeOfCharacter(from: invisibleChars) == nil else { return nil }
+
         guard trimmed.data(using: .utf8) != nil else { return nil }
         return trimmed
     }
