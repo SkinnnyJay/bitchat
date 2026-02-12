@@ -70,9 +70,12 @@ struct AnnouncementPacket {
             }
         }
 
-        guard let nickname = nickname, let noisePublicKey = noisePublicKey, let signingPublicKey = signingPublicKey else { return nil }
+        guard let nickname = nickname,
+              let safeNickname = InputValidator.validateNickname(nickname),
+              let noisePublicKey = noisePublicKey,
+              let signingPublicKey = signingPublicKey else { return nil }
         return AnnouncementPacket(
-            nickname: nickname,
+            nickname: safeNickname,
             noisePublicKey: noisePublicKey,
             signingPublicKey: signingPublicKey
         )
