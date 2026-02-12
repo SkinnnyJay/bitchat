@@ -13,6 +13,7 @@ import Foundation
 /// with support for mentions, replies, and delivery tracking.
 /// - Note: This is the primary data model for chat messages
 final class BitchatMessage: Codable {
+    private static let maxMentionsCount = 255
     let id: String
     let sender: String
     let content: String
@@ -68,9 +69,11 @@ final class BitchatMessage: Codable {
         self.isPrivate = isPrivate
         self.recipientNickname = recipientNickname.flatMap(InputValidator.validateNickname)
         self.senderPeerID = senderPeerID?.isValid == true ? senderPeerID : nil
-        self.mentions = mentions?
+        let safeMentions = mentions?
             .compactMap(InputValidator.validateNickname)
             .filter { !$0.isEmpty }
+            .prefix(Self.maxMentionsCount)
+        self.mentions = safeMentions.map(Array.init)
         self.deliveryStatus = deliveryStatus ?? (isPrivate ? .sending : nil)
     }
 
@@ -116,9 +119,11 @@ final class BitchatMessage: Codable {
         self.isPrivate = isPrivate
         self.recipientNickname = recipientNicknameRaw.flatMap(InputValidator.validateNickname)
         self.senderPeerID = senderPeerIDRaw?.isValid == true ? senderPeerIDRaw : nil
-        self.mentions = mentionsRaw?
+        let safeMentions = mentionsRaw?
             .compactMap(InputValidator.validateNickname)
             .filter { !$0.isEmpty }
+            .prefix(Self.maxMentionsCount)
+        self.mentions = safeMentions.map(Array.init)
         self.deliveryStatus = deliveryStatus
     }
 
@@ -150,7 +155,9 @@ final class BitchatMessage: Codable {
         let safeMentions = mentions?
             .compactMap(InputValidator.validateNickname)
             .filter { !$0.isEmpty }
-        try container.encodeIfPresent(safeMentions?.isEmpty == true ? nil : safeMentions, forKey: .mentions)
+            .prefix(Self.maxMentionsCount)
+        let encodedMentions = safeMentions.map(Array.init) ?? []
+        try container.encodeIfPresent(encodedMentions.isEmpty ? nil : encodedMentions, forKey: .mentions)
         try container.encodeIfPresent(deliveryStatus, forKey: .deliveryStatus)
     }
 }

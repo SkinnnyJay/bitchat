@@ -29,6 +29,7 @@ final class BitchatMessageTests: XCTestCase {
     }
 
     func testInitializerSanitizesSenderRecipientOriginalMentionsAndSenderPeerID() {
+        let mentions = ["alice", "  ", "b\nob"] + (0..<300).map { "user\($0)" }
         let message = BitchatMessage(
             id: "mid-sanitize-init",
             sender: "   ",
@@ -39,14 +40,16 @@ final class BitchatMessageTests: XCTestCase {
             isPrivate: true,
             recipientNickname: " \t ",
             senderPeerID: PeerID(str: "invalid peer id"),
-            mentions: ["alice", "   ", "b\nob"]
+            mentions: mentions
         )
 
         XCTAssertEqual(message.sender, "unknown")
         XCTAssertNil(message.originalSender)
         XCTAssertNil(message.recipientNickname)
         XCTAssertNil(message.senderPeerID)
-        XCTAssertEqual(message.mentions, ["alice", "bob"])
+        XCTAssertEqual(message.mentions?.first, "alice")
+        XCTAssertEqual(message.mentions?.dropFirst().first, "bob")
+        XCTAssertEqual(message.mentions?.count, 255)
     }
 
     func testInitializerGeneratesValidIDWhenMissing() {
@@ -175,6 +178,7 @@ final class BitchatMessageTests: XCTestCase {
     }
 
     func testCodableDecodeSanitizesOptionalFields() {
+        let mentions = ["alice", "  ", "b\nob"] + (0..<300).map { "user\($0)" }
         let raw: [String: Any] = [
             "id": "mid-codable-sanitize",
             "sender": "   ",
@@ -185,7 +189,7 @@ final class BitchatMessageTests: XCTestCase {
             "isPrivate": true,
             "recipientNickname": "   ",
             "senderPeerID": "invalid peer id",
-            "mentions": ["alice", "  ", "b\nob"]
+            "mentions": mentions
         ]
         let data = try! JSONSerialization.data(withJSONObject: raw, options: [])
 
@@ -195,7 +199,9 @@ final class BitchatMessageTests: XCTestCase {
         XCTAssertNil(decoded?.originalSender)
         XCTAssertNil(decoded?.recipientNickname)
         XCTAssertNil(decoded?.senderPeerID)
-        XCTAssertEqual(decoded?.mentions, ["alice", "bob"])
+        XCTAssertEqual(decoded?.mentions?.first, "alice")
+        XCTAssertEqual(decoded?.mentions?.dropFirst().first, "bob")
+        XCTAssertEqual(decoded?.mentions?.count, 255)
     }
 
     func testCodableEncodeOmitsInvalidSenderPeerID() throws {
