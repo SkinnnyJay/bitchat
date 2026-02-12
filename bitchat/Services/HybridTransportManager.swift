@@ -162,11 +162,14 @@ final class HybridTransportManager {
         recipientNickname: String,
         messageID: String
     ) -> HybridOutboundRoute {
+        guard content.utf8.count <= InputValidator.Limits.maxMessageLength else {
+            return .dropped
+        }
         let safeMessageID = InputValidator.validateMessageID(messageID)
         guard safeMessageID != nil else {
             return .dropped
         }
-        let canUseWiFiPayload = content.utf8.count <= InputValidator.Limits.maxMessageLength
+        let canUseWiFiPayload = true
         let recipientID = peerID.id
         let resolvedRecipientID = resolveWiFiPeerIdentifier(for: peerID, requiredCapability: "pm")
         let meshReachable = meshTransport.isPeerReachable(peerID)

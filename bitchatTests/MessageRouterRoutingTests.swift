@@ -218,7 +218,7 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
-    func testFallsBackToMeshWhenWiFiPrivateMessageContentExceedsLimit() {
+    func testDropsPrivateMessageWhenContentExceedsLimit() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
         mesh.setReachable(recipient, isReachable: true)
@@ -240,8 +240,8 @@ final class MessageRouterRoutingTests: XCTestCase {
         router.sendPrivate(oversized, to: recipient, recipientNickname: "peer", messageID: "msg-oversized-outbound")
 
         XCTAssertEqual(backend.sentPayloads.count, 0)
-        XCTAssertEqual(mesh.sentPrivateMessages.count, 1)
-        XCTAssertEqual(mesh.sentPrivateMessages[0].messageID, "msg-oversized-outbound")
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 0)
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 0)
     }
 
     @MainActor

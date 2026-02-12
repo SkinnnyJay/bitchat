@@ -285,7 +285,7 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
-    func testSendPrivateFallsBackToMeshWhenContentExceedsMaxMessageLengthForWiFiPath() {
+    func testSendPrivateDropsWhenContentExceedsMaxMessageLengthForWiFiPath() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
         mesh.setReachable(recipient, isReachable: false)
@@ -303,9 +303,9 @@ final class HybridTransportManagerTests: XCTestCase {
         let oversized = String(repeating: "x", count: InputValidator.Limits.maxMessageLength + 1)
         let route = manager.sendPrivate(oversized, to: recipient, recipientNickname: "peer", messageID: "mid-oversized")
 
-        XCTAssertEqual(route, .mesh)
+        XCTAssertEqual(route, .dropped)
         XCTAssertEqual(backend.sentPayloads.count, 0)
-        XCTAssertEqual(mesh.sentPrivateMessages.count, 1)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 0)
     }
 
     @MainActor
