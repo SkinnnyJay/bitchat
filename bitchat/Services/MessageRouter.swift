@@ -475,6 +475,8 @@ final class MessageRouter {
         let oldKey = normalizedOutboxPeerID(for: oldPeerID)
         let newKey = normalizedOutboxPeerID(for: newPeerID)
         guard oldKey != newKey else { return }
+        pruneExpiredOutboxMessages(for: oldKey)
+        pruneExpiredOutboxMessages(for: newKey)
         guard let oldQueued = outbox[oldKey], !oldQueued.isEmpty else { return }
 
         var merged = outbox[newKey] ?? []
