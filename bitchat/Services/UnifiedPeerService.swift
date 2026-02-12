@@ -201,7 +201,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         var peer = BitchatPeer(
             peerID: peerInfo.peerID,
             noisePublicKey: resolvedNoisePublicKey ?? Data(),
-            nickname: peerInfo.nickname,
+            nickname: Self.sanitizedPeerNickname(peerInfo.nickname),
             lastSeen: peerInfo.lastSeen,
             isConnected: peerInfo.isConnected,
             isReachable: isReachable
@@ -224,7 +224,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         var peer = BitchatPeer(
             peerID: PeerID(str: peerID),
             noisePublicKey: favorite.peerNoisePublicKey,
-            nickname: favorite.peerNickname,
+            nickname: Self.sanitizedPeerNickname(favorite.peerNickname),
             lastSeen: favorite.lastUpdated,
             isConnected: false,
             isReachable: false
@@ -576,6 +576,10 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         }
 
         return true
+    }
+
+    static func sanitizedPeerNickname(_ nickname: String) -> String {
+        InputValidator.validateNickname(nickname) ?? "user"
     }
 
     static func resolvedNoisePublicKey(for snapshot: TransportPeerSnapshot) -> Data? {

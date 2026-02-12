@@ -567,6 +567,14 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertFalse(shouldInclude)
     }
 
+    func testSanitizedPeerNicknameFallsBackToUserForInvalidInput() {
+        XCTAssertEqual(UnifiedPeerService.sanitizedPeerNickname("   "), "user")
+    }
+
+    func testSanitizedPeerNicknameKeepsValidNickname() {
+        XCTAssertEqual(UnifiedPeerService.sanitizedPeerNickname("alice"), "alice")
+    }
+
     func testPeerIDLookupMatchesNicknameCaseInsensitivelyAndTrimmed() {
         let peer = BitchatPeer(
             peerID: PeerID(str: "abcdef0123456789"),
