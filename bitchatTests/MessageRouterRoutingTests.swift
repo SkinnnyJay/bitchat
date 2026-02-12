@@ -270,6 +270,37 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testSanitizesRecipientNicknameWhenQueuedThenFlushedViaMesh() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: false)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = false
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 1),
+            wifiTransport: wifi
+        )
+
+        let invalidNickname = String(repeating: "q", count: InputValidator.Limits.maxNicknameLength + 10)
+        router.sendPrivate("hello", to: recipient, recipientNickname: invalidNickname, messageID: "mid-queued-nick-sanitize")
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 1)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 0)
+
+        mesh.setReachable(recipient, isReachable: true)
+        router.flushOutbox(for: recipient)
+
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 0)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 1)
+        XCTAssertEqual(mesh.sentPrivateMessages[0].nickname, "user")
+    }
+
+    @MainActor
     func testDropsPrivateMessageWhenMessageIDExceedsLimit() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
