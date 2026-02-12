@@ -35,6 +35,10 @@ final class FavoritesPersistenceService: ObservableObject {
     
     static let shared = FavoritesPersistenceService()
 
+    static func isValidFavoriteNoisePublicKey(_ peerNoisePublicKey: Data) -> Bool {
+        peerNoisePublicKey.count == 32
+    }
+
     static func sanitizedPeerNickname(_ peerNickname: String?) -> String {
         if let peerNickname,
            let sanitizedNickname = InputValidator.validateNickname(peerNickname) {
@@ -60,6 +64,10 @@ final class FavoritesPersistenceService: ObservableObject {
         peerNostrPublicKey: String? = nil,
         peerNickname: String
     ) {
+        guard Self.isValidFavoriteNoisePublicKey(peerNoisePublicKey) else {
+            SecureLogger.warning("⚠️ Rejecting favorite add with invalid noise key length", category: .session)
+            return
+        }
         let sanitizedPeerNickname = Self.sanitizedPeerNickname(peerNickname)
         SecureLogger.info("⭐️ Adding favorite: \(sanitizedPeerNickname) (\(peerNoisePublicKey.hexEncodedString()))", category: .session)
         
@@ -133,6 +141,10 @@ final class FavoritesPersistenceService: ObservableObject {
         peerNickname: String? = nil,
         peerNostrPublicKey: String? = nil
     ) {
+        guard Self.isValidFavoriteNoisePublicKey(peerNoisePublicKey) else {
+            SecureLogger.warning("⚠️ Rejecting favorite status update with invalid noise key length", category: .session)
+            return
+        }
         let existing = favorites[peerNoisePublicKey]
         let displayName = Self.sanitizedPeerNickname(peerNickname ?? existing?.peerNickname)
         
