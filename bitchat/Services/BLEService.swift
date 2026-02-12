@@ -1744,10 +1744,12 @@ extension BLEService {
     // MARK: Private Message Handling
     
     private func sendPrivateMessage(_ content: String, to recipientID: String, messageID: String) {
-        guard PeerID(str: recipientID).isValid else {
+        let canonicalRecipient = PeerID(str: recipientID).toShort()
+        guard canonicalRecipient.isShort else {
             SecureLogger.warning("Dropping PM with invalid recipient ID", category: .session)
             return
         }
+        let recipientHex = canonicalRecipient.bare
         guard content.utf8.count <= maxMessageLength else {
             SecureLogger.warning("Dropping PM with oversized payload for \(recipientID.prefix(8))…", category: .session)
             return
@@ -1756,10 +1758,10 @@ extension BLEService {
             SecureLogger.warning("Dropping PM with invalid message ID for \(recipientID.prefix(8))…", category: .session)
             return
         }
-        SecureLogger.debug("📨 Sending PM to \(recipientID): \(content.prefix(30))...", category: .session)
+        SecureLogger.debug("📨 Sending PM to \(recipientHex): \(content.prefix(30))...", category: .session)
         
         // Check if we have an established Noise session
-        if noiseService.hasEstablishedSession(with: PeerID(str: recipientID)) {
+        if noiseService.hasEstablishedSession(with: PeerID(str: recipientHex)) {
             // Encrypt and send
             do {
                 // Create TLV-encoded private message
@@ -1773,22 +1775,10 @@ extension BLEService {
                 var messagePayload = Data([NoisePayloadType.privateMessage.rawValue])
                 messagePayload.append(tlvData)
                 
-                let encrypted = try noiseService.encrypt(messagePayload, for: PeerID(str: recipientID))
-                
-                // Convert recipientID to Data (assuming it's a hex string)
-                var recipientData = Data()
-                var tempID = recipientID
-                while tempID.count >= 2 {
-                    let hexByte = String(tempID.prefix(2))
-                    if let byte = UInt8(hexByte, radix: 16) {
-                        recipientData.append(byte)
-                    }
-                    tempID = String(tempID.dropFirst(2))
-                }
-                if tempID.count == 1 {
-                    if let byte = UInt8(tempID, radix: 16) {
-                        recipientData.append(byte)
-                    }
+                let encrypted = try noiseService.encrypt(messagePayload, for: PeerID(str: recipientHex))
+                guard let recipientData = Data(hexString: recipientHex), recipientData.count == 8 else {
+                    SecureLogger.error("Failed to convert recipient ID to routing bytes")
+                    return
                 }
                 
             let packet = BitchatPacket(
@@ -1818,17 +1808,17 @@ extension BLEService {
             }
         } else {
             // Queue message for sending after handshake completes
-            SecureLogger.debug("🤝 No session with \(recipientID), initiating handshake and queueing message", category: .session)
+            SecureLogger.debug("🤝 No session with \(recipientHex), initiating handshake and queueing message", category: .session)
             
             // Queue the message (especially important for favorite notifications)
             collectionsQueue.sync(flags: .barrier) {
-                if pendingMessagesAfterHandshake[recipientID] == nil {
-                    pendingMessagesAfterHandshake[recipientID] = []
+                if pendingMessagesAfterHandshake[recipientHex] == nil {
+                    pendingMessagesAfterHandshake[recipientHex] = []
                 }
-                pendingMessagesAfterHandshake[recipientID]?.append((content, safeMessageID))
+                pendingMessagesAfterHandshake[recipientHex]?.append((content, safeMessageID))
             }
             
-            initiateNoiseHandshake(with: recipientID)
+            initiateNoiseHandshake(with: recipientHex)
             
             // Notify delegate that message is pending
             notifyUI { [weak self] in
@@ -1838,17 +1828,21 @@ extension BLEService {
     }
     
     private func initiateNoiseHandshake(with peerID: String) {
+        let canonicalPeerID = PeerID(str: peerID).toShort()
+        guard canonicalPeerID.isShort else { return }
+        let routingPeerID = canonicalPeerID.bare
         // Use NoiseEncryptionService for handshake
-        guard !noiseService.hasSession(with: PeerID(str: peerID)) else { return }
+        guard !noiseService.hasSession(with: PeerID(str: routingPeerID)) else { return }
         
         do {
-            let handshakeData = try noiseService.initiateHandshake(with: PeerID(str: peerID))
+            let handshakeData = try noiseService.initiateHandshake(with: PeerID(str: routingPeerID))
+            guard let recipientData = Data(hexString: routingPeerID), recipientData.count == 8 else { return }
             
             // Send handshake init
             let packet = BitchatPacket(
                 type: MessageType.noiseHandshake.rawValue,
                 senderID: myPeerIDData,
-                recipientID: Data(hexString: peerID),
+                recipientID: recipientData,
                 timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
                 payload: handshakeData,
                 signature: nil,
@@ -1868,22 +1862,40 @@ extension BLEService {
     }
     
     private func sendPendingMessagesAfterHandshake(for peerID: String) {
+        let canonicalPeerID = PeerID(str: peerID).toShort()
+        guard canonicalPeerID.isShort else {
+            SecureLogger.warning("Dropping pending PM queue for invalid peer ID", category: .session)
+            return
+        }
+        let routingPeerID = canonicalPeerID.bare
+        guard let recipientData = Data(hexString: routingPeerID), recipientData.count == 8 else {
+            SecureLogger.warning("Dropping pending PM queue for non-routable peer ID", category: .session)
+            return
+        }
         // Get and clear pending messages for this peer
         let pendingMessages = collectionsQueue.sync(flags: .barrier) { () -> [(content: String, messageID: String)]? in
-            let messages = pendingMessagesAfterHandshake[peerID]
-            pendingMessagesAfterHandshake.removeValue(forKey: peerID)
+            let messages = pendingMessagesAfterHandshake[routingPeerID]
+            pendingMessagesAfterHandshake.removeValue(forKey: routingPeerID)
             return messages
         }
         
         guard let messages = pendingMessages, !messages.isEmpty else { return }
         
-        SecureLogger.debug("📤 Sending \(messages.count) pending messages after handshake to \(peerID)", category: .session)
+        SecureLogger.debug("📤 Sending \(messages.count) pending messages after handshake to \(routingPeerID)", category: .session)
         
         // Send each pending message directly (we know session is established)
         for (content, messageID) in messages {
+            guard content.utf8.count <= maxMessageLength else {
+                SecureLogger.warning("Dropping oversized pending PM for \(routingPeerID.prefix(8))…", category: .session)
+                continue
+            }
+            guard let safeMessageID = InputValidator.validateMessageID(messageID) else {
+                SecureLogger.warning("Dropping pending PM with invalid message ID for \(routingPeerID.prefix(8))…", category: .session)
+                continue
+            }
             do {
                 // Use the same TLV format as normal sends to keep receiver decoding consistent
-                let privateMessage = PrivateMessagePacket(messageID: messageID, content: content)
+                let privateMessage = PrivateMessagePacket(messageID: safeMessageID, content: content)
                 guard let tlvData = privateMessage.encode() else {
                     SecureLogger.error("Failed to encode pending private message TLV")
                     continue
@@ -1892,12 +1904,12 @@ extension BLEService {
                 var messagePayload = Data([NoisePayloadType.privateMessage.rawValue])
                 messagePayload.append(tlvData)
 
-                let encrypted = try noiseService.encrypt(messagePayload, for: PeerID(str: peerID))
+                let encrypted = try noiseService.encrypt(messagePayload, for: PeerID(str: routingPeerID))
 
                 let packet = BitchatPacket(
                     type: MessageType.noiseEncrypted.rawValue,
                     senderID: myPeerIDData,
-                    recipientID: Data(hexString: peerID),
+                    recipientID: recipientData,
                     timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
                     payload: encrypted,
                     signature: nil,
@@ -1909,16 +1921,16 @@ extension BLEService {
 
                 // Notify delegate that message was sent
                 notifyUI { [weak self] in
-                    self?.delegate?.didUpdateMessageDeliveryStatus(messageID, status: .sent)
+                    self?.delegate?.didUpdateMessageDeliveryStatus(safeMessageID, status: .sent)
                 }
 
-                SecureLogger.debug("✅ Sent pending message \(messageID) to \(peerID) after handshake", category: .session)
+                SecureLogger.debug("✅ Sent pending message \(safeMessageID) to \(routingPeerID) after handshake", category: .session)
             } catch {
                 SecureLogger.error("Failed to send pending message after handshake: \(error)")
 
                 // Notify delegate of failure
                 notifyUI { [weak self] in
-                    self?.delegate?.didUpdateMessageDeliveryStatus(messageID, status: .failed(reason: "Encryption failed"))
+                    self?.delegate?.didUpdateMessageDeliveryStatus(safeMessageID, status: .failed(reason: "Encryption failed"))
                 }
             }
         }
