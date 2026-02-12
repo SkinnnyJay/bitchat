@@ -189,15 +189,20 @@ final class NostrEmbeddedBitChatTests: XCTestCase {
     }
 
     func testEncodeAckForNostrAcceptsUppercaseHexPeerIDs() {
+        let uppercaseRecipient = "ABCDEF0123456789"
+        let uppercaseSender = "0123456789ABCDEF"
         let result = NostrEmbeddedBitChat.encodeAckForNostr(
             type: .delivered,
             messageID: "mid-uppercase-hex",
-            recipientPeerID: "ABCDEF0123456789",
-            senderPeerID: "0123456789ABCDEF"
+            recipientPeerID: uppercaseRecipient,
+            senderPeerID: uppercaseSender
         )
 
         XCTAssertNotNil(result)
         XCTAssertTrue(result?.hasPrefix("bitchat1:") == true)
+        let decoded = decodeEmbeddedPacket(result)
+        XCTAssertEqual(decoded?.recipientID?.hexEncodedString(), uppercaseRecipient.lowercased())
+        XCTAssertEqual(decoded?.senderID.hexEncodedString(), uppercaseSender.lowercased())
     }
 
     private func decodeEmbeddedPacket(_ encoded: String?) -> BitchatPacket? {

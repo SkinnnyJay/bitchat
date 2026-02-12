@@ -115,7 +115,7 @@ struct NostrEmbeddedBitChat {
         let canonical = PeerID(str: trimmed).toShort()
         guard canonical.isValid else { return nil }
         guard let data = Data(hexString: canonical.bare), data.count == 8 else { return nil }
-        return canonical.bare
+        return canonical.bare.lowercased()
     }
 
     /// Base64url encode without padding
