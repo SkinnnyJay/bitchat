@@ -22,12 +22,12 @@ enum WiFiPeerIdentity {
         guard !trimmed.isEmpty else { return "" }
         let canonical = canonicalPeerID(PeerID(str: trimmed))
         if let noiseKey = canonical.noiseKey {
-            return PeerID(publicKey: noiseKey).id
+            return PeerID(publicKey: noiseKey).id.lowercased()
         }
         if canonical.prefix != .empty {
-            return canonical.bare
+            return canonical.bare.lowercased()
         }
-        return canonical.id
+        return canonical.id.lowercased()
     }
 
     static func isEquivalent(_ lhs: String, _ rhs: String) -> Bool {

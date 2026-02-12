@@ -39,6 +39,13 @@ final class WiFiPeerIdentityTests: XCTestCase {
         )
     }
 
+    func testNormalizedKeyLowercasesPrefixedShortHexValues() {
+        XCTAssertEqual(
+            WiFiPeerIdentity.normalizedKey("mesh:ABCDEF0123456789"),
+            "abcdef0123456789"
+        )
+    }
+
     func testIsEquivalentMatchesFullAndShortNoiseIDs() {
         let noiseKey = Data(repeating: 0x22, count: 32)
         let full = PeerID(hexData: noiseKey).id
@@ -86,6 +93,11 @@ final class WiFiPeerIdentityTests: XCTestCase {
     func testIsEquivalentMatchesPrefixedAndBarePeerIDs() {
         XCTAssertTrue(WiFiPeerIdentity.isEquivalent("mesh:peerabc000000000", "peerabc000000000"))
         XCTAssertTrue(WiFiPeerIdentity.isEquivalent("name:peerabc000000000", "peerabc000000000"))
+    }
+
+    func testIsEquivalentTreatsHexPeerIDsCaseInsensitively() {
+        XCTAssertTrue(WiFiPeerIdentity.isEquivalent("mesh:ABCDEF0123456789", "abcdef0123456789"))
+        XCTAssertTrue(WiFiPeerIdentity.isEquivalent("ABCDEF0123456789", "abcdef0123456789"))
     }
 
     func testIsEquivalentRejectsEmptyOrWhitespacePeerIDs() {
