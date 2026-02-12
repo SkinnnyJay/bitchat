@@ -10,6 +10,7 @@ enum WiFiDirectTransportError: Error, Equatable {
     case notAvailable
     case peerNotFound
     case sendFailed
+    case invalidPayload
 }
 
 /// Wi‑Fi Direct style transport backed by MultipeerConnectivity where available.
@@ -64,6 +65,9 @@ final class WiFiDirectTransport: NSObject {
     }
 
     func send(_ data: Data, to peerID: String? = nil) throws {
+        guard !data.isEmpty, data.count <= TransportConfig.messageRouterInboundWiFiPayloadMaxBytes else {
+            throw WiFiDirectTransportError.invalidPayload
+        }
         let normalizedPeerID: String?
         if let peerID {
             let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)

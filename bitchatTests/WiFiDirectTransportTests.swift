@@ -178,6 +178,27 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertEqual(backend.sentPayloads[0].peerID, "peer-a")
     }
 
+    func testSendRejectsEmptyPayloadBeforeBackendSend() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+
+        XCTAssertThrowsError(try transport.send(Data(), to: "peer-a")) { error in
+            XCTAssertEqual(error as? WiFiDirectTransportError, .invalidPayload)
+        }
+        XCTAssertTrue(backend.sentPayloads.isEmpty)
+    }
+
+    func testSendRejectsOversizedPayloadBeforeBackendSend() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let oversized = Data(repeating: 0x41, count: TransportConfig.messageRouterInboundWiFiPayloadMaxBytes + 1)
+
+        XCTAssertThrowsError(try transport.send(oversized, to: "peer-a")) { error in
+            XCTAssertEqual(error as? WiFiDirectTransportError, .invalidPayload)
+        }
+        XCTAssertTrue(backend.sentPayloads.isEmpty)
+    }
+
     func testDelegateReceivesPeerAndMessageEvents() {
         let backend = MockBackend(localPeerID: "self")
         let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
