@@ -65,4 +65,30 @@ final class ChatViewModelUnreadCleanupTests: XCTestCase {
 
         XCTAssertTrue(ChatViewModel.hasPrivateMessages(in: chats, for: "NOSTR_ABCDEF0123456789"))
     }
+
+    func testPrivateChatThreadKeysIncludeResolvedNoiseKeyThreads() {
+        let fullNoiseID = String(repeating: "ab", count: 32)
+        let shortID = PeerID(str: fullNoiseID).toShort().bare
+        let chats = [fullNoiseID: [sampleMessage(senderPeerID: fullNoiseID)]]
+
+        let keys = ChatViewModel.privateChatThreadKeys(
+            in: chats,
+            for: shortID,
+            resolvedNoiseKeyHex: fullNoiseID
+        )
+
+        XCTAssertTrue(keys.contains(fullNoiseID))
+    }
+
+    func testPrivateChatThreadKeysKeepGeoPrefixIsolated() {
+        let chats = ["abcdef0123456789": [sampleMessage(senderPeerID: "abcdef0123456789")]]
+
+        let keys = ChatViewModel.privateChatThreadKeys(
+            in: chats,
+            for: "nostr_abcdef0123456789",
+            resolvedNoiseKeyHex: nil
+        )
+
+        XCTAssertEqual(keys, ["nostr_abcdef0123456789"])
+    }
 }

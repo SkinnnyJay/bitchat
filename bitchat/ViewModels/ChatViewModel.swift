@@ -3260,17 +3260,15 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     @MainActor
     func getPrivateChatMessages(for peerID: String) -> [BitchatMessage] {
         var combined: [BitchatMessage] = []
-
-        // Gather messages under the ephemeral peer ID
-        if let ephemeralMessages = privateChats[peerID] {
-            combined.append(contentsOf: ephemeralMessages)
-        }
-
-        // Also include messages stored under the stable Noise key (Nostr path)
-        if let peer = unifiedPeerService.getPeer(by: peerID) {
-            let noiseKeyHex = peer.noisePublicKey.hexEncodedString()
-            if noiseKeyHex != peerID, let nostrMessages = privateChats[noiseKeyHex] {
-                combined.append(contentsOf: nostrMessages)
+        let resolvedNoiseKeyHex = unifiedPeerService.getPeer(by: peerID)?.noisePublicKey.hexEncodedString()
+        let threadKeys = Self.privateChatThreadKeys(
+            in: privateChats,
+            for: peerID,
+            resolvedNoiseKeyHex: resolvedNoiseKeyHex
+        )
+        for key in threadKeys {
+            if let threadMessages = privateChats[key] {
+                combined.append(contentsOf: threadMessages)
             }
         }
 
@@ -4437,20 +4435,51 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         in privateChats: [String: [BitchatMessage]],
         for peerID: String
     ) -> Bool {
-        let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return false }
-        for key in WiFiPeerIdentity.lookupKeys(for: trimmed) {
+        for key in privateChatThreadKeys(
+            in: privateChats,
+            for: peerID,
+            resolvedNoiseKeyHex: nil
+        ) {
             if let messages = privateChats[key], !messages.isEmpty {
                 return true
             }
         }
+        return false
+    }
+
+    static func privateChatThreadKeys(
+        in privateChats: [String: [BitchatMessage]],
+        for peerID: String,
+        resolvedNoiseKeyHex: String?
+    ) -> [String] {
+        let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        var keys: [String] = []
+        func appendKey(_ key: String) {
+            let candidate = key.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !candidate.isEmpty else { return }
+            if !keys.contains(candidate) {
+                keys.append(candidate)
+            }
+        }
+
+        for key in WiFiPeerIdentity.lookupKeys(for: trimmed) {
+            appendKey(key)
+        }
+
+        if let resolvedNoiseKeyHex {
+            for key in WiFiPeerIdentity.lookupKeys(for: resolvedNoiseKeyHex) {
+                appendKey(key)
+            }
+        }
 
         let normalizedTarget = WiFiPeerIdentity.normalizedKey(trimmed)
-        guard !normalizedTarget.isEmpty else { return false }
-        return privateChats.contains { key, messages in
-            guard !messages.isEmpty else { return false }
-            return WiFiPeerIdentity.normalizedKey(key) == normalizedTarget
+        guard !normalizedTarget.isEmpty else { return keys }
+        for key in privateChats.keys where WiFiPeerIdentity.normalizedKey(key) == normalizedTarget {
+            appendKey(key)
         }
+        return keys
     }
     
     @MainActor
