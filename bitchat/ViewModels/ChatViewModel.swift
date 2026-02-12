@@ -2769,7 +2769,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
             switch envelope.ackType {
             case .delivered:
-                let senderName = envelope.senderNickname
+                let senderName = InputValidator.validateNickname(envelope.senderNickname ?? "")
                     ?? unifiedPeerService.getPeer(by: envelope.senderPeerID)?.nickname
                     ?? resolveNickname(for: envelope.senderPeerID)
                 if let index = messages.firstIndex(where: { $0.id == envelope.messageID }) {
@@ -2782,7 +2782,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     }
                 }
             case .read:
-                let senderName = envelope.senderNickname
+                let senderName = InputValidator.validateNickname(envelope.senderNickname ?? "")
                     ?? unifiedPeerService.getPeer(by: envelope.senderPeerID)?.nickname
                     ?? resolveNickname(for: envelope.senderPeerID)
                 let receipt = ReadReceipt(
