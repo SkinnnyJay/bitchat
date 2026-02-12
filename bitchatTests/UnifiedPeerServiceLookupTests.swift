@@ -292,23 +292,27 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertNil(index[PeerID(str: fullNoiseHex).toShort().bare])
     }
 
-    func testBuildPeerIndexPrefersFirstPeerForEquivalentLookupKey() {
+    func testBuildPeerIndexPrefersHigherPriorityPeerForEquivalentLookupKey() {
         let fullNoiseHex = String(repeating: "ab", count: 32)
         let shortPeer = BitchatPeer(
             peerID: PeerID(str: PeerID(str: fullNoiseHex).toShort().bare),
             noisePublicKey: Data(repeating: 0x66, count: 32),
-            nickname: "preferred"
+            nickname: "preferred",
+            isConnected: false,
+            isReachable: false
         )
         let fullPeer = BitchatPeer(
             peerID: PeerID(str: fullNoiseHex),
             noisePublicKey: Data(hexString: fullNoiseHex) ?? Data(),
-            nickname: "fallback"
+            nickname: "fallback",
+            isConnected: true,
+            isReachable: true
         )
 
         let index = UnifiedPeerService.buildPeerIndex(from: [shortPeer, fullPeer])
         let shortID = PeerID(str: fullNoiseHex).toShort().bare
 
-        XCTAssertEqual(index[shortID], shortPeer)
+        XCTAssertEqual(index[shortID], fullPeer)
     }
 
     func testBuildConnectedPeerLookupKeysIncludesEquivalentVariants() {

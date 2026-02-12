@@ -454,7 +454,8 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
 
     static func buildPeerIndex(from peers: [BitchatPeer]) -> [String: BitchatPeer] {
         var index: [String: BitchatPeer] = [:]
-        for peer in peers {
+        let sortedPeers = peers.sorted(by: shouldSortPeer)
+        for peer in sortedPeers {
             for key in lookupKeys(for: peer.peerID.id) where index[key] == nil {
                 index[key] = peer
             }
