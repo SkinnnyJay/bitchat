@@ -783,6 +783,56 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testFavoriteKeyUpdateMigratesOutboxFromOldToNewPeerIDAndFlushes() {
+        let oldKey = Data(repeating: 0x11, count: 32)
+        let newKey = Data(repeating: 0x22, count: 32)
+        let oldPeer = PeerID(publicKey: oldKey)
+        let newPeer = PeerID(publicKey: newKey)
+
+        let mesh = MockTransport()
+        mesh.setReachable(oldPeer, isReachable: false)
+        mesh.setReachable(newPeer, isReachable: false)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = false
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setCapabilities(["pm", "ack"], for: newPeer.id)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 8),
+            wifiTransport: wifi
+        )
+
+        router.sendPrivate("queued-for-old", to: oldPeer, recipientNickname: "peer", messageID: "mid-old-key")
+        XCTAssertEqual(router.queuedMessageCount(for: oldPeer), 1)
+
+        backend.isAvailable = true
+        backend.setPeers([newPeer.id])
+
+        let expect = expectation(description: "outbox migrated and flushed on key update")
+        NotificationCenter.default.post(
+            name: .favoriteStatusChanged,
+            object: nil,
+            userInfo: [
+                "peerPublicKey": newKey,
+                "oldPeerPublicKey": oldKey,
+                "isKeyUpdate": true
+            ]
+        )
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(router.queuedMessageCount(for: oldPeer), 0)
+        XCTAssertEqual(router.queuedMessageCount(for: newPeer), 0)
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+    }
+
+    @MainActor
     func testPrunesExpiredOutboxMessagesBeforeFlush() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()

@@ -80,6 +80,10 @@ final class MessageRouter {
             if let newKey = note.userInfo?["peerPublicKey"] as? Data,
                let _ = note.userInfo?["isKeyUpdate"] as? Bool {
                 let peerID = PeerID(publicKey: newKey)
+                if let oldKey = note.userInfo?["oldPeerPublicKey"] as? Data {
+                    let oldPeerID = PeerID(publicKey: oldKey)
+                    self.migrateOutbox(from: oldPeerID, to: peerID)
+                }
                 handledSpecificPeer = true
                 Task { @MainActor in
                     self.flushOutbox(for: peerID)
@@ -465,6 +469,26 @@ final class MessageRouter {
             return PeerID(str: peerID.bare)
         }
         return peerID
+    }
+
+    private func migrateOutbox(from oldPeerID: PeerID, to newPeerID: PeerID) {
+        let oldKey = normalizedOutboxPeerID(for: oldPeerID)
+        let newKey = normalizedOutboxPeerID(for: newPeerID)
+        guard oldKey != newKey else { return }
+        guard let oldQueued = outbox[oldKey], !oldQueued.isEmpty else { return }
+
+        var merged = outbox[newKey] ?? []
+        var existingIDs = Set(merged.map(\.messageID))
+        for message in oldQueued where !existingIDs.contains(message.messageID) {
+            merged.append(message)
+            existingIDs.insert(message.messageID)
+        }
+        outbox[newKey] = merged
+        outbox.removeValue(forKey: oldKey)
+        SecureLogger.debug(
+            "Migrated \(oldQueued.count) queued PM(s) \(oldKey.id.prefix(8))… -> \(newKey.id.prefix(8))…",
+            category: .session
+        )
     }
 
     private func shouldAcceptInboundWiFiEnvelope(dedupKey: String) -> Bool {
