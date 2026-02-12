@@ -179,6 +179,17 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertTrue(backend.sentPayloads.isEmpty)
     }
 
+    func testSendRejectsInvalidFormattedPeerIDBeforeBackendSend() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let invalidPeerID = "invalid peer id"
+
+        XCTAssertThrowsError(try transport.send(Data("hello".utf8), to: invalidPeerID)) { error in
+            XCTAssertEqual(error as? WiFiDirectTransportError, .peerNotFound)
+        }
+        XCTAssertTrue(backend.sentPayloads.isEmpty)
+    }
+
     func testSendTrimsPeerIDBeforeBackendSend() throws {
         let backend = MockBackend(localPeerID: "self")
         let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
@@ -276,6 +287,22 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertEqual(delegate.peerUpdates.last, ["peer-a"])
     }
 
+    func testPeerUpdatesDropInvalidFormattedPeerIDs() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let delegate = MockDelegate()
+        transport.delegate = delegate
+
+        let expect = expectation(description: "invalid formatted peers dropped from update")
+        backend.simulatePeerUpdate(["peer-a", "invalid peer id"])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(delegate.peerUpdates.last, ["peer-a"])
+    }
+
     func testPeerUpdatesAreCappedToConfiguredMaximum() {
         let backend = MockBackend(localPeerID: "self")
         let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
@@ -321,6 +348,23 @@ final class WiFiDirectTransportTests: XCTestCase {
 
         let expect = expectation(description: "oversized receive peer IDs dropped")
         backend.simulateReceive(Data("ping".utf8), from: oversizedPeerID)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertTrue(delegate.receives.isEmpty)
+    }
+
+    func testReceiveDropsInvalidFormattedPeerIDs() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let delegate = MockDelegate()
+        transport.delegate = delegate
+        transport.startDiscovery()
+
+        let expect = expectation(description: "invalid formatted receive peer IDs dropped")
+        backend.simulateReceive(Data("ping".utf8), from: "invalid peer id")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             expect.fulfill()
         }
@@ -390,11 +434,13 @@ final class WiFiDirectTransportTests: XCTestCase {
         let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
         transport.startDiscovery()
         let oversizedPeerID = String(repeating: "p", count: TransportConfig.wifiDirectPeerIDMaxBytes + 1)
+        let invalidPeerID = "invalid peer id"
 
         XCTAssertEqual(transport.peerCapabilities(peerID: "peer-a"), ["pm", "ack"])
         XCTAssertEqual(transport.peerCapabilities(peerID: "  peer-a  "), ["pm", "ack"])
         XCTAssertNil(transport.peerCapabilities(peerID: "   "))
         XCTAssertNil(transport.peerCapabilities(peerID: oversizedPeerID))
+        XCTAssertNil(transport.peerCapabilities(peerID: invalidPeerID))
         XCTAssertNil(transport.peerCapabilities(peerID: "missing"))
     }
 

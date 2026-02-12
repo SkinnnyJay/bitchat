@@ -81,6 +81,9 @@ final class WiFiDirectTransport: NSObject {
             guard trimmed.utf8.count <= maxPeerIDBytes else {
                 throw WiFiDirectTransportError.peerNotFound
             }
+            guard PeerID(str: trimmed).isValid else {
+                throw WiFiDirectTransportError.peerNotFound
+            }
             normalizedPeerID = trimmed
         } else {
             normalizedPeerID = nil
@@ -93,6 +96,7 @@ final class WiFiDirectTransport: NSObject {
         let normalizedPeerID = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedPeerID.isEmpty else { return nil }
         guard normalizedPeerID.utf8.count <= maxPeerIDBytes else { return nil }
+        guard PeerID(str: normalizedPeerID).isValid else { return nil }
         return impl.capabilities(for: normalizedPeerID)
     }
 
@@ -109,6 +113,7 @@ final class WiFiDirectTransport: NSObject {
             let normalizedPeerID = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !normalizedPeerID.isEmpty else { return }
             guard normalizedPeerID.utf8.count <= self.maxPeerIDBytes else { return }
+            guard PeerID(str: normalizedPeerID).isValid else { return }
             self.delegate?.wifiTransportDidReceive(data, from: normalizedPeerID)
         }
     }
@@ -118,7 +123,11 @@ final class WiFiDirectTransport: NSObject {
             guard let self else { return }
             let normalized = peers
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty && $0.utf8.count <= self.maxPeerIDBytes }
+                .filter {
+                    !$0.isEmpty &&
+                    $0.utf8.count <= self.maxPeerIDBytes &&
+                    PeerID(str: $0).isValid
+                }
             let uniqueSorted = Array(Set(normalized)).sorted()
             let capped = Array(uniqueSorted.prefix(self.maxTrackedPeers))
             if !self.isDiscovering && !uniqueSorted.isEmpty {
