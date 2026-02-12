@@ -1280,7 +1280,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                         nickname = messages.first { $0.senderPeerID == peerID }?.sender
                     }
                     
-                    let finalNickname = nickname ?? "Unknown"
+                    let finalNickname = Self.favoriteNicknameForPersistence(
+                        preferredNickname: nickname,
+                        fallbackNickname: "Unknown"
+                    )
                     let nostrKey = currentStatus?.peerNostrPublicKey ?? NostrIdentityBridge.getNostrPublicKey(for: noisePublicKey)
                     
                     FavoritesPersistenceService.shared.addFavorite(
@@ -1340,6 +1343,20 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     static func validatedNoisePublicKey(_ value: Data?) -> Data? {
         guard let value, value.count == 32 else { return nil }
         return value
+    }
+
+    static func favoriteNicknameForPersistence(
+        preferredNickname: String?,
+        fallbackNickname: String = "user"
+    ) -> String {
+        if let preferredNickname,
+           let sanitizedPreferred = InputValidator.validateNickname(preferredNickname) {
+            return sanitizedPreferred
+        }
+        if let sanitizedFallback = InputValidator.validateNickname(fallbackNickname) {
+            return sanitizedFallback
+        }
+        return "user"
     }
 
     static func resolvedFavoriteNotificationPeerID(from peerID: String, resolvedPeer: BitchatPeer?) -> PeerID? {

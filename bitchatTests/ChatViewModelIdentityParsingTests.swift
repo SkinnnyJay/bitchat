@@ -105,4 +105,34 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
 
         XCTAssertEqual(resolved, expected)
     }
+
+    func testFavoriteNicknameForPersistencePrefersSanitizedNickname() {
+        XCTAssertEqual(
+            ChatViewModel.favoriteNicknameForPersistence(
+                preferredNickname: "alice",
+                fallbackNickname: "fallback"
+            ),
+            "alice"
+        )
+    }
+
+    func testFavoriteNicknameForPersistenceFallsBackWhenPreferredInvalid() {
+        XCTAssertEqual(
+            ChatViewModel.favoriteNicknameForPersistence(
+                preferredNickname: "   ",
+                fallbackNickname: "fallback"
+            ),
+            "fallback"
+        )
+    }
+
+    func testFavoriteNicknameForPersistenceDefaultsToUserWhenBothInvalid() {
+        XCTAssertEqual(
+            ChatViewModel.favoriteNicknameForPersistence(
+                preferredNickname: "   ",
+                fallbackNickname: "   "
+            ),
+            "user"
+        )
+    }
 }
