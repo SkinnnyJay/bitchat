@@ -152,6 +152,19 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertEqual(index[shortID], peer)
     }
 
+    func testBuildPeerIndexKeepsGeoPrefixIsolation() {
+        let peer = BitchatPeer(
+            peerID: PeerID(str: "nostr_abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x77, count: 32),
+            nickname: "geo"
+        )
+
+        let index = UnifiedPeerService.buildPeerIndex(from: [peer])
+
+        XCTAssertEqual(index["nostr_abcdef0123456789"], peer)
+        XCTAssertNil(index["abcdef0123456789"])
+    }
+
     func testBuildPeerIndexPrefersFirstPeerForEquivalentLookupKey() {
         let fullNoiseHex = String(repeating: "ab", count: 32)
         let shortPeer = BitchatPeer(
