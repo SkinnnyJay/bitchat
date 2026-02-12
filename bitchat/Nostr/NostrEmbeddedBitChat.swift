@@ -6,9 +6,9 @@ struct NostrEmbeddedBitChat {
     /// Build a `bitchat1:` base64url-encoded BitChat packet carrying a private message for Nostr DMs.
     static func encodePMForNostr(content: String, messageID: String, recipientPeerID: String, senderPeerID: String) -> String? {
         guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return nil }
-        guard PeerID(str: recipientPeerID).isValid else { return nil }
-        guard PeerID(str: senderPeerID).isValid else { return nil }
-        guard let senderData = Data(hexString: senderPeerID) else { return nil }
+        guard let recipientIDHex = normalizeRoutingPeerIDHex(recipientPeerID) else { return nil }
+        guard let senderIDHex = normalizeRoutingPeerIDHex(senderPeerID) else { return nil }
+        guard let senderData = Data(hexString: senderIDHex), senderData.count == 8 else { return nil }
         // TLV-encode the private message
         let pm = PrivateMessagePacket(messageID: safeMessageID, content: content)
         guard let tlv = pm.encode() else { return nil }
@@ -17,8 +17,6 @@ struct NostrEmbeddedBitChat {
         var payload = Data([NoisePayloadType.privateMessage.rawValue])
         payload.append(tlv)
 
-        // Determine 8-byte recipient ID to embed
-        let recipientIDHex: String = normalizeRecipientPeerID(recipientPeerID)
         guard let recipientData = Data(hexString: recipientIDHex), recipientData.count == 8 else { return nil }
 
         let packet = BitchatPacket(
@@ -39,14 +37,13 @@ struct NostrEmbeddedBitChat {
     static func encodeAckForNostr(type: NoisePayloadType, messageID: String, recipientPeerID: String, senderPeerID: String) -> String? {
         guard type == .delivered || type == .readReceipt else { return nil }
         guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return nil }
-        guard PeerID(str: recipientPeerID).isValid else { return nil }
-        guard PeerID(str: senderPeerID).isValid else { return nil }
-        guard let senderData = Data(hexString: senderPeerID) else { return nil }
+        guard let recipientIDHex = normalizeRoutingPeerIDHex(recipientPeerID) else { return nil }
+        guard let senderIDHex = normalizeRoutingPeerIDHex(senderPeerID) else { return nil }
+        guard let senderData = Data(hexString: senderIDHex), senderData.count == 8 else { return nil }
 
         var payload = Data([type.rawValue])
         payload.append(Data(safeMessageID.utf8))
 
-        let recipientIDHex: String = normalizeRecipientPeerID(recipientPeerID)
         guard let recipientData = Data(hexString: recipientIDHex), recipientData.count == 8 else { return nil }
 
         let packet = BitchatPacket(
@@ -67,8 +64,8 @@ struct NostrEmbeddedBitChat {
     static func encodeAckForNostrNoRecipient(type: NoisePayloadType, messageID: String, senderPeerID: String) -> String? {
         guard type == .delivered || type == .readReceipt else { return nil }
         guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return nil }
-        guard PeerID(str: senderPeerID).isValid else { return nil }
-        guard let senderData = Data(hexString: senderPeerID) else { return nil }
+        guard let senderIDHex = normalizeRoutingPeerIDHex(senderPeerID) else { return nil }
+        guard let senderData = Data(hexString: senderIDHex), senderData.count == 8 else { return nil }
 
         var payload = Data([type.rawValue])
         payload.append(Data(safeMessageID.utf8))
@@ -90,8 +87,8 @@ struct NostrEmbeddedBitChat {
     /// Build a `bitchat1:` payload without an embedded recipient peer ID (used for geohash DMs).
     static func encodePMForNostrNoRecipient(content: String, messageID: String, senderPeerID: String) -> String? {
         guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return nil }
-        guard PeerID(str: senderPeerID).isValid else { return nil }
-        guard let senderData = Data(hexString: senderPeerID) else { return nil }
+        guard let senderIDHex = normalizeRoutingPeerIDHex(senderPeerID) else { return nil }
+        guard let senderData = Data(hexString: senderIDHex), senderData.count == 8 else { return nil }
         let pm = PrivateMessagePacket(messageID: safeMessageID, content: content)
         guard let tlv = pm.encode() else { return nil }
 
@@ -112,18 +109,13 @@ struct NostrEmbeddedBitChat {
         return "bitchat1:" + base64URLEncode(data)
     }
 
-    private static func normalizeRecipientPeerID(_ recipientPeerID: String) -> String {
-        if let maybeData = Data(hexString: recipientPeerID) {
-            if maybeData.count == 32 {
-                // Treat as Noise static public key; derive peerID from fingerprint
-                return PeerID(publicKey: maybeData).id
-            } else if maybeData.count == 8 {
-                // Already an 8-byte peer ID
-                return recipientPeerID
-            }
-        }
-        // Fallback: return as-is (expecting 16 hex chars) – caller should pass a valid peer ID
-        return recipientPeerID
+    private static func normalizeRoutingPeerIDHex(_ rawPeerID: String) -> String? {
+        let trimmed = rawPeerID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let canonical = PeerID(str: trimmed).toShort()
+        guard canonical.isValid else { return nil }
+        guard let data = Data(hexString: canonical.bare), data.count == 8 else { return nil }
+        return canonical.bare
     }
 
     /// Base64url encode without padding
