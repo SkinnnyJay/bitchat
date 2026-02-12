@@ -519,6 +519,12 @@ final class MessageRouter {
     private func migrateOutbox(from oldPeerID: PeerID, to newPeerID: PeerID) {
         let oldKey = normalizedOutboxPeerID(for: oldPeerID)
         let newKey = normalizedOutboxPeerID(for: newPeerID)
+        guard oldKey.isValid, newKey.isValid else {
+            outbox.removeValue(forKey: oldKey)
+            outbox.removeValue(forKey: newKey)
+            SecureLogger.warning("Dropped outbox migration due to invalid peer ID key(s)", category: .session)
+            return
+        }
         guard oldKey != newKey else { return }
         pruneExpiredOutboxMessages(for: oldKey)
         pruneExpiredOutboxMessages(for: newKey)
