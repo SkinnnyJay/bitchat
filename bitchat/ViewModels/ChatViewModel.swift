@@ -2739,11 +2739,12 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
         Task { @MainActor in
             guard self.isWiFiEnvelopeForCurrentPeer(envelope.recipientPeerID) else { return }
+            guard let safeMessageID = InputValidator.validateMessageID(envelope.messageID) else { return }
             let senderPeerID = envelope.senderPeerID
             let senderName = resolveWiFiSenderDisplayName(senderPeerID) ?? resolveNickname(for: senderPeerID)
             let privateMentions = parseMentions(from: envelope.content)
             let msg = BitchatMessage(
-                id: envelope.messageID,
+                id: safeMessageID,
                 sender: senderName,
                 content: envelope.content,
                 timestamp: Date(timeIntervalSince1970: TimeInterval(envelope.createdAtMs) / 1000),
@@ -2755,7 +2756,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 mentions: privateMentions.isEmpty ? nil : privateMentions
             )
             handlePrivateMessage(msg)
-            messageRouter.sendDeliveryAck(envelope.messageID, to: PeerID(str: senderPeerID))
+            messageRouter.sendDeliveryAck(safeMessageID, to: PeerID(str: senderPeerID))
         }
     }
 
@@ -2766,17 +2767,18 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
         Task { @MainActor in
             guard self.isWiFiEnvelopeForCurrentPeer(envelope.recipientPeerID) else { return }
+            guard let safeMessageID = InputValidator.validateMessageID(envelope.messageID) else { return }
 
             switch envelope.ackType {
             case .delivered:
                 let senderName = InputValidator.validateNickname(envelope.senderNickname ?? "")
                     ?? resolveWiFiSenderDisplayName(envelope.senderPeerID)
                     ?? resolveNickname(for: envelope.senderPeerID)
-                if let index = messages.firstIndex(where: { $0.id == envelope.messageID }) {
+                if let index = messages.firstIndex(where: { $0.id == safeMessageID }) {
                     messages[index].deliveryStatus = .delivered(to: senderName, at: Date())
                 }
                 for (peerID, chatMessages) in privateChats {
-                    if let index = chatMessages.firstIndex(where: { $0.id == envelope.messageID }) {
+                    if let index = chatMessages.firstIndex(where: { $0.id == safeMessageID }) {
                         privateChats[peerID]?[index].deliveryStatus = .delivered(to: senderName, at: Date())
                         break
                     }
@@ -2786,7 +2788,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     ?? resolveWiFiSenderDisplayName(envelope.senderPeerID)
                     ?? resolveNickname(for: envelope.senderPeerID)
                 let receipt = ReadReceipt(
-                    originalMessageID: envelope.messageID,
+                    originalMessageID: safeMessageID,
                     readerID: envelope.senderPeerID,
                     readerNickname: senderName
                 )
