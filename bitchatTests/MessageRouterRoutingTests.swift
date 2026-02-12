@@ -469,6 +469,46 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testFavoriteStatusBroadcastFlushesOutboxWhenNoSpecificPeerProvided() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: false)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = true
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setCapabilities(["pm", "ack"], for: recipient.id)
+        backend.setPeers([recipient.id])
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 8),
+            wifiTransport: wifi
+        )
+
+        router.sendPrivate("queued message body", to: recipient, recipientNickname: "peer", messageID: "mid-fav-flush")
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 0)
+
+        // Force queued state by temporarily making WiFi unavailable.
+        backend.isAvailable = false
+        router.sendPrivate("queued message body 2", to: recipient, recipientNickname: "peer", messageID: "mid-fav-flush-2")
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 1)
+
+        backend.isAvailable = true
+        let expect = expectation(description: "favorite status change triggers flushAll")
+        NotificationCenter.default.post(name: .favoriteStatusChanged, object: nil, userInfo: nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 0)
+        XCTAssertEqual(backend.sentPayloads.count, 2)
+    }
+
+    @MainActor
     func testRoutesReadReceiptViaWiFiWhenPeerIsAvailable() throws {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()

@@ -45,8 +45,10 @@ final class MessageRouter {
             queue: .main
         ) { [weak self] note in
             guard let self = self else { return }
+            var handledSpecificPeer = false
             if let data = note.userInfo?["peerPublicKey"] as? Data {
                 let peerID = PeerID(publicKey: data)
+                handledSpecificPeer = true
                 Task { @MainActor in
                     self.flushOutbox(for: peerID)
                 }
@@ -55,8 +57,14 @@ final class MessageRouter {
             if let newKey = note.userInfo?["peerPublicKey"] as? Data,
                let _ = note.userInfo?["isKeyUpdate"] as? Bool {
                 let peerID = PeerID(publicKey: newKey)
+                handledSpecificPeer = true
                 Task { @MainActor in
                     self.flushOutbox(for: peerID)
+                }
+            }
+            if !handledSpecificPeer {
+                Task { @MainActor in
+                    self.flushAllOutbox()
                 }
             }
         }
