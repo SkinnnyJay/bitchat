@@ -34,12 +34,14 @@ final class WiFiDirectTransport: NSObject {
     private(set) var isDiscovering = false
     private let impl: WiFiDirectTransportBackend
     private let maxTrackedPeers: Int
+    private let maxPeerIDBytes: Int
     private let maxInboundPayloadBytes: Int
     private var lastPublishedAvailability: Bool?
 
     init(localPeerID: String? = nil, backend: WiFiDirectTransportBackend? = nil) {
         impl = backend ?? WiFiDirectTransportBackendImpl(localPeerID: localPeerID)
         maxTrackedPeers = max(1, TransportConfig.wifiDirectMaxTrackedPeers)
+        maxPeerIDBytes = max(1, TransportConfig.wifiDirectPeerIDMaxBytes)
         maxInboundPayloadBytes = TransportConfig.messageRouterInboundWiFiPayloadMaxBytes
         super.init()
         impl.owner = self
@@ -76,6 +78,9 @@ final class WiFiDirectTransport: NSObject {
             guard !trimmed.isEmpty else {
                 throw WiFiDirectTransportError.peerNotFound
             }
+            guard trimmed.utf8.count <= maxPeerIDBytes else {
+                throw WiFiDirectTransportError.peerNotFound
+            }
             normalizedPeerID = trimmed
         } else {
             normalizedPeerID = nil
@@ -87,6 +92,7 @@ final class WiFiDirectTransport: NSObject {
         guard isDiscovering else { return nil }
         let normalizedPeerID = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedPeerID.isEmpty else { return nil }
+        guard normalizedPeerID.utf8.count <= maxPeerIDBytes else { return nil }
         return impl.capabilities(for: normalizedPeerID) ?? impl.capabilities(for: peerID)
     }
 
@@ -102,6 +108,7 @@ final class WiFiDirectTransport: NSObject {
             guard data.count <= self.maxInboundPayloadBytes else { return }
             let normalizedPeerID = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !normalizedPeerID.isEmpty else { return }
+            guard normalizedPeerID.utf8.count <= self.maxPeerIDBytes else { return }
             self.delegate?.wifiTransportDidReceive(data, from: normalizedPeerID)
         }
     }
@@ -111,7 +118,7 @@ final class WiFiDirectTransport: NSObject {
             guard let self else { return }
             let normalized = peers
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
+                .filter { !$0.isEmpty && $0.utf8.count <= self.maxPeerIDBytes }
             let uniqueSorted = Array(Set(normalized)).sorted()
             let capped = Array(uniqueSorted.prefix(self.maxTrackedPeers))
             if !self.isDiscovering && !uniqueSorted.isEmpty {
