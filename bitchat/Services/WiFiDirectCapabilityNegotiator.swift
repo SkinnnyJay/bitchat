@@ -22,7 +22,7 @@ struct WiFiDirectCapabilityNegotiator {
         requiredCapabilities: Set<String> = WiFiDirectCapabilityNegotiator.requiredCapabilities,
         defaultCapabilities: Set<String> = WiFiDirectCapabilityNegotiator.defaultCapabilities
     ) {
-        self.protocolVersion = protocolVersion
+        self.protocolVersion = max(1, protocolVersion)
         self.requiredCapabilitiesSet = requiredCapabilities
         self.defaultCapabilitiesSet = defaultCapabilities
     }

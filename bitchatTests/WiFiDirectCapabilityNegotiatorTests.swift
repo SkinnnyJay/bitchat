@@ -114,6 +114,13 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
         XCTAssertEqual(info["caps"], "pm,relay")
     }
 
+    func testConfiguredProtocolVersionIsClampedToPositive() {
+        let negotiator = WiFiDirectCapabilityNegotiator(protocolVersion: 0)
+        let info = negotiator.discoveryInfo()
+
+        XCTAssertEqual(info["v"], "1")
+    }
+
     func testParseDiscoveryInfoIgnoresUnknownFields() throws {
         let negotiator = WiFiDirectCapabilityNegotiator()
         let raw: [String: Any] = ["v": 1, "caps": "pm,ack", "junk": "value"]
