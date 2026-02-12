@@ -12,6 +12,25 @@ struct WiFiDirectCapabilityNegotiator {
         ]
     }
 
+    func invitationContextData() -> Data? {
+        try? JSONSerialization.data(withJSONObject: discoveryInfo(), options: [])
+    }
+
+    func parseDiscoveryInfo(from context: Data?) -> [String: String]? {
+        guard let context, !context.isEmpty else { return nil }
+        guard let rawObject = try? JSONSerialization.jsonObject(with: context, options: []),
+              let dictionary = rawObject as? [String: Any] else {
+            return nil
+        }
+        var parsed: [String: String] = [:]
+        for (key, value) in dictionary {
+            if let stringValue = value as? String {
+                parsed[key] = stringValue
+            }
+        }
+        return parsed.isEmpty ? nil : parsed
+    }
+
     func isPeerCompatible(discoveryInfo: [String: String]?) -> Bool {
         guard let discoveryInfo else {
             // Backward compatibility: peers without metadata are treated as legacy-compatible.

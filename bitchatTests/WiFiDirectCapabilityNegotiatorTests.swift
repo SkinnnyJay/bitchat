@@ -40,4 +40,26 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
         let parsed = WiFiDirectCapabilityNegotiator.parseCapabilities(" PM,ack,pm , ACK ")
         XCTAssertEqual(parsed, ["pm", "ack"])
     }
+
+    func testInvitationContextRoundTripsDiscoveryInfo() throws {
+        let negotiator = WiFiDirectCapabilityNegotiator()
+        let context = negotiator.invitationContextData()
+        let parsed = negotiator.parseDiscoveryInfo(from: context)
+
+        XCTAssertEqual(parsed?["v"], "1")
+        XCTAssertEqual(parsed?["caps"], "ack,pm")
+    }
+
+    func testParseDiscoveryInfoReturnsNilForMalformedContext() {
+        let negotiator = WiFiDirectCapabilityNegotiator()
+        let malformed = Data("not-json".utf8)
+        XCTAssertNil(negotiator.parseDiscoveryInfo(from: malformed))
+    }
+
+    func testIsPeerCompatibleWithInvitationContext() {
+        let negotiator = WiFiDirectCapabilityNegotiator()
+        let context = negotiator.invitationContextData()
+        let parsed = negotiator.parseDiscoveryInfo(from: context)
+        XCTAssertTrue(negotiator.isPeerCompatible(discoveryInfo: parsed))
+    }
 }

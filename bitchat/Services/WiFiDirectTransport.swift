@@ -237,6 +237,11 @@ extension MPCWiFiDirectTransportImplementation: MCNearbyServiceAdvertiserDelegat
         withContext context: Data?,
         invitationHandler: @escaping (Bool, MCSession?) -> Void
     ) {
+        let discoveryInfoFromContext = capabilityNegotiator.parseDiscoveryInfo(from: context)
+        guard capabilityNegotiator.isPeerCompatible(discoveryInfo: discoveryInfoFromContext) else {
+            invitationHandler(false, nil)
+            return
+        }
         invitationHandler(true, session)
     }
 }
@@ -256,7 +261,7 @@ extension MPCWiFiDirectTransportImplementation: MCNearbyServiceBrowserDelegate {
             return
         }
 
-        browser.invitePeer(peerID, to: session, withContext: nil, timeout: 10)
+        browser.invitePeer(peerID, to: session, withContext: capabilityNegotiator.invitationContextData(), timeout: 10)
 
         let currentBackoff = inviteBackoffByPeerID[peerKey] ?? initialInviteBackoffSeconds
         let nextBackoff = min(currentBackoff * 2, maxInviteBackoffSeconds)
