@@ -244,4 +244,25 @@ final class HybridTransportManagerTests: XCTestCase {
         XCTAssertEqual(delegate.receivedEnvelopes.count, 1)
         XCTAssertEqual(delegate.receivedEnvelopes[0].messageID, "mid-dup")
     }
+
+    @MainActor
+    func testRejectsInboundPrivateEnvelopeWhenPayloadExceedsMaxBytes() {
+        let mesh = MockTransport()
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let manager = HybridTransportManager(meshTransport: mesh, wifiTransport: wifi)
+        let delegate = MockDelegate()
+        manager.delegate = delegate
+
+        let oversizedPayload = Data(repeating: 0x41, count: TransportConfig.messageRouterInboundWiFiPayloadMaxBytes + 1)
+        backend.simulateIncoming(oversizedPayload, from: "peer-oversized")
+
+        let expect = expectation(description: "oversized envelope should be ignored")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertTrue(delegate.receivedEnvelopes.isEmpty)
+    }
 }

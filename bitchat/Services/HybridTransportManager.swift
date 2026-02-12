@@ -103,6 +103,7 @@ final class HybridTransportManager {
     private let inboundTimestampFutureSkewSeconds: TimeInterval
     private let inboundDedupMaxCount: Int
     private let inboundDedupMaxAgeSeconds: TimeInterval
+    private let inboundPayloadMaxBytes: Int
     private let nowProvider: () -> Date
     private var inboundDedupByKey: [String: Date] = [:]
     private var inboundDedupOrder: [String] = []
@@ -122,6 +123,7 @@ final class HybridTransportManager {
         self.inboundTimestampFutureSkewSeconds = TransportConfig.messageRouterInboundWiFiTimestampFutureSkewSeconds
         self.inboundDedupMaxCount = TransportConfig.messageRouterInboundWiFiDedupMaxCount
         self.inboundDedupMaxAgeSeconds = TransportConfig.messageRouterInboundWiFiDedupMaxAgeSeconds
+        self.inboundPayloadMaxBytes = TransportConfig.messageRouterInboundWiFiPayloadMaxBytes
         self.nowProvider = nowProvider
         self.wifiTransport.delegate = self
     }
@@ -268,6 +270,7 @@ extension HybridTransportManager: WiFiDirectTransportDelegate {
     nonisolated func wifiTransportDidReceive(_ data: Data, from peerID: String) {
         Task { @MainActor [weak self] in
             guard let self else { return }
+            guard data.count <= self.inboundPayloadMaxBytes else { return }
             guard let envelope = try? JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: data),
                   envelope.messageType == "private",
                   envelope.version == WiFiDirectEnvelopeVersion.current,
