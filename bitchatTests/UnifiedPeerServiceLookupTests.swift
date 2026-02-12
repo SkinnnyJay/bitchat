@@ -67,6 +67,26 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertFalse(UnifiedPeerService.shouldSortPeer(second, first))
     }
 
+    func testShouldSortPeerComparesDisplayNamesCaseInsensitively() {
+        let alpha = BitchatPeer(
+            peerID: PeerID(str: "aaaaaaaaaaaaaaaa"),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "Alice",
+            isConnected: false,
+            isReachable: false
+        )
+        let beta = BitchatPeer(
+            peerID: PeerID(str: "bbbbbbbbbbbbbbbb"),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "bob",
+            isConnected: false,
+            isReachable: false
+        )
+
+        XCTAssertTrue(UnifiedPeerService.shouldSortPeer(alpha, beta))
+        XCTAssertFalse(UnifiedPeerService.shouldSortPeer(beta, alpha))
+    }
+
     func testResolvePeerMatchesShortQueryAgainstFullNoiseIndexedPeer() {
         let fullNoiseHex = String(repeating: "ab", count: 32)
         let shortID = PeerID(str: fullNoiseHex).toShort().bare
