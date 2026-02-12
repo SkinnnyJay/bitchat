@@ -68,13 +68,9 @@ final class MessageRouter {
             queue: .main
         ) { [weak self] note in
             guard let self = self else { return }
-            var handledSpecificPeer = false
+            var peersToFlush = Set<PeerID>()
             if let data = note.userInfo?["peerPublicKey"] as? Data {
-                let peerID = PeerID(publicKey: data)
-                handledSpecificPeer = true
-                Task { @MainActor in
-                    self.flushOutbox(for: peerID)
-                }
+                peersToFlush.insert(PeerID(publicKey: data))
             }
             // Handle key updates
             if let newKey = note.userInfo?["peerPublicKey"] as? Data,
@@ -84,14 +80,18 @@ final class MessageRouter {
                     let oldPeerID = PeerID(publicKey: oldKey)
                     self.migrateOutbox(from: oldPeerID, to: peerID)
                 }
-                handledSpecificPeer = true
-                Task { @MainActor in
-                    self.flushOutbox(for: peerID)
-                }
+                peersToFlush.insert(peerID)
             }
-            if !handledSpecificPeer {
+            if peersToFlush.isEmpty {
                 Task { @MainActor in
                     self.flushAllOutbox()
+                }
+                return
+            }
+
+            Task { @MainActor in
+                for peerID in peersToFlush {
+                    self.flushOutbox(for: peerID)
                 }
             }
         }
