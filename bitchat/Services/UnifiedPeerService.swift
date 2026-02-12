@@ -254,9 +254,10 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
 
         let normalizedTarget = WiFiPeerIdentity.normalizedKey(peerID)
         guard !normalizedTarget.isEmpty else { return nil }
-        return peerIndex.values.first {
+        let matches = peerIndex.values.filter {
             WiFiPeerIdentity.normalizedKey($0.peerID.id) == normalizedTarget
         }
+        return matches.min { $0.peerID.id < $1.peerID.id }
     }
 
     static func resolveCachedFingerprint(from cache: [String: String], peerID: String) -> String? {
@@ -268,10 +269,13 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         }
         let normalizedTarget = WiFiPeerIdentity.normalizedKey(peerID)
         guard !normalizedTarget.isEmpty else { return nil }
-        return cache.first { key, value in
-            guard canonicalFingerprint(value) != nil else { return false }
-            WiFiPeerIdentity.normalizedKey(key) == normalizedTarget
-        }.flatMap { canonicalFingerprint($0.value) }
+        let matches = cache
+            .filter { key, value in
+                guard canonicalFingerprint(value) != nil else { return false }
+                return WiFiPeerIdentity.normalizedKey(key) == normalizedTarget
+            }
+            .sorted { $0.key < $1.key }
+        return matches.first.flatMap { canonicalFingerprint($0.value) }
     }
 
     static func shouldSortPeer(_ lhs: BitchatPeer, _ rhs: BitchatPeer) -> Bool {

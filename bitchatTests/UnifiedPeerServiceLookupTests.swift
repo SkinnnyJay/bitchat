@@ -105,6 +105,27 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertEqual(resolved, peer)
     }
 
+    func testResolvePeerFallbackIsDeterministicAcrossEquivalentMatches() {
+        let first = BitchatPeer(
+            peerID: PeerID(str: "aaaaaaaaaaaaaaaa"),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "first"
+        )
+        let second = BitchatPeer(
+            peerID: PeerID(str: "mesh:aaaaaaaaaaaaaaaa"),
+            noisePublicKey: Data(repeating: 0x22, count: 32),
+            nickname: "second"
+        )
+        let index = [
+            "key-first": first,
+            "key-second": second
+        ]
+
+        let resolved = UnifiedPeerService.resolvePeer(from: index, peerID: "name:aaaaaaaaaaaaaaaa")
+
+        XCTAssertEqual(resolved?.peerID.id, "aaaaaaaaaaaaaaaa")
+    }
+
     func testResolveCachedFingerprintMatchesEquivalentIdentifierVariants() {
         let fingerprint = String(repeating: "a1", count: 32)
         let cache = ["abcdef0123456789": fingerprint]
@@ -140,6 +161,22 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         )
 
         XCTAssertEqual(resolved, fingerprint)
+    }
+
+    func testResolveCachedFingerprintFallbackUsesDeterministicKeyOrdering() {
+        let first = String(repeating: "c3", count: 32)
+        let second = String(repeating: "d4", count: 32)
+        let cache = [
+            "mesh:abcdef0123456789": second,
+            "abcdef0123456789": first
+        ]
+
+        let resolved = UnifiedPeerService.resolveCachedFingerprint(
+            from: cache,
+            peerID: "name:abcdef0123456789"
+        )
+
+        XCTAssertEqual(resolved, first)
     }
 
     func testResolveCachedFingerprintMatchesShortQueryAgainstFullNoiseCacheKey() {
