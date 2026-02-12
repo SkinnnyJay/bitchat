@@ -442,7 +442,11 @@ extension BitchatMessage {
 extension Array where Element == BitchatMessage {
     /// Filters out empty ones and deduplicate by ID while preserving order (from oldest to newest)
     func cleanedAndDeduped() -> [Element] {
-        let arr = filter { $0.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false }
+        let arr = filter {
+            guard $0.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else { return false }
+            guard InputValidator.validateMessageID($0.id) != nil else { return false }
+            return $0.content.utf8.count <= InputValidator.Limits.maxMessageLength
+        }
         guard arr.count > 1 else {
             return arr
         }

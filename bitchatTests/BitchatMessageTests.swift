@@ -207,4 +207,35 @@ final class BitchatMessageTests: XCTestCase {
 
         XCTAssertThrowsError(try JSONEncoder().encode(message))
     }
+
+    func testCleanedAndDedupedDropsEmptyAndOversizedMessages() {
+        let now = Date()
+        let oversizedContent = String(repeating: "x", count: InputValidator.Limits.maxMessageLength + 1)
+        let valid = BitchatMessage(
+            id: "mid-valid-cleanup",
+            sender: "alice",
+            content: "hello",
+            timestamp: now,
+            isRelay: false
+        )
+        let emptyContent = BitchatMessage(
+            id: "mid-empty-cleanup",
+            sender: "bob",
+            content: "   ",
+            timestamp: now.addingTimeInterval(1),
+            isRelay: false
+        )
+        let oversized = BitchatMessage(
+            id: "mid-oversized-cleanup",
+            sender: "carol",
+            content: oversizedContent,
+            timestamp: now.addingTimeInterval(2),
+            isRelay: false
+        )
+
+        let cleaned = [valid, emptyContent, oversized].cleanedAndDeduped()
+
+        XCTAssertEqual(cleaned.count, 1)
+        XCTAssertEqual(cleaned.first?.id, "mid-valid-cleanup")
+    }
 }
