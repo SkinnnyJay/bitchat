@@ -249,6 +249,22 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertTrue(delegate.receives.isEmpty)
     }
 
+    func testReceiveIgnoredWhenNotDiscovering() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let delegate = MockDelegate()
+        transport.delegate = delegate
+
+        let expect = expectation(description: "receive ignored while not discovering")
+        backend.simulateReceive(Data("ping".utf8), from: "peer-a")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertTrue(delegate.receives.isEmpty)
+    }
+
     func testSendWithoutPeersThrows() {
         let transport = WiFiDirectTransport()
         XCTAssertThrowsError(try transport.send(Data("hello".utf8)))
