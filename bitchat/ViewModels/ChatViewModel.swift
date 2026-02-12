@@ -5000,7 +5000,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         var validMessageIDs = Set<String>()
         for (_, messages) in privateChats {
             for message in messages {
-                validMessageIDs.insert(message.id)
+                if let safeMessageID = InputValidator.validateMessageID(message.id) {
+                    validMessageIDs.insert(safeMessageID)
+                }
             }
         }
         
