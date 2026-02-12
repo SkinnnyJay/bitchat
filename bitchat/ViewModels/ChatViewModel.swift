@@ -863,6 +863,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     // MARK: - Deinitialization
     
     deinit {
+        NotificationCenter.default.removeObserver(self)
         // No need to force UserDefaults synchronization
     }
 
