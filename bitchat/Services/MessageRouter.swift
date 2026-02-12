@@ -259,7 +259,7 @@ final class MessageRouter {
                 continue
             }
             let content = message.content
-            let nickname = message.recipientNickname
+            let nickname = InputValidator.validateNickname(message.recipientNickname) ?? "user"
             let messageID = message.messageID
             guard let safeMessageID = InputValidator.validateMessageID(messageID) else {
                 SecureLogger.warning(
