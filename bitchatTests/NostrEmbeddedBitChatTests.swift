@@ -58,4 +58,35 @@ final class NostrEmbeddedBitChatTests: XCTestCase {
 
         XCTAssertNil(result)
     }
+
+    func testEncodeAckForNostrNoRecipientRejectsInvalidMessageID() {
+        let result = NostrEmbeddedBitChat.encodeAckForNostrNoRecipient(
+            type: .delivered,
+            messageID: "mid with-space",
+            senderPeerID: "0123456789abcdef"
+        )
+
+        XCTAssertNil(result)
+    }
+
+    func testEncodePMForNostrNoRecipientRejectsInvalidSenderPeerID() {
+        let result = NostrEmbeddedBitChat.encodePMForNostrNoRecipient(
+            content: "hello",
+            messageID: "mid-norecipient",
+            senderPeerID: "peerabc000000000"
+        )
+
+        XCTAssertNil(result)
+    }
+
+    func testEncodePMForNostrNoRecipientReturnsPrefixedPayloadForValidInput() {
+        let result = NostrEmbeddedBitChat.encodePMForNostrNoRecipient(
+            content: "hello",
+            messageID: "mid-norecipient",
+            senderPeerID: "0123456789abcdef"
+        )
+
+        XCTAssertNotNil(result)
+        XCTAssertTrue(result?.hasPrefix("bitchat1:") == true)
+    }
 }
