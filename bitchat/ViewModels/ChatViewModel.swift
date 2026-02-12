@@ -1250,11 +1250,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     @MainActor
     func toggleFavorite(peerID: String) {
-        // Distinguish between ephemeral peer IDs (16 hex chars) and Noise public keys (64 hex chars)
-        // Ephemeral peer IDs are 8 bytes = 16 hex characters
-        // Noise public keys are 32 bytes = 64 hex characters
-        
-        if peerID.count == 64, let noisePublicKey = Data(hexString: peerID) {
+        if let noisePublicKey = Self.decodeNoisePublicKey(from: peerID) {
             // This is a stable Noise key hex (used in private chats)
             // Find the ephemeral peer ID for this Noise key
             let ephemeralPeerID = unifiedPeerService.peers.first { peer in
@@ -1316,8 +1312,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     @MainActor
     func isFavorite(peerID: String) -> Bool {
-        // Distinguish between ephemeral peer IDs (16 hex chars) and Noise public keys (64 hex chars)
-        if peerID.count == 64, let noisePublicKey = Data(hexString: peerID) {
+        if let noisePublicKey = Self.decodeNoisePublicKey(from: peerID) {
             // This is a Noise public key
             if let status = FavoritesPersistenceService.shared.getFavoriteStatus(for: noisePublicKey) {
                 return status.isFavorite
@@ -1330,6 +1325,16 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         return false
+    }
+
+    static func decodeNoisePublicKey(from peerID: String) -> Data? {
+        let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if let noiseKey = PeerID(str: trimmed).noiseKey, noiseKey.count == 32 {
+            return noiseKey
+        }
+        guard let data = Data(hexString: trimmed), data.count == 32 else { return nil }
+        return data
     }
     
     // MARK: - Public Key and Identity Management
