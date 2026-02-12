@@ -595,6 +595,64 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertEqual(cache["peera"], "fp-a2")
     }
 
+    func testFingerprintCacheReferenceIDsIncludePeerAndNoiseAliases() {
+        let fullNoiseHex = String(repeating: "ab", count: 32)
+        let shortPeer = BitchatPeer(
+            peerID: PeerID(str: PeerID(str: fullNoiseHex).toShort().bare),
+            noisePublicKey: Data(hexString: fullNoiseHex) ?? Data(),
+            nickname: "short"
+        )
+        let geoPeer = BitchatPeer(
+            peerID: PeerID(str: "nostr_abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "geo"
+        )
+
+        let references = UnifiedPeerService.fingerprintCacheReferenceIDs(from: [shortPeer, geoPeer])
+
+        XCTAssertTrue(references.contains(shortPeer.peerID.id))
+        XCTAssertTrue(references.contains(fullNoiseHex))
+        XCTAssertTrue(references.contains(geoPeer.peerID.id))
+        XCTAssertFalse(references.contains(geoPeer.noisePublicKey.hexEncodedString()))
+    }
+
+    func testPruneFingerprintCacheRemovesKeysOutsideReferenceSet() {
+        var cache: [String: String] = [
+            "peera": "fp-a",
+            "peerb": "fp-b"
+        ]
+        var order = ["peera", "peerb"]
+
+        UnifiedPeerService.pruneFingerprintCache(
+            &cache,
+            order: &order,
+            referenceIDs: ["peera"],
+            cap: 10
+        )
+
+        XCTAssertEqual(cache, ["peera": "fp-a"])
+        XCTAssertEqual(order, ["peera"])
+    }
+
+    func testPruneFingerprintCacheHonorsCapAfterFiltering() {
+        var cache: [String: String] = [
+            "peera": "fp-a",
+            "peerb": "fp-b",
+            "peerc": "fp-c"
+        ]
+        var order = ["peera", "peerb", "peerc"]
+
+        UnifiedPeerService.pruneFingerprintCache(
+            &cache,
+            order: &order,
+            referenceIDs: ["peera", "peerb", "peerc"],
+            cap: 2
+        )
+
+        XCTAssertEqual(order, ["peerb", "peerc"])
+        XCTAssertNil(cache["peera"])
+    }
+
     func testResolvedNoisePublicKeyPrefersSnapshotNoiseKeyWhenValid() {
         let snapshotKey = Data(repeating: 0x33, count: 32)
         let peerIDNoise = String(repeating: "ab", count: 32)

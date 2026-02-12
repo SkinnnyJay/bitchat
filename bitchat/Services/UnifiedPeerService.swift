@@ -139,6 +139,12 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
                 cap: TransportConfig.uiFingerprintCacheCap
             )
         }
+        Self.pruneFingerprintCache(
+            &fingerprintCache,
+            order: &fingerprintCacheOrder,
+            referenceIDs: Self.fingerprintCacheReferenceIDs(from: enrichedPeers),
+            cap: TransportConfig.uiFingerprintCacheCap
+        )
         
         // Phase 3: Sort peers
         enrichedPeers.sort { lhs, rhs in
@@ -324,6 +330,65 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
                 order.remove(at: existingIndex)
             }
             order.append(key)
+        }
+
+        while order.count > cap {
+            let evicted = order.removeFirst()
+            cache.removeValue(forKey: evicted)
+        }
+    }
+
+    static func fingerprintCacheReferenceIDs(from peers: [BitchatPeer]) -> [String] {
+        var referenceIDs: [String] = []
+        func appendID(_ id: String) {
+            let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+            if !referenceIDs.contains(trimmed) {
+                referenceIDs.append(trimmed)
+            }
+        }
+
+        for peer in peers {
+            appendID(peer.peerID.id)
+            if !peer.peerID.isGeoDM && !peer.peerID.isGeoChat,
+               peer.noisePublicKey.count == 32 {
+                appendID(peer.noisePublicKey.hexEncodedString())
+            }
+        }
+
+        return referenceIDs
+    }
+
+    static func pruneFingerprintCache(
+        _ cache: inout [String: String],
+        order: inout [String],
+        referenceIDs: [String],
+        cap: Int
+    ) {
+        guard cap > 0 else {
+            cache.removeAll()
+            order.removeAll()
+            return
+        }
+
+        var allowedKeys: Set<String> = []
+        for referenceID in referenceIDs {
+            for key in lookupKeys(for: referenceID) {
+                allowedKeys.insert(key)
+            }
+            let normalized = WiFiPeerIdentity.normalizedKey(referenceID)
+            if !normalized.isEmpty {
+                allowedKeys.insert(normalized)
+            }
+        }
+
+        if !allowedKeys.isEmpty {
+            cache = cache.filter { allowedKeys.contains($0.key) }
+            order = order.filter { allowedKeys.contains($0) && cache[$0] != nil }
+        } else {
+            cache.removeAll()
+            order.removeAll()
+            return
         }
 
         while order.count > cap {
