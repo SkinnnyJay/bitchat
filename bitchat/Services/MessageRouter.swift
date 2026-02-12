@@ -531,7 +531,9 @@ extension MessageRouter: WiFiDirectTransportDelegate {
         Task { @MainActor [weak self] in
             guard let self else { return }
             SecureLogger.debug("WiFi Direct peers updated count=\(peers.count)", category: .session)
-            self.flushAllOutbox()
+            if !peers.isEmpty {
+                self.flushAllOutbox()
+            }
         }
     }
 
