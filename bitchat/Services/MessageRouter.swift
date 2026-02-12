@@ -10,7 +10,12 @@ final class MessageRouter {
     private let wifiRoutingPolicy: WiFiDirectRoutingPolicy
     private let wifiTransport: WiFiDirectTransport?
     private let outboxPerPeerCap: Int
+    private let inboundWiFiPayloadMaxBytes: Int
+    private let inboundWiFiDedupMaxCount: Int
+    private let inboundWiFiDedupMaxAgeSeconds: TimeInterval
     private var favoriteStatusObserver: NSObjectProtocol?
+    private var inboundWiFiDedupByKey: [String: Date] = [:]
+    private var inboundWiFiDedupOrder: [String] = []
     private var outbox: [PeerID: [(content: String, nickname: String, messageID: String)]] = [:] // peerID -> queued messages
 
     init(
@@ -26,6 +31,9 @@ final class MessageRouter {
         self.wifiRoutingPolicy = wifiRoutingPolicy
         self.wifiTransport = wifiTransport ?? WiFiDirectTransport(localPeerID: mesh.myPeerID.id)
         self.outboxPerPeerCap = TransportConfig.messageRouterOutboxPerPeerCap
+        self.inboundWiFiPayloadMaxBytes = TransportConfig.messageRouterInboundWiFiPayloadMaxBytes
+        self.inboundWiFiDedupMaxCount = TransportConfig.messageRouterInboundWiFiDedupMaxCount
+        self.inboundWiFiDedupMaxAgeSeconds = TransportConfig.messageRouterInboundWiFiDedupMaxAgeSeconds
         self.nostr.senderPeerID = mesh.myPeerID
         self.wifiTransport?.delegate = self
         self.wifiTransport?.startDiscovery()
@@ -272,6 +280,34 @@ final class MessageRouter {
     func queuedMessageCount(for peerID: PeerID) -> Int {
         outbox[peerID]?.count ?? 0
     }
+
+    private func shouldAcceptInboundWiFiEnvelope(dedupKey: String) -> Bool {
+        let now = Date()
+        cleanupInboundWiFiDedup(now: now)
+        if inboundWiFiDedupByKey[dedupKey] != nil {
+            return false
+        }
+        inboundWiFiDedupByKey[dedupKey] = now
+        inboundWiFiDedupOrder.append(dedupKey)
+        if inboundWiFiDedupOrder.count > inboundWiFiDedupMaxCount {
+            let overflow = inboundWiFiDedupOrder.count - inboundWiFiDedupMaxCount
+            for _ in 0..<overflow {
+                let oldest = inboundWiFiDedupOrder.removeFirst()
+                inboundWiFiDedupByKey.removeValue(forKey: oldest)
+            }
+        }
+        return true
+    }
+
+    private func cleanupInboundWiFiDedup(now: Date) {
+        let cutoff = now.addingTimeInterval(-inboundWiFiDedupMaxAgeSeconds)
+        while let first = inboundWiFiDedupOrder.first,
+              let timestamp = inboundWiFiDedupByKey[first],
+              timestamp < cutoff {
+            inboundWiFiDedupOrder.removeFirst()
+            inboundWiFiDedupByKey.removeValue(forKey: first)
+        }
+    }
 }
 
 extension MessageRouter: WiFiDirectTransportDelegate {
@@ -284,10 +320,16 @@ extension MessageRouter: WiFiDirectTransportDelegate {
     nonisolated func wifiTransportDidReceive(_ data: Data, from peerID: String) {
         Task { @MainActor [weak self] in
             guard let self else { return }
+            guard data.count <= self.inboundWiFiPayloadMaxBytes else {
+                SecureLogger.debug("Dropped oversized WiFi payload from \(peerID.prefix(8))… bytes=\(data.count)", category: .session)
+                return
+            }
             if let envelope = try? JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: data),
                envelope.messageType == "private",
                envelope.version == 1,
                envelope.recipientPeerID == self.mesh.myPeerID.id {
+                let dedupKey = "pm:\(envelope.senderPeerID):\(envelope.messageID)"
+                guard self.shouldAcceptInboundWiFiEnvelope(dedupKey: dedupKey) else { return }
                 NotificationCenter.default.post(
                     name: .wifiDirectPrivateEnvelopeReceived,
                     object: nil,
@@ -300,6 +342,8 @@ extension MessageRouter: WiFiDirectTransportDelegate {
                envelope.messageType == "ack",
                envelope.version == 1,
                envelope.recipientPeerID == self.mesh.myPeerID.id {
+                let dedupKey = "ack:\(envelope.ackType.rawValue):\(envelope.senderPeerID):\(envelope.messageID)"
+                guard self.shouldAcceptInboundWiFiEnvelope(dedupKey: dedupKey) else { return }
                 NotificationCenter.default.post(
                     name: .wifiDirectAckEnvelopeReceived,
                     object: nil,

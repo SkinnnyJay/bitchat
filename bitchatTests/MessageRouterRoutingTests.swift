@@ -264,6 +264,44 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testDeduplicatesIncomingWiFiPrivateEnvelopeByMessageIDAndSender() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "receives only one deduped private envelope")
+        var count = 0
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            count += 1
+            if count == 1 {
+                expect.fulfill()
+            }
+        }
+
+        let envelope = WiFiDirectPrivateEnvelope(
+            senderPeerID: "peer-1",
+            recipientPeerID: mesh.myPeerID.id,
+            recipientNickname: "self",
+            messageID: "msg-dedup-private",
+            content: "hello"
+        )
+        let payload = try JSONEncoder().encode(envelope)
+        backend.simulateIncoming(payload, from: "peer-1")
+        backend.simulateIncoming(payload, from: "peer-1")
+
+        wait(for: [expect], timeout: 1.0)
+        NotificationCenter.default.removeObserver(token)
+        XCTAssertEqual(count, 1)
+    }
+
+    @MainActor
     func testDoesNotPostNotificationForEnvelopeTargetingDifferentPeer() throws {
         let mesh = MockTransport()
         let nostr = NostrTransport(keychain: MockKeychain())
@@ -397,6 +435,81 @@ final class MessageRouterRoutingTests: XCTestCase {
         NotificationCenter.default.removeObserver(token)
         XCTAssertEqual(receivedEnvelope?.messageID, "mid-read-2")
         XCTAssertEqual(receivedEnvelope?.ackType, .read)
+    }
+
+    @MainActor
+    func testDeduplicatesIncomingWiFiAckEnvelopeByTypeSenderAndMessageID() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "receives only one deduped ack envelope")
+        var count = 0
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectAckEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            count += 1
+            if count == 1 {
+                expect.fulfill()
+            }
+        }
+
+        let envelope = WiFiDirectAckEnvelope(
+            ackType: .delivered,
+            senderPeerID: "peer-1",
+            recipientPeerID: mesh.myPeerID.id,
+            messageID: "mid-dedup-ack",
+            senderNickname: "peer"
+        )
+        let payload = try JSONEncoder().encode(envelope)
+        backend.simulateIncoming(payload, from: "peer-1")
+        backend.simulateIncoming(payload, from: "peer-1")
+
+        wait(for: [expect], timeout: 1.0)
+        NotificationCenter.default.removeObserver(token)
+        XCTAssertEqual(count, 1)
+    }
+
+    @MainActor
+    func testIgnoresOversizedIncomingWiFiPayload() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expectPrivate = expectation(description: "no oversized private notification")
+        expectPrivate.isInverted = true
+        let privateToken = NotificationCenter.default.addObserver(
+            forName: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expectPrivate.fulfill()
+        }
+
+        let expectAck = expectation(description: "no oversized ack notification")
+        expectAck.isInverted = true
+        let ackToken = NotificationCenter.default.addObserver(
+            forName: .wifiDirectAckEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expectAck.fulfill()
+        }
+
+        let oversizedData = Data(repeating: 0x41, count: TransportConfig.messageRouterInboundWiFiPayloadMaxBytes + 1)
+        backend.simulateIncoming(oversizedData, from: "peer-1")
+
+        wait(for: [expectPrivate, expectAck], timeout: 0.2)
+        NotificationCenter.default.removeObserver(privateToken)
+        NotificationCenter.default.removeObserver(ackToken)
     }
 
     @MainActor

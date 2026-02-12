@@ -42,6 +42,9 @@ enum TransportConfig {
     static let wifiDirectInviteMaxBackoffSeconds: TimeInterval = 30.0
     // Cap queued private messages per recipient when no route is currently available.
     static let messageRouterOutboxPerPeerCap: Int = 200
+    static let messageRouterInboundWiFiPayloadMaxBytes: Int = 64 * 1024
+    static let messageRouterInboundWiFiDedupMaxCount: Int = 2_000
+    static let messageRouterInboundWiFiDedupMaxAgeSeconds: TimeInterval = 300
 
     // UI thresholds
     static let uiLateInsertThreshold: TimeInterval = 15.0
