@@ -91,6 +91,7 @@ final class WiFiDirectTransport: NSObject {
             guard let self else { return }
             if !available {
                 self.currentPeers = []
+                self.isDiscovering = false
             }
             self.delegate?.wifiTransportDidChangeAvailability(available)
         }

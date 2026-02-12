@@ -246,5 +246,38 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertEqual(delegate.availability, [true, false])
         XCTAssertTrue(delegate.peerUpdates.contains(["peer-a"]))
         XCTAssertTrue(delegate.peerUpdates.contains([]))
+        XCTAssertFalse(transport.isDiscovering)
+    }
+
+    func testAvailabilityDropAllowsDiscoveryRestartAfterRecovery() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let delegate = MockDelegate()
+        transport.delegate = delegate
+
+        transport.startDiscovery()
+        XCTAssertTrue(transport.isDiscovering)
+        XCTAssertEqual(backend.startDiscoveryCount, 1)
+
+        let drop = expectation(description: "availability drop settles")
+        backend.simulateAvailability(false)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            drop.fulfill()
+        }
+        wait(for: [drop], timeout: 1.0)
+        XCTAssertFalse(transport.isDiscovering)
+
+        backend.isAvailable = true
+        transport.startDiscovery()
+
+        let recover = expectation(description: "recovery availability settles")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            recover.fulfill()
+        }
+        wait(for: [recover], timeout: 1.0)
+
+        XCTAssertTrue(transport.isDiscovering)
+        XCTAssertEqual(backend.startDiscoveryCount, 2)
+        XCTAssertEqual(delegate.availability, [true, false, true])
     }
 }
