@@ -321,8 +321,18 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     
     /// Get peer ID for nickname
     func getPeerID(for nickname: String) -> String? {
+        Self.peerID(for: nickname, in: peers)
+    }
+
+    static func peerID(for nickname: String, in peers: [BitchatPeer]) -> String? {
+        let target = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !target.isEmpty else { return nil }
+        let normalizedTarget = target.lowercased()
+
         for peer in peers {
-            if peer.displayName == nickname || peer.nickname == nickname {
+            let display = peer.displayName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let rawNick = peer.nickname.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if display == normalizedTarget || rawNick == normalizedTarget {
                 return peer.peerID.id
             }
         }
