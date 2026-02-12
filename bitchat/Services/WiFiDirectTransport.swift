@@ -96,11 +96,15 @@ final class WiFiDirectTransport: NSObject {
 
     func didUpdatePeers(_ peers: [String]) {
         dispatchOnMain { [weak self] in
+            guard let self else { return }
             let normalized = peers
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
             let uniqueSorted = Array(Set(normalized)).sorted()
-            self?.currentPeers = uniqueSorted
+            if !self.isDiscovering && !uniqueSorted.isEmpty {
+                return
+            }
+            self.currentPeers = uniqueSorted
         }
     }
 

@@ -357,4 +357,26 @@ final class WiFiDirectTransportTests: XCTestCase {
 
         XCTAssertEqual(delegate.availability, [true, false])
     }
+
+    func testIgnoresStalePeerUpdatesWhenNotDiscovering() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let delegate = MockDelegate()
+        transport.delegate = delegate
+
+        transport.startDiscovery()
+        transport.stopDiscovery()
+        XCTAssertFalse(transport.isDiscovering)
+        XCTAssertEqual(transport.currentPeers, [])
+
+        let expect = expectation(description: "stale peer update ignored")
+        backend.simulatePeerUpdate(["peer-z"])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(transport.currentPeers, [])
+        XCTAssertFalse(delegate.peerUpdates.contains(["peer-z"]))
+    }
 }
