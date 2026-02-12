@@ -274,6 +274,7 @@ extension MessageRouter: WiFiDirectTransportDelegate {
             guard let self else { return }
             if let envelope = try? JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: data),
                envelope.messageType == "private",
+               envelope.version == 1,
                envelope.recipientPeerID == self.mesh.myPeerID.id {
                 NotificationCenter.default.post(
                     name: .wifiDirectPrivateEnvelopeReceived,
@@ -285,6 +286,7 @@ extension MessageRouter: WiFiDirectTransportDelegate {
 
             if let envelope = try? JSONDecoder().decode(WiFiDirectAckEnvelope.self, from: data),
                envelope.messageType == "ack",
+               envelope.version == 1,
                envelope.recipientPeerID == self.mesh.myPeerID.id {
                 NotificationCenter.default.post(
                     name: .wifiDirectAckEnvelopeReceived,

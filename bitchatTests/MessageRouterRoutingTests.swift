@@ -361,4 +361,76 @@ final class MessageRouterRoutingTests: XCTestCase {
         XCTAssertEqual(receivedEnvelope?.messageID, "mid-read-2")
         XCTAssertEqual(receivedEnvelope?.ackType, .read)
     }
+
+    @MainActor
+    func testIgnoresIncomingWiFiPrivateEnvelopeWithUnsupportedVersion() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "should not receive private notification")
+        expect.isInverted = true
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expect.fulfill()
+        }
+
+        let payloadObject: [String: Any] = [
+            "version": 2,
+            "messageType": "private",
+            "senderPeerID": "peer-1",
+            "recipientPeerID": mesh.myPeerID.id,
+            "recipientNickname": "self",
+            "messageID": "mid-v2-private",
+            "content": "hello",
+            "createdAtMs": 1_700_000_000_000 as UInt64
+        ]
+        let payload = try JSONSerialization.data(withJSONObject: payloadObject, options: [])
+        backend.simulateIncoming(payload, from: "peer-1")
+
+        wait(for: [expect], timeout: 0.2)
+        NotificationCenter.default.removeObserver(token)
+    }
+
+    @MainActor
+    func testIgnoresIncomingWiFiAckEnvelopeWithUnsupportedVersion() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "should not receive ack notification")
+        expect.isInverted = true
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectAckEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expect.fulfill()
+        }
+
+        let payloadObject: [String: Any] = [
+            "version": 2,
+            "messageType": "ack",
+            "ackType": "read",
+            "senderPeerID": "peer-1",
+            "recipientPeerID": mesh.myPeerID.id,
+            "messageID": "mid-v2-ack",
+            "senderNickname": "peer",
+            "createdAtMs": 1_700_000_000_000 as UInt64
+        ]
+        let payload = try JSONSerialization.data(withJSONObject: payloadObject, options: [])
+        backend.simulateIncoming(payload, from: "peer-1")
+
+        wait(for: [expect], timeout: 0.2)
+        NotificationCenter.default.removeObserver(token)
+    }
 }
