@@ -412,6 +412,10 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertEqual(best, newer)
     }
 
+    func testBestPeerForNicknameMatchReturnsNilForEmptyInput() {
+        XCTAssertNil(UnifiedPeerService.bestPeerForNicknameMatch([]))
+    }
+
     func testFingerprintFromPeerRejectsNon32ByteNoiseKey() {
         let peer = BitchatPeer(
             peerID: PeerID(str: "abcdef0123456789"),
