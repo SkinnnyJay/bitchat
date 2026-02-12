@@ -28,12 +28,16 @@ struct WiFiDirectCapabilityNegotiator {
             return true
         }
 
-        let capabilities = Set(
+        let capabilities = Self.parseCapabilities(capabilityString)
+        return !Self.requiredCapabilities.isDisjoint(with: capabilities)
+    }
+
+    static func parseCapabilities(_ capabilityString: String) -> Set<String> {
+        Set(
             capabilityString
                 .split(separator: ",")
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
                 .filter { !$0.isEmpty }
         )
-        return !Self.requiredCapabilities.isDisjoint(with: capabilities)
     }
 }

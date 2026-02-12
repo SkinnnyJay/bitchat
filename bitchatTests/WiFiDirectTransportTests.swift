@@ -48,6 +48,10 @@ final class WiFiDirectTransportTests: XCTestCase {
             sentPayloads.append((data, peerID))
         }
 
+        func capabilities(for peerID: String) -> Set<String>? {
+            nil
+        }
+
         func simulatePeerUpdate(_ peers: [String]) {
             owner?.didUpdatePeers(peers)
         }

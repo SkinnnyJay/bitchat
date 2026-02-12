@@ -59,6 +59,10 @@ final class WiFiDirectTransport: NSObject {
         try impl.send(data, to: peerID)
     }
 
+    func peerCapabilities(peerID: String) -> Set<String>? {
+        impl.capabilities(for: peerID)
+    }
+
     deinit {
         stopDiscovery()
     }
@@ -97,6 +101,7 @@ protocol WiFiDirectTransportBackend: AnyObject {
     func startDiscovery()
     func stopDiscovery()
     func send(_ data: Data, to peerID: String?) throws
+    func capabilities(for peerID: String) -> Set<String>?
 }
 
 #if canImport(MultipeerConnectivity)
@@ -120,6 +125,7 @@ private final class MPCWiFiDirectTransportImplementation: NSObject, WiFiDirectTr
     )
     private var inviteBackoffByPeerID: [String: TimeInterval] = [:]
     private var nextInviteAllowedAt: [String: Date] = [:]
+    private var capabilitiesByPeerID: [String: Set<String>] = [:]
     private let initialInviteBackoffSeconds: TimeInterval = 1.0
     private let maxInviteBackoffSeconds: TimeInterval = 30.0
 
@@ -166,6 +172,10 @@ private final class MPCWiFiDirectTransportImplementation: NSObject, WiFiDirectTr
         } catch {
             throw WiFiDirectTransportError.sendFailed
         }
+    }
+
+    func capabilities(for peerID: String) -> Set<String>? {
+        capabilitiesByPeerID[peerID]
     }
 
     private static func sanitizeDisplayName(_ candidate: String?) -> String {
@@ -236,6 +246,9 @@ extension MPCWiFiDirectTransportImplementation: MCNearbyServiceBrowserDelegate {
         guard capabilityNegotiator.isPeerCompatible(discoveryInfo: info) else {
             return
         }
+        if let caps = info?["caps"] {
+            capabilitiesByPeerID[peerID.displayName] = WiFiDirectCapabilityNegotiator.parseCapabilities(caps)
+        }
 
         let peerKey = peerID.displayName
         let now = Date()
@@ -254,6 +267,7 @@ extension MPCWiFiDirectTransportImplementation: MCNearbyServiceBrowserDelegate {
     func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
         nextInviteAllowedAt.removeValue(forKey: peerID.displayName)
         inviteBackoffByPeerID.removeValue(forKey: peerID.displayName)
+        capabilitiesByPeerID.removeValue(forKey: peerID.displayName)
         let peers = session.connectedPeers.map(\.displayName).sorted()
         owner?.didUpdatePeers(peers)
     }
@@ -276,6 +290,10 @@ private final class NoopWiFiDirectTransportImplementation: WiFiDirectTransportBa
 
     func send(_ data: Data, to peerID: String?) throws {
         throw WiFiDirectTransportError.notAvailable
+    }
+
+    func capabilities(for peerID: String) -> Set<String>? {
+        nil
     }
 }
 

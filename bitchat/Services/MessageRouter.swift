@@ -208,6 +208,10 @@ final class MessageRouter {
             wifiPeerIDs: Set(wifiTransport.currentPeers)
         )
         guard shouldUseWiFi else { return false }
+        if let capabilities = wifiTransport.peerCapabilities(peerID: peerID.id),
+           !capabilities.contains("pm") {
+            return false
+        }
 
         let envelope = WiFiDirectPrivateEnvelope(
             senderPeerID: mesh.myPeerID.id,
@@ -237,6 +241,10 @@ final class MessageRouter {
         guard let wifiTransport else { return false }
         guard wifiTransport.isAvailable else { return false }
         guard Set(wifiTransport.currentPeers).contains(peerID.id) else { return false }
+        if let capabilities = wifiTransport.peerCapabilities(peerID: peerID.id),
+           !capabilities.contains("ack") {
+            return false
+        }
 
         let envelope = WiFiDirectAckEnvelope(
             ackType: ackType,
