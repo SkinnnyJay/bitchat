@@ -184,6 +184,33 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testRoutesViaWiFiBelowThresholdWhenNoOtherRouteExists() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: false)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = true
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm", "ack"], for: recipient.id)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 10_000), // force below-threshold
+            wifiTransport: wifi
+        )
+
+        router.sendPrivate("small", to: recipient, recipientNickname: "peer", messageID: "msg-small-wifi-fallback")
+
+        XCTAssertEqual(backend.sentPayloads.count, 1)
+        XCTAssertTrue(mesh.sentPrivateMessages.isEmpty)
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 0)
+    }
+
+    @MainActor
     func testFallsBackToMeshWhenWiFiSendFails() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
@@ -539,6 +566,42 @@ final class MessageRouterRoutingTests: XCTestCase {
 
         XCTAssertEqual(router.queuedMessageCount(for: recipient), 0)
         XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertTrue(mesh.sentPrivateMessages.isEmpty)
+    }
+
+    @MainActor
+    func testFlushOutboxUsesWiFiFallbackBelowThresholdWhenNoOtherRouteExists() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: false)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = false
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 10_000), // force below-threshold
+            wifiTransport: wifi
+        )
+
+        router.sendPrivate("tiny", to: recipient, recipientNickname: "peer", messageID: "mid-small-queued")
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 1)
+
+        backend.setCapabilities(["pm", "ack"], for: recipient.id)
+        backend.setPeers([recipient.id])
+        backend.simulateAvailability(true)
+
+        let expect = expectation(description: "queued tiny message flushed by WiFi fallback")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 0)
+        XCTAssertEqual(backend.sentPayloads.count, 1)
         XCTAssertTrue(mesh.sentPrivateMessages.isEmpty)
     }
 

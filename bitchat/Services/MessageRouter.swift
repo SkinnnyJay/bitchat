@@ -94,7 +94,13 @@ final class MessageRouter {
     }
 
     func sendPrivate(_ content: String, to peerID: PeerID, recipientNickname: String, messageID: String) {
-        if routePrivateViaWiFiIfPreferred(content, to: peerID, recipientNickname: recipientNickname, messageID: messageID) {
+        if routePrivateViaWiFi(
+            content,
+            to: peerID,
+            recipientNickname: recipientNickname,
+            messageID: messageID,
+            requirePolicyThreshold: true
+        ) {
             return
         }
         let reachableMesh = mesh.isPeerReachable(peerID)
@@ -114,6 +120,15 @@ final class MessageRouter {
             SecureLogger.debug("Routing PM via Nostr to \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
             nostr.sendPrivateMessage(content, to: peerID, recipientNickname: recipientNickname, messageID: messageID)
         case nil:
+            if routePrivateViaWiFi(
+                content,
+                to: peerID,
+                recipientNickname: recipientNickname,
+                messageID: messageID,
+                requirePolicyThreshold: false
+            ) {
+                return
+            }
             // Queue for later (when mesh connects or Nostr mapping appears)
             pruneExpiredOutboxMessages(for: peerID)
             if outbox[peerID] == nil { outbox[peerID] = [] }
@@ -215,7 +230,13 @@ final class MessageRouter {
             let content = message.content
             let nickname = message.recipientNickname
             let messageID = message.messageID
-            if routePrivateViaWiFiIfPreferred(content, to: peerID, recipientNickname: nickname, messageID: messageID) {
+            if routePrivateViaWiFi(
+                content,
+                to: peerID,
+                recipientNickname: nickname,
+                messageID: messageID,
+                requirePolicyThreshold: true
+            ) {
                 continue
             }
             let reachableMesh = mesh.isPeerReachable(peerID)
@@ -233,6 +254,15 @@ final class MessageRouter {
                 SecureLogger.debug("Outbox -> Nostr for \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
                 nostr.sendPrivateMessage(content, to: peerID, recipientNickname: nickname, messageID: messageID)
             case nil:
+                if routePrivateViaWiFi(
+                    content,
+                    to: peerID,
+                    recipientNickname: nickname,
+                    messageID: messageID,
+                    requirePolicyThreshold: false
+                ) {
+                    continue
+                }
                 // Keep unsent items queued
                 remaining.append(message)
             }
@@ -245,20 +275,25 @@ final class MessageRouter {
         }
     }
 
-    private func routePrivateViaWiFiIfPreferred(
+    private func routePrivateViaWiFi(
         _ content: String,
         to peerID: PeerID,
         recipientNickname: String,
-        messageID: String
+        messageID: String,
+        requirePolicyThreshold: Bool
     ) -> Bool {
         guard let wifiTransport else { return false }
-        let shouldUseWiFi = wifiRoutingPolicy.shouldUseWiFi(
-            payloadBytes: content.utf8.count,
-            recipientPeerID: peerID.id,
-            wifiAvailable: wifiTransport.isAvailable,
-            wifiPeerIDs: Set(wifiTransport.currentPeers)
-        )
-        guard shouldUseWiFi else { return false }
+        guard wifiTransport.isAvailable else { return false }
+        guard Set(wifiTransport.currentPeers).contains(peerID.id) else { return false }
+        if requirePolicyThreshold {
+            let shouldUseWiFi = wifiRoutingPolicy.shouldUseWiFi(
+                payloadBytes: content.utf8.count,
+                recipientPeerID: peerID.id,
+                wifiAvailable: wifiTransport.isAvailable,
+                wifiPeerIDs: Set(wifiTransport.currentPeers)
+            )
+            guard shouldUseWiFi else { return false }
+        }
         if let capabilities = wifiTransport.peerCapabilities(peerID: peerID.id),
            !capabilities.contains("pm") {
             return false
