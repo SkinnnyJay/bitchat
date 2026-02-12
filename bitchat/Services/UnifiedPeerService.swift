@@ -85,8 +85,8 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         
         // Phase 1: Add all mesh peers (connected and reachable)
         for peerInfo in meshPeers {
+            guard Self.shouldIncludeMeshSnapshot(peerInfo, localPeerID: meshService.myPeerID) else { continue }
             let peerID = peerInfo.peerID
-            guard peerID != meshService.myPeerID else { continue }  // Never add self
             let resolvedNoisePublicKey = Self.resolvedNoisePublicKey(for: peerInfo)
             
             let peer = buildPeerFromMesh(
@@ -588,6 +588,13 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             }
         }
         return nil
+    }
+
+    static func shouldIncludeMeshSnapshot(_ snapshot: TransportPeerSnapshot, localPeerID: PeerID) -> Bool {
+        if snapshot.peerID == localPeerID {
+            return false
+        }
+        return snapshot.peerID.isValid
     }
 
     static func fingerprintFromPeer(_ peer: BitchatPeer) -> String? {

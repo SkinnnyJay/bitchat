@@ -870,6 +870,45 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertNil(UnifiedPeerService.resolvedNoisePublicKey(for: snapshot))
     }
 
+    func testShouldIncludeMeshSnapshotRejectsLocalPeerID() {
+        let localPeerID = PeerID(str: "abcdef0123456789")
+        let snapshot = TransportPeerSnapshot(
+            peerID: localPeerID,
+            nickname: "self",
+            isConnected: true,
+            noisePublicKey: nil,
+            lastSeen: Date()
+        )
+
+        XCTAssertFalse(UnifiedPeerService.shouldIncludeMeshSnapshot(snapshot, localPeerID: localPeerID))
+    }
+
+    func testShouldIncludeMeshSnapshotRejectsInvalidPeerID() {
+        let localPeerID = PeerID(str: "abcdef0123456789")
+        let snapshot = TransportPeerSnapshot(
+            peerID: PeerID(str: "invalid peer id"),
+            nickname: "invalid",
+            isConnected: true,
+            noisePublicKey: nil,
+            lastSeen: Date()
+        )
+
+        XCTAssertFalse(UnifiedPeerService.shouldIncludeMeshSnapshot(snapshot, localPeerID: localPeerID))
+    }
+
+    func testShouldIncludeMeshSnapshotAcceptsValidRemotePeerID() {
+        let localPeerID = PeerID(str: "abcdef0123456789")
+        let snapshot = TransportPeerSnapshot(
+            peerID: PeerID(str: "0011223344556677"),
+            nickname: "remote",
+            isConnected: true,
+            noisePublicKey: nil,
+            lastSeen: Date()
+        )
+
+        XCTAssertTrue(UnifiedPeerService.shouldIncludeMeshSnapshot(snapshot, localPeerID: localPeerID))
+    }
+
     func testResolveFingerprintFromMeshChecksLookupKeyVariants() {
         let fingerprint = String(repeating: "a0", count: 32)
         let lookup: [String: String] = ["abcdef0123456789": fingerprint]
