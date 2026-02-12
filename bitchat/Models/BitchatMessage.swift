@@ -55,7 +55,11 @@ final class BitchatMessage: Codable {
         mentions: [String]? = nil,
         deliveryStatus: DeliveryStatus? = nil
     ) {
-        self.id = id ?? UUID().uuidString
+        if let id, let safeID = InputValidator.validateMessageID(id) {
+            self.id = safeID
+        } else {
+            self.id = UUID().uuidString
+        }
         self.sender = sender
         self.content = content
         self.timestamp = timestamp
