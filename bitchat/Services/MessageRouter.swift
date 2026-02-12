@@ -155,6 +155,16 @@ final class MessageRouter {
             nostr.sendPrivateMessage(content, to: peerID, recipientNickname: safeRecipientNickname, messageID: safeMessageID)
         case nil:
             let outboxPeerID = normalizedOutboxPeerID(for: peerID)
+            if requiresWiFiForPayload,
+               !canEncodeWiFiPrivateEnvelope(
+                content: content,
+                recipientPeerID: outboxPeerID.id,
+                recipientNickname: safeRecipientNickname,
+                messageID: safeMessageID
+               ) {
+                SecureLogger.warning("Dropping PM that exceeds WiFi envelope payload limits", category: .session)
+                return
+            }
             if routePrivateViaWiFi(
                 content,
                 to: outboxPeerID,
@@ -336,6 +346,19 @@ final class MessageRouter {
                 ) {
                     continue
                 }
+                if requiresWiFiForPayload,
+                   !canEncodeWiFiPrivateEnvelope(
+                    content: content,
+                    recipientPeerID: outboxPeerID.id,
+                    recipientNickname: nickname,
+                    messageID: safeMessageID
+                   ) {
+                    SecureLogger.warning(
+                        "Dropping queued PM that exceeds WiFi envelope payload limits for \(outboxPeerID.id.prefix(8))…",
+                        category: .session
+                    )
+                    continue
+                }
                 // Keep unsent items queued
                 remaining.append(message)
             }
@@ -392,6 +415,26 @@ final class MessageRouter {
             SecureLogger.debug("WiFi Direct PM route failed for \(peerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…, falling back", category: .session)
             return false
         }
+
+    private func canEncodeWiFiPrivateEnvelope(
+        content: String,
+        recipientPeerID: String,
+        recipientNickname: String,
+        messageID: String
+    ) -> Bool {
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return false }
+        guard content.utf8.count <= InputValidator.Limits.maxMessageLength else { return false }
+        let safeRecipientNickname = InputValidator.validateNickname(recipientNickname) ?? "user"
+        let envelope = WiFiDirectPrivateEnvelope(
+            senderPeerID: mesh.myPeerID.id,
+            recipientPeerID: recipientPeerID,
+            recipientNickname: safeRecipientNickname,
+            messageID: safeMessageID,
+            content: content
+        )
+        guard let data = try? JSONEncoder().encode(envelope) else { return false }
+        return data.count <= inboundWiFiPayloadMaxBytes
+    }
     }
 
     private func routeAckViaWiFiIfAvailable(
