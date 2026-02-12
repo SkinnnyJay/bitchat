@@ -410,6 +410,15 @@ final class MessageRouter {
         return candidates
     }
 
+    private func senderMatchesTransportPeerID(claimedSenderID: String, transportPeerID: String) -> Bool {
+        let claimed = PeerID(str: claimedSenderID)
+        let observed = PeerID(str: transportPeerID)
+        if claimed.id == observed.id {
+            return true
+        }
+        return claimed.toShort().id == observed.toShort().id
+    }
+
     func flushAllOutbox() {
         for key in Array(outbox.keys) { flushOutbox(for: key) }
     }
@@ -494,7 +503,7 @@ extension MessageRouter: WiFiDirectTransportDelegate {
             if let envelope = try? JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: data),
                envelope.messageType == "private",
                envelope.version == WiFiDirectEnvelopeVersion.current,
-               envelope.senderPeerID == peerID,
+               self.senderMatchesTransportPeerID(claimedSenderID: envelope.senderPeerID, transportPeerID: peerID),
                envelope.recipientPeerID == self.mesh.myPeerID.id,
                !envelope.messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                self.isInboundWiFiTimestampAcceptable(envelope.createdAtMs),
@@ -512,7 +521,7 @@ extension MessageRouter: WiFiDirectTransportDelegate {
             if let envelope = try? JSONDecoder().decode(WiFiDirectAckEnvelope.self, from: data),
                envelope.messageType == "ack",
                envelope.version == WiFiDirectEnvelopeVersion.current,
-               envelope.senderPeerID == peerID,
+               self.senderMatchesTransportPeerID(claimedSenderID: envelope.senderPeerID, transportPeerID: peerID),
                envelope.recipientPeerID == self.mesh.myPeerID.id,
                self.isInboundWiFiTimestampAcceptable(envelope.createdAtMs),
                !envelope.messageID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
