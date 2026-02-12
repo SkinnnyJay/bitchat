@@ -4508,16 +4508,18 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         guard !trimmed.isEmpty else { return nil }
 
         for key in WiFiPeerIdentity.lookupKeys(for: trimmed) {
-            if let nickname = peerNicknames[PeerID(str: key)] {
-                return nickname
+            if let nickname = peerNicknames[PeerID(str: key)],
+               let safeNickname = InputValidator.validateNickname(nickname) {
+                return safeNickname
             }
         }
 
         let normalizedTarget = WiFiPeerIdentity.normalizedKey(trimmed)
         guard !normalizedTarget.isEmpty else { return nil }
-        return peerNicknames.first { candidate, _ in
+        return peerNicknames.first { candidate, nickname in
+            guard InputValidator.validateNickname(nickname) != nil else { return false }
             WiFiPeerIdentity.normalizedKey(candidate.id) == normalizedTarget
-        }?.value
+        }.flatMap { InputValidator.validateNickname($0.value) }
     }
     
     @MainActor

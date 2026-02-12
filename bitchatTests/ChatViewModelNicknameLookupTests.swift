@@ -46,4 +46,17 @@ final class ChatViewModelNicknameLookupTests: XCTestCase {
 
         XCTAssertNil(resolved)
     }
+
+    func testResolveMeshNicknameSkipsInvalidNicknameValues() {
+        let peerNicknames: [PeerID: String] = [
+            PeerID(str: "abcdef0123456789"): "   "
+        ]
+
+        let resolved = ChatViewModel.resolveMeshNickname(
+            from: peerNicknames,
+            for: "abcdef0123456789"
+        )
+
+        XCTAssertNil(resolved)
+    }
 }
