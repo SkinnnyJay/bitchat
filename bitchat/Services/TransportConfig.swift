@@ -51,6 +51,7 @@ enum TransportConfig {
     static let messageRouterInboundWiFiSenderRateWindowSeconds: TimeInterval = 5
     static let messageRouterInboundWiFiSenderRateMaxEvents: Int = 60
     static let messageRouterInboundWiFiSenderRateMaxTrackedSenders: Int = 256
+    static let messageRouterInboundWiFiSenderIDMaxBytes: Int = 128
 
     // UI thresholds
     static let uiLateInsertThreshold: TimeInterval = 15.0

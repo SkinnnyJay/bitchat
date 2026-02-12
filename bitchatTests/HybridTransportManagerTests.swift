@@ -770,6 +770,39 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testHybridRateLimiterRejectsOversizedSenderID() throws {
+        let mesh = MockTransport()
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let fixedNow = Date()
+        let manager = HybridTransportManager(meshTransport: mesh, wifiTransport: wifi, nowProvider: { fixedNow })
+        let delegate = MockDelegate()
+        manager.delegate = delegate
+
+        let oversizedSenderID = String(repeating: "a", count: TransportConfig.messageRouterInboundWiFiSenderIDMaxBytes + 1)
+        let payloadObject: [String: Any] = [
+            "version": WiFiDirectEnvelopeVersion.current,
+            "messageType": "private",
+            "senderPeerID": oversizedSenderID,
+            "recipientPeerID": mesh.myPeerID.id,
+            "recipientNickname": "self",
+            "messageID": "mid-hybrid-oversized-sender",
+            "content": "hello",
+            "createdAtMs": UInt64(fixedNow.timeIntervalSince1970 * 1000)
+        ]
+        let payload = try JSONSerialization.data(withJSONObject: payloadObject, options: [])
+        backend.simulateIncoming(payload, from: oversizedSenderID)
+
+        let expect = expectation(description: "oversized sender dropped by hybrid rate limiter")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertTrue(delegate.receivedEnvelopes.isEmpty)
+    }
+
+    @MainActor
     func testRejectsInboundPrivateEnvelopeWhenPayloadExceedsMaxBytes() {
         let mesh = MockTransport()
         let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)

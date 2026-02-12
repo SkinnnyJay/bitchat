@@ -108,6 +108,7 @@ final class HybridTransportManager {
     private let inboundSenderRateWindowSeconds: TimeInterval
     private let inboundSenderRateMaxEvents: Int
     private let inboundSenderRateMaxTrackedSenders: Int
+    private let inboundSenderIDMaxBytes: Int
     private let nowProvider: () -> Date
     private var inboundDedupByKey: [String: Date] = [:]
     private var inboundDedupOrder: [String] = []
@@ -133,6 +134,7 @@ final class HybridTransportManager {
         self.inboundSenderRateWindowSeconds = TransportConfig.messageRouterInboundWiFiSenderRateWindowSeconds
         self.inboundSenderRateMaxEvents = TransportConfig.messageRouterInboundWiFiSenderRateMaxEvents
         self.inboundSenderRateMaxTrackedSenders = TransportConfig.messageRouterInboundWiFiSenderRateMaxTrackedSenders
+        self.inboundSenderIDMaxBytes = TransportConfig.messageRouterInboundWiFiSenderIDMaxBytes
         self.nowProvider = nowProvider
         self.wifiTransport.delegate = self
     }
@@ -271,6 +273,7 @@ final class HybridTransportManager {
     private func allowInboundEvent(from senderID: String) -> Bool {
         let normalizedSenderID = normalizedIdentityKey(senderID)
         guard !normalizedSenderID.isEmpty else { return false }
+        guard normalizedSenderID.utf8.count <= inboundSenderIDMaxBytes else { return false }
         let now = nowProvider()
         cleanupInboundSenderRate(now: now)
         if inboundSenderEventTimestamps[normalizedSenderID] == nil,

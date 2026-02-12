@@ -2628,6 +2628,44 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testInboundWiFiRateLimiterRejectsOversizedSenderID() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let fixedNow = Date()
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { fixedNow })
+
+        let oversizedSenderID = String(repeating: "a", count: TransportConfig.messageRouterInboundWiFiSenderIDMaxBytes + 1)
+        let expect = expectation(description: "oversized sender should not emit notification")
+        expect.isInverted = true
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expect.fulfill()
+        }
+
+        let payloadObject: [String: Any] = [
+            "version": WiFiDirectEnvelopeVersion.current,
+            "messageType": "private",
+            "senderPeerID": oversizedSenderID,
+            "recipientPeerID": mesh.myPeerID.id,
+            "recipientNickname": "self",
+            "messageID": "mid-oversized-sender",
+            "content": "hello",
+            "createdAtMs": UInt64(fixedNow.timeIntervalSince1970 * 1000)
+        ]
+        let payload = try JSONSerialization.data(withJSONObject: payloadObject, options: [])
+        backend.simulateIncoming(payload, from: oversizedSenderID)
+
+        wait(for: [expect], timeout: 0.2)
+        NotificationCenter.default.removeObserver(token)
+    }
+
+    @MainActor
     func testFallsBackFromWiFiReadReceiptWhenPeerLacksAckCapability() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
