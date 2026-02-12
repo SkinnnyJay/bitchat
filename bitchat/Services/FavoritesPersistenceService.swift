@@ -34,6 +34,14 @@ final class FavoritesPersistenceService: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     
     static let shared = FavoritesPersistenceService()
+
+    static func sanitizedPeerNickname(_ peerNickname: String?) -> String {
+        if let peerNickname,
+           let sanitizedNickname = InputValidator.validateNickname(peerNickname) {
+            return sanitizedNickname
+        }
+        return "user"
+    }
     
     private init() {
         loadFavorites()
@@ -52,14 +60,15 @@ final class FavoritesPersistenceService: ObservableObject {
         peerNostrPublicKey: String? = nil,
         peerNickname: String
     ) {
-        SecureLogger.info("⭐️ Adding favorite: \(peerNickname) (\(peerNoisePublicKey.hexEncodedString()))", category: .session)
+        let sanitizedPeerNickname = Self.sanitizedPeerNickname(peerNickname)
+        SecureLogger.info("⭐️ Adding favorite: \(sanitizedPeerNickname) (\(peerNoisePublicKey.hexEncodedString()))", category: .session)
         
         let existing = favorites[peerNoisePublicKey]
         
         let relationship = FavoriteRelationship(
             peerNoisePublicKey: peerNoisePublicKey,
             peerNostrPublicKey: peerNostrPublicKey ?? existing?.peerNostrPublicKey,
-            peerNickname: peerNickname,
+            peerNickname: sanitizedPeerNickname,
             isFavorite: true,
             theyFavoritedUs: existing?.theyFavoritedUs ?? false,
             favoritedAt: existing?.favoritedAt ?? Date(),
@@ -68,7 +77,7 @@ final class FavoritesPersistenceService: ObservableObject {
         
         // Log if this creates a mutual favorite
         if relationship.isMutual {
-            SecureLogger.info("💕 Mutual favorite relationship established with \(peerNickname)!", category: .session)
+            SecureLogger.info("💕 Mutual favorite relationship established with \(sanitizedPeerNickname)!", category: .session)
         }
         
         favorites[peerNoisePublicKey] = relationship
@@ -125,7 +134,7 @@ final class FavoritesPersistenceService: ObservableObject {
         peerNostrPublicKey: String? = nil
     ) {
         let existing = favorites[peerNoisePublicKey]
-        let displayName = peerNickname ?? existing?.peerNickname ?? "Unknown"
+        let displayName = Self.sanitizedPeerNickname(peerNickname ?? existing?.peerNickname)
         
         SecureLogger.info("📨 Received favorite notification: \(displayName) \(favorited ? "favorited" : "unfavorited") us", category: .session)
         
