@@ -28,6 +28,27 @@ final class BitchatMessageTests: XCTestCase {
         XCTAssertNotNil(InputValidator.validateMessageID(message.id))
     }
 
+    func testInitializerSanitizesSenderRecipientOriginalMentionsAndSenderPeerID() {
+        let message = BitchatMessage(
+            id: "mid-sanitize-init",
+            sender: "   ",
+            content: "hello",
+            timestamp: Date(),
+            isRelay: false,
+            originalSender: "\n",
+            isPrivate: true,
+            recipientNickname: " \t ",
+            senderPeerID: PeerID(str: "invalid peer id"),
+            mentions: ["alice", "   ", "b\nob"]
+        )
+
+        XCTAssertEqual(message.sender, "unknown")
+        XCTAssertNil(message.originalSender)
+        XCTAssertNil(message.recipientNickname)
+        XCTAssertNil(message.senderPeerID)
+        XCTAssertEqual(message.mentions, ["alice", "bob"])
+    }
+
     func testInitializerGeneratesValidIDWhenMissing() {
         let message = BitchatMessage(
             sender: "alice",

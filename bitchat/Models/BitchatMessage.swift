@@ -60,15 +60,17 @@ final class BitchatMessage: Codable {
         } else {
             self.id = UUID().uuidString
         }
-        self.sender = sender
+        self.sender = InputValidator.validateNickname(sender) ?? "unknown"
         self.content = content
         self.timestamp = timestamp
         self.isRelay = isRelay
-        self.originalSender = originalSender
+        self.originalSender = originalSender.flatMap(InputValidator.validateNickname)
         self.isPrivate = isPrivate
-        self.recipientNickname = recipientNickname
-        self.senderPeerID = senderPeerID
-        self.mentions = mentions
+        self.recipientNickname = recipientNickname.flatMap(InputValidator.validateNickname)
+        self.senderPeerID = senderPeerID?.isValid == true ? senderPeerID : nil
+        self.mentions = mentions?
+            .compactMap(InputValidator.validateNickname)
+            .filter { !$0.isEmpty }
         self.deliveryStatus = deliveryStatus ?? (isPrivate ? .sending : nil)
     }
 
