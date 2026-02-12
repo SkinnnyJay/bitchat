@@ -1319,7 +1319,8 @@ struct ContentView: View {
             // Try direct mesh nickname (connected-only)
             if let name = viewModel.meshService.peerNickname(peerID: PeerID(str: headerPeerID)) { return name }
             // Try favorite nickname by stable Noise key
-            if let fav = FavoritesPersistenceService.shared.getFavoriteStatus(for: Data(hexString: headerPeerID) ?? Data()),
+            if let noiseKey = ChatViewModel.decodeNoisePublicKey(from: headerPeerID),
+               let fav = FavoritesPersistenceService.shared.getFavoriteStatus(for: noiseKey),
                !fav.peerNickname.isEmpty { return fav.peerNickname }
             // Fallback: resolve from persisted social identity via fingerprint mapping
             if headerPeerID.count == 16 {
@@ -1329,7 +1330,7 @@ struct ContentView: View {
                     if let pet = social.localPetname, !pet.isEmpty { return pet }
                     if !social.claimedNickname.isEmpty { return social.claimedNickname }
                 }
-            } else if headerPeerID.count == 64, let keyData = Data(hexString: headerPeerID) {
+            } else if let keyData = ChatViewModel.decodeNoisePublicKey(from: headerPeerID) {
                 let fp = keyData.sha256Fingerprint()
                 if let social = viewModel.identityManager.getSocialIdentity(for: fp) {
                     if let pet = social.localPetname, !pet.isEmpty { return pet }
@@ -1341,7 +1342,7 @@ struct ContentView: View {
         let isNostrAvailable: Bool = {
             guard let connectionState = peer?.connectionState else { 
                 // Check if we can reach this peer via Nostr even if not in allPeers
-                if let noiseKey = Data(hexString: headerPeerID),
+                if let noiseKey = ChatViewModel.decodeNoisePublicKey(from: headerPeerID),
                    let favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: noiseKey),
                    favoriteStatus.isMutual {
                     return true
