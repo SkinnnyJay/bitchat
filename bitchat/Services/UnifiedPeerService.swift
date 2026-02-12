@@ -147,16 +147,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         )
         
         // Phase 3: Sort peers
-        enrichedPeers.sort { lhs, rhs in
-            // Connectivity rank: connected > reachable > others
-            func rank(_ p: BitchatPeer) -> Int { p.isConnected ? 2 : (p.isReachable ? 1 : 0) }
-            let lr = rank(lhs), rr = rank(rhs)
-            if lr != rr { return lr > rr }
-            // Then favorites inside same rank
-            if lhs.isFavorite != rhs.isFavorite { return lhs.isFavorite }
-            // Finally alphabetical
-            return lhs.displayName < rhs.displayName
-        }
+        enrichedPeers.sort(by: Self.shouldSortPeer)
         
         // Phase 4: Build subsets and indices
         var favoritesList: [BitchatPeer] = []
@@ -281,6 +272,33 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             guard canonicalFingerprint(value) != nil else { return false }
             WiFiPeerIdentity.normalizedKey(key) == normalizedTarget
         }.flatMap { canonicalFingerprint($0.value) }
+    }
+
+    static func shouldSortPeer(_ lhs: BitchatPeer, _ rhs: BitchatPeer) -> Bool {
+        // Connectivity rank: connected > reachable > others
+        func rank(_ peer: BitchatPeer) -> Int {
+            peer.isConnected ? 2 : (peer.isReachable ? 1 : 0)
+        }
+
+        let leftRank = rank(lhs)
+        let rightRank = rank(rhs)
+        if leftRank != rightRank {
+            return leftRank > rightRank
+        }
+
+        // Then favorites inside same rank
+        if lhs.isFavorite != rhs.isFavorite {
+            return lhs.isFavorite
+        }
+
+        // Then alphabetical name, and deterministic peerID tie-break
+        let leftName = lhs.displayName.lowercased()
+        let rightName = rhs.displayName.lowercased()
+        if leftName != rightName {
+            return leftName < rightName
+        }
+
+        return lhs.peerID.id < rhs.peerID.id
     }
 
     static func cacheFingerprint(

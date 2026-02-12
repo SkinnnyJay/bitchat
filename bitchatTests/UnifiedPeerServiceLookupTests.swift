@@ -27,6 +27,46 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertEqual(resolved, peer)
     }
 
+    func testShouldSortPeerPrioritizesConnectedThenReachable() {
+        let connected = BitchatPeer(
+            peerID: PeerID(str: "aaaaaaaaaaaaaaaa"),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "peer",
+            isConnected: true,
+            isReachable: true
+        )
+        let reachable = BitchatPeer(
+            peerID: PeerID(str: "bbbbbbbbbbbbbbbb"),
+            noisePublicKey: Data(repeating: 0x22, count: 32),
+            nickname: "peer",
+            isConnected: false,
+            isReachable: true
+        )
+
+        XCTAssertTrue(UnifiedPeerService.shouldSortPeer(connected, reachable))
+        XCTAssertFalse(UnifiedPeerService.shouldSortPeer(reachable, connected))
+    }
+
+    func testShouldSortPeerUsesDeterministicPeerIDTieBreaker() {
+        let first = BitchatPeer(
+            peerID: PeerID(str: "aaaaaaaaaaaaaaaa"),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "same",
+            isConnected: false,
+            isReachable: false
+        )
+        let second = BitchatPeer(
+            peerID: PeerID(str: "bbbbbbbbbbbbbbbb"),
+            noisePublicKey: Data(repeating: 0x22, count: 32),
+            nickname: "same",
+            isConnected: false,
+            isReachable: false
+        )
+
+        XCTAssertTrue(UnifiedPeerService.shouldSortPeer(first, second))
+        XCTAssertFalse(UnifiedPeerService.shouldSortPeer(second, first))
+    }
+
     func testResolvePeerMatchesShortQueryAgainstFullNoiseIndexedPeer() {
         let fullNoiseHex = String(repeating: "ab", count: 32)
         let shortID = PeerID(str: fullNoiseHex).toShort().bare
