@@ -242,7 +242,8 @@ extension BitchatMessage {
         guard offset + senderLength <= dataCopy.count else {
             return nil
         }
-        let sender = String(data: dataCopy[offset..<offset+senderLength], encoding: .utf8) ?? "unknown"
+        let senderRaw = String(data: dataCopy[offset..<offset+senderLength], encoding: .utf8) ?? ""
+        let sender = InputValidator.validateNickname(senderRaw) ?? "unknown"
         offset += senderLength
         
         // Content
@@ -275,7 +276,8 @@ extension BitchatMessage {
         if hasRecipientNickname && offset < dataCopy.count {
             let length = Int(dataCopy[offset]); offset += 1
             if offset + length <= dataCopy.count {
-                recipientNickname = String(data: dataCopy[offset..<offset+length], encoding: .utf8)
+                let rawNickname = String(data: dataCopy[offset..<offset+length], encoding: .utf8) ?? ""
+                recipientNickname = InputValidator.validateNickname(rawNickname)
                 offset += length
             }
         }
@@ -304,8 +306,9 @@ extension BitchatMessage {
                     if offset < dataCopy.count {
                         let length = Int(dataCopy[offset]); offset += 1
                         if offset + length <= dataCopy.count {
-                            if let mention = String(data: dataCopy[offset..<offset+length], encoding: .utf8) {
-                                mentions?.append(mention)
+                            if let mention = String(data: dataCopy[offset..<offset+length], encoding: .utf8),
+                               let sanitizedMention = InputValidator.validateNickname(mention) {
+                                mentions?.append(sanitizedMention)
                             }
                             offset += length
                         }

@@ -57,4 +57,26 @@ final class BitchatMessageTests: XCTestCase {
         XCTAssertNotNil(decoded)
         XCTAssertNil(decoded?.senderPeerID)
     }
+
+    func testBinaryDecodeSanitizesSenderRecipientAndMentions() {
+        let message = BitchatMessage(
+            id: "mid-sanitize",
+            sender: "   ",
+            content: "hello",
+            timestamp: Date(),
+            isRelay: false,
+            isPrivate: true,
+            recipientNickname: "   ",
+            senderPeerID: PeerID(str: "abcdef0123456789"),
+            mentions: ["alice", "  ", "b\nob"]
+        )
+
+        let payload = message.toBinaryPayload()
+        let decoded = payload.flatMap(BitchatMessage.init)
+
+        XCTAssertNotNil(decoded)
+        XCTAssertEqual(decoded?.sender, "unknown")
+        XCTAssertNil(decoded?.recipientNickname)
+        XCTAssertEqual(decoded?.mentions, ["alice", "bob"])
+    }
 }
