@@ -16,6 +16,7 @@ final class NostrTransport: Transport {
     private var isSendingReadAcks = false
     private let readAckInterval: TimeInterval = TransportConfig.nostrReadAckInterval
     private let readAckQueueCap: Int = TransportConfig.nostrReadAckQueueCap
+    private let maxEmbeddedPayloadBytes: Int = TransportConfig.nostrEmbeddedPayloadMaxBytes
     private let keychain: KeychainManagerProtocol
 
     init(keychain: KeychainManagerProtocol) {
@@ -66,6 +67,7 @@ final class NostrTransport: Transport {
     func sendPrivateMessage(_ content: String, to peerID: PeerID, recipientNickname: String, messageID: String) {
         guard peerID.isValid else { return }
         guard content.utf8.count <= InputValidator.Limits.maxMessageLength else { return }
+        guard content.utf8.count <= maxEmbeddedPayloadBytes else { return }
         guard let safeMessageID = InputValidator.validateMessageID(messageID) else { return }
         guard let senderRoutingPeerID = normalizedSenderPeerID() else { return }
         Task { @MainActor in
@@ -193,6 +195,7 @@ extension NostrTransport {
         guard !recipientHex.isEmpty else { return }
         guard Data(hexString: recipientHex)?.count == 32 else { return }
         guard content.utf8.count <= InputValidator.Limits.maxMessageLength else { return }
+        guard content.utf8.count <= maxEmbeddedPayloadBytes else { return }
         guard InputValidator.validateMessageID(messageID) != nil else { return }
         guard let senderRoutingPeerID = normalizedSenderPeerID() else { return }
         Task { @MainActor in
