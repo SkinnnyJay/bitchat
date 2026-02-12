@@ -88,7 +88,11 @@ final class WiFiDirectTransport: NSObject {
 
     func didChangeAvailability(_ available: Bool) {
         dispatchOnMain { [weak self] in
-            self?.delegate?.wifiTransportDidChangeAvailability(available)
+            guard let self else { return }
+            if !available {
+                self.currentPeers = []
+            }
+            self.delegate?.wifiTransportDidChangeAvailability(available)
         }
     }
 

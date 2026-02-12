@@ -65,6 +65,11 @@ final class WiFiDirectTransportTests: XCTestCase {
         func simulateReceive(_ data: Data, from peerID: String) {
             owner?.didReceive(data, from: peerID)
         }
+
+        func simulateAvailability(_ available: Bool) {
+            isAvailable = available
+            owner?.didChangeAvailability(available)
+        }
     }
 
     private enum SampleError: Error {
@@ -220,5 +225,26 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertTrue(delegate.peerUpdates.contains(["peer-a"]))
         XCTAssertTrue(delegate.peerUpdates.contains([]))
         XCTAssertEqual(backend.resetStateCount, 1)
+    }
+
+    func testAvailabilityDropClearsPeersWithoutStopDiscovery() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let delegate = MockDelegate()
+        transport.delegate = delegate
+
+        let expect = expectation(description: "availability drop clears peers")
+        transport.startDiscovery()
+        backend.simulatePeerUpdate(["peer-a"])
+        backend.simulateAvailability(false)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(delegate.availability, [true, false])
+        XCTAssertTrue(delegate.peerUpdates.contains(["peer-a"]))
+        XCTAssertTrue(delegate.peerUpdates.contains([]))
     }
 }
