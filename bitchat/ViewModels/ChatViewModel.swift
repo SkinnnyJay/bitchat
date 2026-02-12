@@ -530,6 +530,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Initialize services
         self.commandProcessor = CommandProcessor(identityManager: identityManager)
         self.privateChatManager = PrivateChatManager(meshService: meshService)
+        for messageID in self.sentReadReceiptOrder {
+            self.privateChatManager.markReadReceiptSent(messageID)
+        }
         self.unifiedPeerService = UnifiedPeerService(meshService: meshService, identityManager: identityManager)
         let nostrTransport = NostrTransport(keychain: keychain)
         self.messageRouter = MessageRouter(mesh: meshService, nostr: nostrTransport)
