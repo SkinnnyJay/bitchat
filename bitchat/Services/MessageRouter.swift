@@ -182,7 +182,7 @@ final class MessageRouter {
             ackType: .delivered,
             messageID: messageID,
             to: peerID,
-            senderNickname: nil
+            senderNickname: mesh.myNickname
         ) {
             return
         }

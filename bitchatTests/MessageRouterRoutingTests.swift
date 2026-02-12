@@ -951,6 +951,7 @@ final class MessageRouterRoutingTests: XCTestCase {
     func testRoutesDeliveryAckViaWiFiWhenPeerIsAvailable() throws {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
+        mesh.setNickname("sender-nick")
         let nostr = NostrTransport(keychain: MockKeychain())
         let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
@@ -964,6 +965,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let envelope = try JSONDecoder().decode(WiFiDirectAckEnvelope.self, from: backend.sentPayloads[0].0)
         XCTAssertEqual(envelope.ackType, .delivered)
         XCTAssertEqual(envelope.messageID, "mid-delivered-1")
+        XCTAssertEqual(envelope.senderNickname, "sender-nick")
         XCTAssertTrue(mesh.sentDeliveryAcks.isEmpty)
     }
 
