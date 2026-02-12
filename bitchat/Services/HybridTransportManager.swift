@@ -99,17 +99,24 @@ final class HybridTransportManager {
     private let meshTransport: Transport
     private let wifiTransport: WiFiDirectTransport
     private let wifiRoutingPolicy: WiFiDirectRoutingPolicy
+    private let inboundTimestampMaxAgeSeconds: TimeInterval
+    private let inboundTimestampFutureSkewSeconds: TimeInterval
+    private let nowProvider: () -> Date
 
     weak var delegate: HybridTransportManagerDelegate?
 
     init(
         meshTransport: Transport,
         wifiTransport: WiFiDirectTransport? = nil,
-        wifiRoutingPolicy: WiFiDirectRoutingPolicy = WiFiDirectRoutingPolicy()
+        wifiRoutingPolicy: WiFiDirectRoutingPolicy = WiFiDirectRoutingPolicy(),
+        nowProvider: @escaping () -> Date = Date.init
     ) {
         self.meshTransport = meshTransport
         self.wifiTransport = wifiTransport ?? WiFiDirectTransport(localPeerID: meshTransport.myPeerID.id)
         self.wifiRoutingPolicy = wifiRoutingPolicy
+        self.inboundTimestampMaxAgeSeconds = TransportConfig.messageRouterInboundWiFiTimestampMaxAgeSeconds
+        self.inboundTimestampFutureSkewSeconds = TransportConfig.messageRouterInboundWiFiTimestampFutureSkewSeconds
+        self.nowProvider = nowProvider
         self.wifiTransport.delegate = self
     }
 
@@ -202,6 +209,18 @@ final class HybridTransportManager {
         }
         return claimed.toShort().id == local.toShort().id
     }
+
+    private func isInboundTimestampAcceptable(_ createdAtMs: UInt64) -> Bool {
+        let createdAt = Date(timeIntervalSince1970: TimeInterval(createdAtMs) / 1000)
+        let now = nowProvider()
+        if createdAt > now.addingTimeInterval(inboundTimestampFutureSkewSeconds) {
+            return false
+        }
+        if createdAt < now.addingTimeInterval(-inboundTimestampMaxAgeSeconds) {
+            return false
+        }
+        return true
+    }
 }
 
 extension HybridTransportManager: WiFiDirectTransportDelegate {
@@ -219,7 +238,8 @@ extension HybridTransportManager: WiFiDirectTransportDelegate {
                   envelope.messageType == "private",
                   envelope.version == WiFiDirectEnvelopeVersion.current,
                   self.senderMatchesTransportPeerID(claimedSenderID: envelope.senderPeerID, transportPeerID: peerID),
-                  self.recipientMatchesLocalPeerID(envelope.recipientPeerID) else {
+                  self.recipientMatchesLocalPeerID(envelope.recipientPeerID),
+                  self.isInboundTimestampAcceptable(envelope.createdAtMs) else {
                 return
             }
             self.delegate?.hybridTransportManager(self, didReceivePrivateEnvelope: envelope)

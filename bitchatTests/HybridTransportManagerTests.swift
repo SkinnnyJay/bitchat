@@ -177,4 +177,41 @@ final class HybridTransportManagerTests: XCTestCase {
         XCTAssertEqual(delegate.receivedEnvelopes.count, 1)
         XCTAssertEqual(delegate.receivedEnvelopes[0].messageID, "mid-3")
     }
+
+    @MainActor
+    func testRejectsInboundPrivateEnvelopeWithStaleTimestamp() throws {
+        let mesh = MockTransport()
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let fixedNow = Date()
+        let manager = HybridTransportManager(meshTransport: mesh, wifiTransport: wifi, nowProvider: { fixedNow })
+        let delegate = MockDelegate()
+        manager.delegate = delegate
+
+        let staleCreatedAt = UInt64(
+            fixedNow
+                .addingTimeInterval(-(TransportConfig.messageRouterInboundWiFiTimestampMaxAgeSeconds + 1))
+                .timeIntervalSince1970 * 1000
+        )
+        let payloadObject: [String: Any] = [
+            "version": WiFiDirectEnvelopeVersion.current,
+            "messageType": "private",
+            "senderPeerID": "peer-stale",
+            "recipientPeerID": mesh.myPeerID.id,
+            "recipientNickname": "self",
+            "messageID": "mid-stale",
+            "content": "hello",
+            "createdAtMs": staleCreatedAt
+        ]
+        let payload = try JSONSerialization.data(withJSONObject: payloadObject, options: [])
+        backend.simulateIncoming(payload, from: "peer-stale")
+
+        let expect = expectation(description: "stale envelope should be ignored")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertTrue(delegate.receivedEnvelopes.isEmpty)
+    }
 }
