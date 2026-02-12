@@ -39,6 +39,10 @@ final class GossipSyncManager {
         return canonical.bare.lowercased()
     }
 
+    static func isValidRoutingSenderData(_ senderID: Data) -> Bool {
+        senderID.count == 8
+    }
+
     func start() {
         stop()
         let timer = DispatchSource.makeTimerSource(queue: queue)
@@ -77,6 +81,7 @@ final class GossipSyncManager {
         let idHex = PacketIdUtil.computeId(packet).hexEncodedString()
 
         if isBroadcastMessage {
+            guard Self.isValidRoutingSenderData(packet.senderID) else { return }
             if messages[idHex] == nil {
                 messages[idHex] = packet
                 messageOrder.append(idHex)
@@ -88,6 +93,7 @@ final class GossipSyncManager {
                 }
             }
         } else if isAnnounce {
+            guard Self.isValidRoutingSenderData(packet.senderID) else { return }
             let sender = packet.senderID.hexEncodedString()
             latestAnnouncementByPeer[sender] = (id: idHex, packet: packet)
         }

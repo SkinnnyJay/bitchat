@@ -3,6 +3,11 @@ import XCTest
 @testable import bitchat
 
 final class GossipSyncManagerTests: XCTestCase {
+    func testIsValidRoutingSenderDataRequiresEightBytes() {
+        XCTAssertTrue(GossipSyncManager.isValidRoutingSenderData(Data(repeating: 0x01, count: 8)))
+        XCTAssertFalse(GossipSyncManager.isValidRoutingSenderData(Data(repeating: 0x01, count: 7)))
+    }
+
     func testPacketIDBytesAcceptsCanonicalHexID() {
         let idHex = String(repeating: "ab", count: 16)
 
@@ -132,6 +137,37 @@ final class GossipSyncManagerTests: XCTestCase {
 
         XCTAssertEqual(lastPacket.type, MessageType.requestSync.rawValue)
         XCTAssertNotNil(RequestSyncPacket.decode(from: lastPacket.payload))
+    }
+
+    func testInvalidAnnouncementSenderIDIsIgnoredDuringSyncResponse() {
+        let manager = GossipSyncManager(myPeerID: "0102030405060708")
+        let delegate = RecordingDelegate()
+        let noAnnouncementExpectation = expectation(description: "invalid announce ignored")
+        noAnnouncementExpectation.isInverted = true
+        delegate.onSend = { packet in
+            if packet.type == MessageType.announce.rawValue {
+                noAnnouncementExpectation.fulfill()
+            }
+        }
+        manager.delegate = delegate
+
+        let invalidAnnouncePacket = BitchatPacket(
+            type: MessageType.announce.rawValue,
+            senderID: Data(repeating: 0x02, count: 3),
+            recipientID: nil,
+            timestamp: 1234,
+            payload: Data([0x01]),
+            signature: nil,
+            ttl: 1
+        )
+
+        manager.onPublicPacketSeen(invalidAnnouncePacket)
+        manager.handleRequestSync(
+            from: "1122334455667788",
+            request: RequestSyncPacket(p: 1, m: 1, data: Data())
+        )
+
+        wait(for: [noAnnouncementExpectation], timeout: 0.2)
     }
 }
 
