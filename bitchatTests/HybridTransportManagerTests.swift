@@ -138,6 +138,8 @@ final class HybridTransportManagerTests: XCTestCase {
         let manager = HybridTransportManager(meshTransport: mesh, wifiTransport: wifi)
 
         manager.start()
+        manager.start()
+        manager.stop()
         manager.stop()
 
         XCTAssertEqual(mesh.startServicesCallCount, 1)

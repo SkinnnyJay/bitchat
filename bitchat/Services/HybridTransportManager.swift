@@ -111,6 +111,7 @@ final class HybridTransportManager {
     private var inboundDedupByKey: [String: Date] = [:]
     private var inboundDedupOrder: [String] = []
     private var inboundSenderEventTimestamps: [String: [Date]] = [:]
+    private var isRunning = false
 
     weak var delegate: HybridTransportManagerDelegate?
 
@@ -136,11 +137,15 @@ final class HybridTransportManager {
     }
 
     func start() {
+        guard !isRunning else { return }
+        isRunning = true
         meshTransport.startServices()
         wifiTransport.startDiscovery()
     }
 
     func stop() {
+        guard isRunning else { return }
+        isRunning = false
         wifiTransport.stopDiscovery()
         meshTransport.stopServices()
     }
