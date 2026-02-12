@@ -335,6 +335,39 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testDoesNotPostNotificationForPrivateEnvelopeSenderMismatch() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "should not receive sender-mismatch private notification")
+        expect.isInverted = true
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expect.fulfill()
+        }
+
+        let envelope = WiFiDirectPrivateEnvelope(
+            senderPeerID: "claimed-peer",
+            recipientPeerID: mesh.myPeerID.id,
+            recipientNickname: "self",
+            messageID: "msg-sender-mismatch-private",
+            content: "hello"
+        )
+        let payload = try JSONEncoder().encode(envelope)
+        backend.simulateIncoming(payload, from: "actual-peer")
+
+        wait(for: [expect], timeout: 0.2)
+        NotificationCenter.default.removeObserver(token)
+    }
+
+    @MainActor
     func testOutboxIsCappedPerPeerWhenNoRouteAvailable() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
@@ -469,6 +502,39 @@ final class MessageRouterRoutingTests: XCTestCase {
         NotificationCenter.default.removeObserver(token)
         XCTAssertEqual(receivedEnvelope?.messageID, "mid-read-2")
         XCTAssertEqual(receivedEnvelope?.ackType, .read)
+    }
+
+    @MainActor
+    func testDoesNotPostNotificationForAckEnvelopeSenderMismatch() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "should not receive sender-mismatch ack notification")
+        expect.isInverted = true
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectAckEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expect.fulfill()
+        }
+
+        let envelope = WiFiDirectAckEnvelope(
+            ackType: .delivered,
+            senderPeerID: "claimed-peer",
+            recipientPeerID: mesh.myPeerID.id,
+            messageID: "mid-sender-mismatch-ack",
+            senderNickname: "peer"
+        )
+        let payload = try JSONEncoder().encode(envelope)
+        backend.simulateIncoming(payload, from: "actual-peer")
+
+        wait(for: [expect], timeout: 0.2)
+        NotificationCenter.default.removeObserver(token)
     }
 
     @MainActor
