@@ -81,7 +81,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         var enrichedPeers: [BitchatPeer] = []
         var connected: Set<PeerID> = []
         var addedPeerIDs: Set<PeerID> = []
-        var meshPeersByDedupKey: [String: BitchatPeer] = [:]
+        var candidateMeshPeers: [BitchatPeer] = []
         
         // Phase 1: Add all mesh peers (connected and reachable)
         for peerInfo in meshPeers {
@@ -96,17 +96,10 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
                 meshAttached: hasAnyConnected
             )
 
-            let dedupKey = Self.meshDedupKey(for: peer.peerID)
-            if let existing = meshPeersByDedupKey[dedupKey] {
-                if Self.shouldPreferMeshPeer(peer, over: existing) {
-                    meshPeersByDedupKey[dedupKey] = peer
-                }
-            } else {
-                meshPeersByDedupKey[dedupKey] = peer
-            }
+            candidateMeshPeers.append(peer)
         }
 
-        let dedupedMeshPeers = Array(meshPeersByDedupKey.values)
+        let dedupedMeshPeers = Self.deduplicateMeshPeers(candidateMeshPeers)
         enrichedPeers.append(contentsOf: dedupedMeshPeers)
         for peer in dedupedMeshPeers {
             if peer.isConnected { connected.insert(peer.peerID) }
@@ -408,6 +401,21 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             return normalized
         }
         return peerID.id.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    static func deduplicateMeshPeers(_ peers: [BitchatPeer]) -> [BitchatPeer] {
+        var peersByDedupKey: [String: BitchatPeer] = [:]
+        for peer in peers {
+            let dedupKey = meshDedupKey(for: peer.peerID)
+            if let existing = peersByDedupKey[dedupKey] {
+                if shouldPreferMeshPeer(peer, over: existing) {
+                    peersByDedupKey[dedupKey] = peer
+                }
+            } else {
+                peersByDedupKey[dedupKey] = peer
+            }
+        }
+        return Array(peersByDedupKey.values)
     }
 
     static func shouldPreferMeshPeer(_ candidate: BitchatPeer, over existing: BitchatPeer) -> Bool {

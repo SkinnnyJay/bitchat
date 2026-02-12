@@ -292,6 +292,49 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertTrue(UnifiedPeerService.shouldPreferMeshPeer(candidate, over: existing))
     }
 
+    func testDeduplicateMeshPeersKeepsPreferredPeerForEquivalentKey() {
+        let fullNoiseHex = String(repeating: "ab", count: 32)
+        let shortID = PeerID(str: fullNoiseHex).toShort().bare
+        let connectedPeer = BitchatPeer(
+            peerID: PeerID(str: shortID),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "connected",
+            isConnected: true,
+            isReachable: true
+        )
+        let disconnectedEquivalent = BitchatPeer(
+            peerID: PeerID(str: fullNoiseHex),
+            noisePublicKey: Data(hexString: fullNoiseHex) ?? Data(),
+            nickname: "disconnected",
+            isConnected: false,
+            isReachable: true
+        )
+
+        let deduped = UnifiedPeerService.deduplicateMeshPeers([disconnectedEquivalent, connectedPeer])
+
+        XCTAssertEqual(deduped.count, 1)
+        XCTAssertEqual(deduped.first, connectedPeer)
+    }
+
+    func testDeduplicateMeshPeersKeepsGeoPrefixDistinctFromMeshID() {
+        let meshPeer = BitchatPeer(
+            peerID: PeerID(str: "abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "mesh"
+        )
+        let geoPeer = BitchatPeer(
+            peerID: PeerID(str: "nostr_abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x22, count: 32),
+            nickname: "geo"
+        )
+
+        let deduped = UnifiedPeerService.deduplicateMeshPeers([meshPeer, geoPeer])
+
+        XCTAssertEqual(deduped.count, 2)
+        XCTAssertTrue(deduped.contains(meshPeer))
+        XCTAssertTrue(deduped.contains(geoPeer))
+    }
+
     func testShouldIncludeFavoriteAsOfflinePeerRejectsEquivalentExistingPeer() {
         let fullNoiseHex = String(repeating: "ab", count: 32)
         let shortID = PeerID(str: fullNoiseHex).toShort().bare
