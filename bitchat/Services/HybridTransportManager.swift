@@ -195,43 +195,15 @@ final class HybridTransportManager {
     }
 
     private func wifiPeerIDCandidates(for peerID: PeerID) -> [String] {
-        var candidates: [String] = [peerID.id]
-        if peerID.prefix != .empty, !peerID.bare.isEmpty {
-            candidates.append(peerID.bare)
-        }
-        let short = peerID.toShort().id
-        if short != peerID.id {
-            candidates.append(short)
-        }
-        if let noiseKey = peerID.noiseKey {
-            let full = noiseKey.hexEncodedString()
-            if full != peerID.id && !candidates.contains(full) {
-                candidates.append(full)
-            }
-        }
-        var unique: [String] = []
-        for candidate in candidates where !unique.contains(candidate) {
-            unique.append(candidate)
-        }
-        return unique
+        WiFiPeerIdentity.candidateIDs(for: peerID)
     }
 
     private func senderMatchesTransportPeerID(claimedSenderID: String, transportPeerID: String) -> Bool {
-        let claimed = PeerID(str: claimedSenderID)
-        let observed = PeerID(str: transportPeerID)
-        if claimed.id == observed.id {
-            return true
-        }
-        return claimed.toShort().id == observed.toShort().id
+        WiFiPeerIdentity.isEquivalent(claimedSenderID, transportPeerID)
     }
 
     private func recipientMatchesLocalPeerID(_ claimedRecipientID: String) -> Bool {
-        let claimed = PeerID(str: claimedRecipientID)
-        let local = meshTransport.myPeerID
-        if claimed.id == local.id {
-            return true
-        }
-        return claimed.toShort().id == local.toShort().id
+        WiFiPeerIdentity.isEquivalent(claimedRecipientID, meshTransport.myPeerID.id)
     }
 
     private func isInboundTimestampAcceptable(_ createdAtMs: UInt64) -> Bool {
@@ -275,7 +247,7 @@ final class HybridTransportManager {
     }
 
     private func normalizedIdentityKey(_ peerID: String) -> String {
-        PeerID(str: peerID).toShort().id
+        WiFiPeerIdentity.normalizedKey(peerID)
     }
 
     private func allowInboundEvent(from senderID: String) -> Bool {
