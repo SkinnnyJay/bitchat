@@ -677,6 +677,16 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         }
         return nil
     }
+
+    static func favoriteNicknameForPersistence(_ nickname: String, fallbackDisplayName: String) -> String {
+        if let sanitized = InputValidator.validateNickname(nickname) {
+            return sanitized
+        }
+        if let sanitizedFallback = InputValidator.validateNickname(fallbackDisplayName) {
+            return sanitizedFallback
+        }
+        return "user"
+    }
     
     /// Get peer by ID
     func getPeer(by id: String) -> BitchatPeer? {
@@ -775,7 +785,11 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         }
         
         // Use displayName as fallback (which shows ID prefix if nickname is empty)
-        let finalNickname = actualNickname.isEmpty ? peer.displayName : actualNickname
+        let preferredNickname = actualNickname.isEmpty ? peer.displayName : actualNickname
+        let finalNickname = Self.favoriteNicknameForPersistence(
+            preferredNickname,
+            fallbackDisplayName: peer.displayName
+        )
         
         if wasFavorite {
             // Remove favorite

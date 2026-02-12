@@ -683,6 +683,27 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         XCTAssertNil(UnifiedPeerService.favoriteNoisePublicKey(for: peer))
     }
 
+    func testFavoriteNicknameForPersistencePrefersSanitizedNickname() {
+        XCTAssertEqual(
+            UnifiedPeerService.favoriteNicknameForPersistence("alice", fallbackDisplayName: "bob"),
+            "alice"
+        )
+    }
+
+    func testFavoriteNicknameForPersistenceFallsBackToDisplayName() {
+        XCTAssertEqual(
+            UnifiedPeerService.favoriteNicknameForPersistence("   ", fallbackDisplayName: "bob"),
+            "bob"
+        )
+    }
+
+    func testFavoriteNicknameForPersistenceFallsBackToUserWhenBothInvalid() {
+        XCTAssertEqual(
+            UnifiedPeerService.favoriteNicknameForPersistence("   ", fallbackDisplayName: "   "),
+            "user"
+        )
+    }
+
     func testPeerIDLookupMatchesNicknameCaseInsensitivelyAndTrimmed() {
         let peer = BitchatPeer(
             peerID: PeerID(str: "abcdef0123456789"),
