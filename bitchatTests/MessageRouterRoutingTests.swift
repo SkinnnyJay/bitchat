@@ -1609,6 +1609,59 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testInboundWiFiRateLimitTreatsFullAndShortSenderIDsAsSameSender() throws {
+        let noiseKey = Data(repeating: 0x6A, count: 32)
+        let senderFull = PeerID(hexData: noiseKey)
+        let senderShort = PeerID(publicKey: noiseKey)
+
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        let fixedNow = Date()
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { fixedNow })
+
+        var receivedCount = 0
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { _ in
+            receivedCount += 1
+        }
+
+        let maxEvents = TransportConfig.messageRouterInboundWiFiSenderRateMaxEvents
+        let createdAtMs = UInt64(fixedNow.timeIntervalSince1970 * 1000)
+        for idx in 0..<(maxEvents + 2) {
+            let useFull = idx % 2 == 0
+            let claimedSender = useFull ? senderFull.id : senderShort.id
+            let observedSender = useFull ? senderShort.id : senderFull.id
+            let payloadObject: [String: Any] = [
+                "version": WiFiDirectEnvelopeVersion.current,
+                "messageType": "private",
+                "senderPeerID": claimedSender,
+                "recipientPeerID": mesh.myPeerID.id,
+                "recipientNickname": "self",
+                "messageID": "mid-rate-cross-\(idx)",
+                "content": "hello",
+                "createdAtMs": createdAtMs
+            ]
+            let payload = try JSONSerialization.data(withJSONObject: payloadObject, options: [])
+            backend.simulateIncoming(payload, from: observedSender)
+        }
+
+        let expect = expectation(description: "cross-id sender rate limit settles")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+        NotificationCenter.default.removeObserver(token)
+
+        XCTAssertEqual(receivedCount, maxEvents)
+    }
+
+    @MainActor
     func testInboundWiFiRateLimiterCapsTrackedSenderBuckets() throws {
         let mesh = MockTransport()
         let nostr = NostrTransport(keychain: MockKeychain())

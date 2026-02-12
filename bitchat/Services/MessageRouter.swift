@@ -534,7 +534,9 @@ final class MessageRouter {
     private func cleanupInboundWiFiSenderRate(now: Date) {
         let cutoff = now.addingTimeInterval(-inboundWiFiSenderRateWindowSeconds)
         guard !inboundWiFiSenderEventTimestamps.isEmpty else { return }
-        for (sender, events) in inboundWiFiSenderEventTimestamps {
+        let senders = Array(inboundWiFiSenderEventTimestamps.keys)
+        for sender in senders {
+            guard let events = inboundWiFiSenderEventTimestamps[sender] else { continue }
             let filtered = events.filter { $0 >= cutoff }
             if filtered.isEmpty {
                 inboundWiFiSenderEventTimestamps.removeValue(forKey: sender)

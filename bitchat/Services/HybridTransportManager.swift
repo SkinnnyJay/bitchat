@@ -292,7 +292,9 @@ final class HybridTransportManager {
     private func cleanupInboundSenderRate(now: Date) {
         let cutoff = now.addingTimeInterval(-inboundSenderRateWindowSeconds)
         guard !inboundSenderEventTimestamps.isEmpty else { return }
-        for (sender, events) in inboundSenderEventTimestamps {
+        let senders = Array(inboundSenderEventTimestamps.keys)
+        for sender in senders {
+            guard let events = inboundSenderEventTimestamps[sender] else { continue }
             let filtered = events.filter { $0 >= cutoff }
             if filtered.isEmpty {
                 inboundSenderEventTimestamps.removeValue(forKey: sender)
