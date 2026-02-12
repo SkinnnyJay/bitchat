@@ -4,6 +4,7 @@ struct WiFiDirectCapabilityNegotiator {
     private enum Limits {
         static let maxVersionLength = 16
         static let maxCapabilitiesLength = 512
+        static let maxCapabilityTokenLength = 32
     }
 
     static let currentProtocolVersion = 1
@@ -80,6 +81,7 @@ struct WiFiDirectCapabilityNegotiator {
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
                 .filter {
                     !$0.isEmpty &&
+                    $0.utf8.count <= Limits.maxCapabilityTokenLength &&
                     $0.rangeOfCharacter(from: allowed.inverted) == nil
                 }
         )
