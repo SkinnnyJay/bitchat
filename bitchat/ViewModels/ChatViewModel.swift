@@ -2797,12 +2797,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
     @MainActor
     private func isWiFiEnvelopeForCurrentPeer(_ recipientPeerID: String) -> Bool {
-        let claimed = PeerID(str: recipientPeerID)
-        let local = meshService.myPeerID
-        if claimed == local {
-            return true
-        }
-        return claimed.toShort() == local.toShort()
+        WiFiPeerIdentity.isEquivalent(recipientPeerID, meshService.myPeerID.id)
     }
     
     @MainActor
