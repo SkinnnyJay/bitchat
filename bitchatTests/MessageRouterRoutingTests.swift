@@ -245,7 +245,7 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
-    func testFallsBackToMeshWhenWiFiPrivateMessageIDExceedsLimit() {
+    func testDropsPrivateMessageWhenMessageIDExceedsLimit() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
         mesh.setReachable(recipient, isReachable: true)
@@ -267,12 +267,12 @@ final class MessageRouterRoutingTests: XCTestCase {
         router.sendPrivate("hello", to: recipient, recipientNickname: "peer", messageID: oversizedMessageID)
 
         XCTAssertEqual(backend.sentPayloads.count, 0)
-        XCTAssertEqual(mesh.sentPrivateMessages.count, 1)
-        XCTAssertEqual(mesh.sentPrivateMessages[0].messageID, oversizedMessageID)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 0)
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 0)
     }
 
     @MainActor
-    func testFallsBackToMeshWhenWiFiPrivateMessageIDHasSurroundingWhitespace() {
+    func testDropsPrivateMessageWhenMessageIDHasSurroundingWhitespace() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
         mesh.setReachable(recipient, isReachable: true)
@@ -294,8 +294,8 @@ final class MessageRouterRoutingTests: XCTestCase {
         router.sendPrivate("hello", to: recipient, recipientNickname: "peer", messageID: whitespaceMessageID)
 
         XCTAssertEqual(backend.sentPayloads.count, 0)
-        XCTAssertEqual(mesh.sentPrivateMessages.count, 1)
-        XCTAssertEqual(mesh.sentPrivateMessages[0].messageID, whitespaceMessageID)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 0)
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 0)
     }
 
     @MainActor
@@ -1373,7 +1373,7 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
-    func testFallsBackFromWiFiReadReceiptWhenMessageIDExceedsLimit() {
+    func testDropsReadReceiptWhenMessageIDExceedsLimit() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
         mesh.setReachable(recipient, isReachable: true)
@@ -1389,8 +1389,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         router.sendReadReceipt(receipt, to: recipient)
 
         XCTAssertEqual(backend.sentPayloads.count, 0)
-        XCTAssertEqual(mesh.sentReadReceipts.count, 1)
-        XCTAssertEqual(mesh.sentReadReceipts[0].receipt.originalMessageID, oversizedMessageID)
+        XCTAssertEqual(mesh.sentReadReceipts.count, 0)
     }
 
     @MainActor
@@ -1475,7 +1474,7 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
-    func testFallsBackFromWiFiDeliveryAckWhenMessageIDIsEmpty() {
+    func testDropsDeliveryAckWhenMessageIDIsEmpty() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
         mesh.setReachable(recipient, isReachable: true)
@@ -1489,12 +1488,11 @@ final class MessageRouterRoutingTests: XCTestCase {
         router.sendDeliveryAck("   ", to: recipient)
 
         XCTAssertEqual(backend.sentPayloads.count, 0)
-        XCTAssertEqual(mesh.sentDeliveryAcks.count, 1)
-        XCTAssertEqual(mesh.sentDeliveryAcks[0].messageID, "   ")
+        XCTAssertEqual(mesh.sentDeliveryAcks.count, 0)
     }
 
     @MainActor
-    func testFallsBackFromWiFiDeliveryAckWhenMessageIDExceedsLimit() {
+    func testDropsDeliveryAckWhenMessageIDExceedsLimit() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
         mesh.setReachable(recipient, isReachable: true)
@@ -1509,8 +1507,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         router.sendDeliveryAck(oversizedMessageID, to: recipient)
 
         XCTAssertEqual(backend.sentPayloads.count, 0)
-        XCTAssertEqual(mesh.sentDeliveryAcks.count, 1)
-        XCTAssertEqual(mesh.sentDeliveryAcks[0].messageID, oversizedMessageID)
+        XCTAssertEqual(mesh.sentDeliveryAcks.count, 0)
     }
 
     @MainActor

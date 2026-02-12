@@ -106,11 +106,15 @@ final class MessageRouter {
     }
 
     func sendPrivate(_ content: String, to peerID: PeerID, recipientNickname: String, messageID: String) {
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else {
+            SecureLogger.warning("Dropping PM with invalid message ID for \(peerID.id.prefix(8))…", category: .session)
+            return
+        }
         if routePrivateViaWiFi(
             content,
             to: peerID,
             recipientNickname: recipientNickname,
-            messageID: messageID,
+            messageID: safeMessageID,
             requirePolicyThreshold: true
         ) {
             return
@@ -125,19 +129,19 @@ final class MessageRouter {
 
         switch routingPolicy.routePrivateMessage(context) {
         case .mesh?:
-            SecureLogger.debug("Routing PM via mesh (reachable) to \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
+            SecureLogger.debug("Routing PM via mesh (reachable) to \(peerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…", category: .session)
             // BLEService will initiate a handshake if needed and queue the message
-            mesh.sendPrivateMessage(content, to: peerID, recipientNickname: recipientNickname, messageID: messageID)
+            mesh.sendPrivateMessage(content, to: peerID, recipientNickname: recipientNickname, messageID: safeMessageID)
         case .nostr?:
-            SecureLogger.debug("Routing PM via Nostr to \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
-            nostr.sendPrivateMessage(content, to: peerID, recipientNickname: recipientNickname, messageID: messageID)
+            SecureLogger.debug("Routing PM via Nostr to \(peerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…", category: .session)
+            nostr.sendPrivateMessage(content, to: peerID, recipientNickname: recipientNickname, messageID: safeMessageID)
         case nil:
             let outboxPeerID = normalizedOutboxPeerID(for: peerID)
             if routePrivateViaWiFi(
                 content,
                 to: outboxPeerID,
                 recipientNickname: recipientNickname,
-                messageID: messageID,
+                messageID: safeMessageID,
                 requirePolicyThreshold: false
             ) {
                 return
@@ -145,12 +149,12 @@ final class MessageRouter {
             // Queue for later (when mesh connects or Nostr mapping appears)
             pruneExpiredOutboxMessages(for: outboxPeerID)
             if outbox[outboxPeerID] == nil { outbox[outboxPeerID] = [] }
-            outbox[outboxPeerID]?.removeAll { $0.messageID == messageID }
+            outbox[outboxPeerID]?.removeAll { $0.messageID == safeMessageID }
             outbox[outboxPeerID]?.append(
                 QueuedPrivateMessage(
                     content: content,
                     recipientNickname: recipientNickname,
-                    messageID: messageID,
+                    messageID: safeMessageID,
                     enqueuedAt: nowProvider()
                 )
             )
@@ -159,14 +163,18 @@ final class MessageRouter {
                 outbox[outboxPeerID]?.removeFirst(overflow)
                 SecureLogger.debug("Trimmed outbox for \(outboxPeerID.id.prefix(8))… by \(overflow) entries to cap \(outboxPerPeerCap)", category: .session)
             }
-            SecureLogger.debug("Queued PM for \(outboxPeerID.id.prefix(8))… (no mesh, no Nostr mapping) id=\(messageID.prefix(8))…", category: .session)
+            SecureLogger.debug("Queued PM for \(outboxPeerID.id.prefix(8))… (no mesh, no Nostr mapping) id=\(safeMessageID.prefix(8))…", category: .session)
         }
     }
 
     func sendReadReceipt(_ receipt: ReadReceipt, to peerID: PeerID) {
+        guard let safeMessageID = InputValidator.validateMessageID(receipt.originalMessageID) else {
+            SecureLogger.warning("Dropping READ ack with invalid message ID for \(peerID.id.prefix(8))…", category: .session)
+            return
+        }
         if routeAckViaWiFiIfAvailable(
             ackType: .read,
-            messageID: receipt.originalMessageID,
+            messageID: safeMessageID,
             to: peerID,
             senderNickname: receipt.readerNickname
         ) {
@@ -174,28 +182,42 @@ final class MessageRouter {
         }
         // Prefer mesh for reachable peers; BLE will queue if handshake is needed
         if mesh.isPeerReachable(peerID) {
-            SecureLogger.debug("Routing READ ack via mesh (reachable) to \(peerID.id.prefix(8))… id=\(receipt.originalMessageID.prefix(8))…", category: .session)
-            mesh.sendReadReceipt(receipt, to: peerID)
+            SecureLogger.debug("Routing READ ack via mesh (reachable) to \(peerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…", category: .session)
+            let safeReceipt = ReadReceipt(
+                originalMessageID: safeMessageID,
+                readerID: receipt.readerID,
+                readerNickname: receipt.readerNickname
+            )
+            mesh.sendReadReceipt(safeReceipt, to: peerID)
         } else {
-            SecureLogger.debug("Routing READ ack via Nostr to \(peerID.id.prefix(8))… id=\(receipt.originalMessageID.prefix(8))…", category: .session)
-            nostr.sendReadReceipt(receipt, to: peerID)
+            SecureLogger.debug("Routing READ ack via Nostr to \(peerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…", category: .session)
+            let safeReceipt = ReadReceipt(
+                originalMessageID: safeMessageID,
+                readerID: receipt.readerID,
+                readerNickname: receipt.readerNickname
+            )
+            nostr.sendReadReceipt(safeReceipt, to: peerID)
         }
     }
 
     func sendDeliveryAck(_ messageID: String, to peerID: PeerID) {
+        guard let safeMessageID = InputValidator.validateMessageID(messageID) else {
+            SecureLogger.warning("Dropping DELIVERED ack with invalid message ID for \(peerID.id.prefix(8))…", category: .session)
+            return
+        }
         if routeAckViaWiFiIfAvailable(
             ackType: .delivered,
-            messageID: messageID,
+            messageID: safeMessageID,
             to: peerID,
             senderNickname: mesh.myNickname
         ) {
             return
         }
         if mesh.isPeerReachable(peerID) {
-            SecureLogger.debug("Routing DELIVERED ack via mesh (reachable) to \(peerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
-            mesh.sendDeliveryAck(for: messageID, to: peerID)
+            SecureLogger.debug("Routing DELIVERED ack via mesh (reachable) to \(peerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…", category: .session)
+            mesh.sendDeliveryAck(for: safeMessageID, to: peerID)
         } else {
-            nostr.sendDeliveryAck(for: messageID, to: peerID)
+            nostr.sendDeliveryAck(for: safeMessageID, to: peerID)
         }
     }
 
@@ -244,11 +266,14 @@ final class MessageRouter {
             let content = message.content
             let nickname = message.recipientNickname
             let messageID = message.messageID
+            guard let safeMessageID = InputValidator.validateMessageID(messageID) else {
+                continue
+            }
             if routePrivateViaWiFi(
                 content,
                 to: outboxPeerID,
                 recipientNickname: nickname,
-                messageID: messageID,
+                messageID: safeMessageID,
                 requirePolicyThreshold: true
             ) {
                 continue
@@ -262,17 +287,17 @@ final class MessageRouter {
 
             switch routingPolicy.routePrivateMessage(context) {
             case .mesh?:
-                SecureLogger.debug("Outbox -> mesh for \(outboxPeerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
-                mesh.sendPrivateMessage(content, to: outboxPeerID, recipientNickname: nickname, messageID: messageID)
+                SecureLogger.debug("Outbox -> mesh for \(outboxPeerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…", category: .session)
+                mesh.sendPrivateMessage(content, to: outboxPeerID, recipientNickname: nickname, messageID: safeMessageID)
             case .nostr?:
-                SecureLogger.debug("Outbox -> Nostr for \(outboxPeerID.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
-                nostr.sendPrivateMessage(content, to: outboxPeerID, recipientNickname: nickname, messageID: messageID)
+                SecureLogger.debug("Outbox -> Nostr for \(outboxPeerID.id.prefix(8))… id=\(safeMessageID.prefix(8))…", category: .session)
+                nostr.sendPrivateMessage(content, to: outboxPeerID, recipientNickname: nickname, messageID: safeMessageID)
             case nil:
                 if routePrivateViaWiFi(
                     content,
                     to: outboxPeerID,
                     recipientNickname: nickname,
-                    messageID: messageID,
+                    messageID: safeMessageID,
                     requirePolicyThreshold: false
                 ) {
                     continue
