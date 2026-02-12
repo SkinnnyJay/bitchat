@@ -7,7 +7,7 @@ struct WiFiDirectCapabilityNegotiator {
         static let maxCapabilityTokenLength = 32
         static let maxCapabilityTokenCount = 32
     }
-    private static let invalidFieldSentinel = "__invalid__"
+    static let invalidFieldSentinel = "__invalid__"
 
     static let currentProtocolVersion = 1
     static let requiredCapabilities: Set<String> = ["pm"]

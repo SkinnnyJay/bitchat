@@ -160,7 +160,7 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
         let parsed = negotiator.parseDiscoveryInfo(from: context)
 
         XCTAssertEqual(parsed?["v"], "1")
-        XCTAssertEqual(parsed?["caps"], "__invalid__")
+        XCTAssertEqual(parsed?["caps"], WiFiDirectCapabilityNegotiator.invalidFieldSentinel)
         XCTAssertFalse(negotiator.isPeerCompatible(discoveryInfo: parsed))
     }
 
@@ -178,8 +178,8 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
         let context = try JSONSerialization.data(withJSONObject: raw, options: [])
 
         let parsed = negotiator.parseDiscoveryInfo(from: context)
-        XCTAssertEqual(parsed?["v"], "__invalid__")
-        XCTAssertEqual(parsed?["caps"], "__invalid__")
+        XCTAssertEqual(parsed?["v"], WiFiDirectCapabilityNegotiator.invalidFieldSentinel)
+        XCTAssertEqual(parsed?["caps"], WiFiDirectCapabilityNegotiator.invalidFieldSentinel)
         XCTAssertFalse(negotiator.isPeerCompatible(discoveryInfo: parsed))
     }
 
@@ -203,7 +203,7 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
 
         let parsed = negotiator.parseDiscoveryInfo(from: context)
 
-        XCTAssertEqual(parsed?["v"], "__invalid__")
+        XCTAssertEqual(parsed?["v"], WiFiDirectCapabilityNegotiator.invalidFieldSentinel)
         XCTAssertFalse(negotiator.isPeerCompatible(discoveryInfo: parsed))
     }
 
@@ -214,7 +214,7 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
 
         let parsed = negotiator.parseDiscoveryInfo(from: context)
 
-        XCTAssertEqual(parsed?["caps"], "__invalid__")
+        XCTAssertEqual(parsed?["caps"], WiFiDirectCapabilityNegotiator.invalidFieldSentinel)
         XCTAssertFalse(negotiator.isPeerCompatible(discoveryInfo: parsed))
     }
 
@@ -225,7 +225,7 @@ final class WiFiDirectCapabilityNegotiatorTests: XCTestCase {
 
         let parsed = negotiator.parseDiscoveryInfo(from: context)
 
-        XCTAssertEqual(parsed?["v"], "__invalid__")
+        XCTAssertEqual(parsed?["v"], WiFiDirectCapabilityNegotiator.invalidFieldSentinel)
         XCTAssertFalse(negotiator.isPeerCompatible(discoveryInfo: parsed))
     }
 }
