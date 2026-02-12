@@ -294,10 +294,11 @@ final class CommandProcessor {
         
         if add {
             let existingFavorite = FavoritesPersistenceService.shared.getFavoriteStatus(for: noisePublicKey)
+            let favoriteNickname = Self.favoriteNicknameForPersistence(nickname)
             FavoritesPersistenceService.shared.addFavorite(
                 peerNoisePublicKey: noisePublicKey,
                 peerNostrPublicKey: existingFavorite?.peerNostrPublicKey,
-                peerNickname: nickname
+                peerNickname: favoriteNickname
             )
             
             chatViewModel?.toggleFavorite(peerID: peerID)
@@ -322,6 +323,10 @@ final class CommandProcessor {
             return fallbackNoiseKey
         }
         return nil
+    }
+
+    static func favoriteNicknameForPersistence(_ nickname: String) -> String {
+        InputValidator.validateNickname(nickname) ?? "user"
     }
     
     private func handleHelp() -> CommandResult {

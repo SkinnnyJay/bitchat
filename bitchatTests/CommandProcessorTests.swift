@@ -95,4 +95,12 @@ final class CommandProcessorTests: XCTestCase {
 
         XCTAssertNil(resolved)
     }
+
+    func testFavoriteNicknameForPersistenceKeepsValidNickname() {
+        XCTAssertEqual(CommandProcessor.favoriteNicknameForPersistence("alice"), "alice")
+    }
+
+    func testFavoriteNicknameForPersistenceFallsBackToUserForInvalidInput() {
+        XCTAssertEqual(CommandProcessor.favoriteNicknameForPersistence("   "), "user")
+    }
 }
