@@ -136,4 +136,25 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertEqual(transport.peerCapabilities(peerID: "peer-a"), ["pm", "ack"])
         XCTAssertNil(transport.peerCapabilities(peerID: "missing"))
     }
+
+    func testStopDiscoveryClearsPeersAndPublishesUnavailable() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let delegate = MockDelegate()
+        transport.delegate = delegate
+
+        let expect = expectation(description: "stop discovery publishes reset events")
+        transport.startDiscovery()
+        backend.simulatePeerUpdate(["peer-a"])
+        transport.stopDiscovery()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(delegate.availability, [true, false])
+        XCTAssertTrue(delegate.peerUpdates.contains(["peer-a"]))
+        XCTAssertTrue(delegate.peerUpdates.contains([]))
+    }
 }

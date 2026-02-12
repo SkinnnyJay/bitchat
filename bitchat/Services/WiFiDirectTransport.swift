@@ -53,6 +53,8 @@ final class WiFiDirectTransport: NSObject {
         guard isDiscovering else { return }
         isDiscovering = false
         impl.stopDiscovery()
+        didUpdatePeers([])
+        didChangeAvailability(false)
     }
 
     func send(_ data: Data, to peerID: String? = nil) throws {
