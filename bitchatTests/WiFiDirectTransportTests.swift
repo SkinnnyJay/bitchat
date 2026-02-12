@@ -199,6 +199,22 @@ final class WiFiDirectTransportTests: XCTestCase {
         XCTAssertEqual(delegate.receives[0].from, "peer-a")
     }
 
+    func testPeerUpdatesAreTrimmedDeduplicatedAndSorted() {
+        let backend = MockBackend(localPeerID: "self")
+        let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        let delegate = MockDelegate()
+        transport.delegate = delegate
+
+        let expect = expectation(description: "normalized peer updates delivered")
+        backend.simulatePeerUpdate([" peer-b ", "", "peer-a", "peer-a", "   "])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            expect.fulfill()
+        }
+        wait(for: [expect], timeout: 1.0)
+
+        XCTAssertEqual(delegate.peerUpdates.last, ["peer-a", "peer-b"])
+    }
+
     func testSendWithoutPeersThrows() {
         let transport = WiFiDirectTransport()
         XCTAssertThrowsError(try transport.send(Data("hello".utf8)))
