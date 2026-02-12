@@ -1342,6 +1342,21 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         return value
     }
 
+    static func resolvedFavoriteNotificationPeerID(from peerID: String, resolvedPeer: BitchatPeer?) -> PeerID? {
+        let candidate = resolvedPeer?.peerID ?? PeerID(str: peerID.trimmingCharacters(in: .whitespacesAndNewlines))
+        return candidate.isValid ? candidate : nil
+    }
+
+    static func resolvedFavoriteNotificationNoisePublicKey(from peerID: String, resolvedPeer: BitchatPeer?) -> Data? {
+        if let resolvedPeer, let decoded = decodeNoisePublicKey(from: resolvedPeer.peerID.id) {
+            return decoded
+        }
+        if let decoded = decodeNoisePublicKey(from: peerID) {
+            return decoded
+        }
+        return validatedNoisePublicKey(resolvedPeer?.noisePublicKey)
+    }
+
     @MainActor
     private func resolveNoisePublicKey(for peerID: String) -> Data? {
         if let decoded = Self.decodeNoisePublicKey(from: peerID) {
@@ -5916,13 +5931,23 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     @MainActor
     func sendFavoriteNotification(to peerID: String, isFavorite: Bool) {
-        // Handle both ephemeral peer IDs and Noise key hex strings
-        let noiseKey = resolveNoisePublicKey(for: peerID)
+        let resolvedPeer = getPeer(byID: peerID)
+        guard let targetPeerID = Self.resolvedFavoriteNotificationPeerID(
+            from: peerID,
+            resolvedPeer: resolvedPeer
+        ) else {
+            SecureLogger.warning("⚠️ Cannot send favorite notification - invalid peer ID", category: .session)
+            return
+        }
+        let noiseKey = Self.resolvedFavoriteNotificationNoisePublicKey(
+            from: peerID,
+            resolvedPeer: resolvedPeer
+        )
         
         // Try mesh first for connected peers
-        if meshService.isPeerConnected(PeerID(str: peerID)) {
-            messageRouter.sendFavoriteNotification(to: PeerID(str: peerID), isFavorite: isFavorite)
-            SecureLogger.debug("📤 Sent favorite notification via BLE to \(peerID)", category: .session)
+        if meshService.isPeerConnected(targetPeerID) {
+            messageRouter.sendFavoriteNotification(to: targetPeerID, isFavorite: isFavorite)
+            SecureLogger.debug("📤 Sent favorite notification via BLE to \(targetPeerID.id)", category: .session)
         } else if let key = noiseKey {
             // Send via Nostr for offline peers (using router)
             let recipientPeerID = key.hexEncodedString()

@@ -49,4 +49,60 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
         XCTAssertNil(ChatViewModel.validatedNoisePublicKey(invalidKey))
         XCTAssertNil(ChatViewModel.validatedNoisePublicKey(nil))
     }
+
+    func testResolvedFavoriteNotificationPeerIDPrefersResolvedPeerVariant() {
+        let resolvedPeer = BitchatPeer(
+            peerID: PeerID(str: "mesh:abcdef0123456789"),
+            noisePublicKey: Data(repeating: 0x11, count: 32),
+            nickname: "peer"
+        )
+
+        let resolved = ChatViewModel.resolvedFavoriteNotificationPeerID(
+            from: "abcdef0123456789",
+            resolvedPeer: resolvedPeer
+        )
+
+        XCTAssertEqual(resolved?.id, "mesh:abcdef0123456789")
+    }
+
+    func testResolvedFavoriteNotificationPeerIDRejectsInvalidInput() {
+        let resolved = ChatViewModel.resolvedFavoriteNotificationPeerID(
+            from: "   ",
+            resolvedPeer: nil
+        )
+
+        XCTAssertNil(resolved)
+    }
+
+    func testResolvedFavoriteNotificationNoisePublicKeyUsesResolvedPeerIDDecode() {
+        let fullNoise = String(repeating: "ab", count: 32)
+        let resolvedPeer = BitchatPeer(
+            peerID: PeerID(str: "noise:\(fullNoise)"),
+            noisePublicKey: Data(),
+            nickname: "peer"
+        )
+
+        let resolved = ChatViewModel.resolvedFavoriteNotificationNoisePublicKey(
+            from: "abcdef0123456789",
+            resolvedPeer: resolvedPeer
+        )
+
+        XCTAssertEqual(resolved?.hexEncodedString(), fullNoise)
+    }
+
+    func testResolvedFavoriteNotificationNoisePublicKeyFallsBackToValidatedPeerKey() {
+        let expected = Data(repeating: 0x22, count: 32)
+        let resolvedPeer = BitchatPeer(
+            peerID: PeerID(str: "abcdef0123456789"),
+            noisePublicKey: expected,
+            nickname: "peer"
+        )
+
+        let resolved = ChatViewModel.resolvedFavoriteNotificationNoisePublicKey(
+            from: "abcdef0123456789",
+            resolvedPeer: resolvedPeer
+        )
+
+        XCTAssertEqual(resolved, expected)
+    }
 }
