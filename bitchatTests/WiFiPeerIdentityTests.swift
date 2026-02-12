@@ -156,4 +156,19 @@ final class WiFiPeerIdentityTests: XCTestCase {
 
         XCTAssertEqual(normalized, geoDM)
     }
+
+    func testLookupKeysIncludeMeshAndBareVariantsCaseInsensitively() {
+        let keys = WiFiPeerIdentity.lookupKeys(for: "mesh:ABCDEF0123456789")
+
+        XCTAssertTrue(keys.contains("mesh:ABCDEF0123456789"))
+        XCTAssertTrue(keys.contains("mesh:abcdef0123456789"))
+        XCTAssertTrue(keys.contains("ABCDEF0123456789"))
+        XCTAssertTrue(keys.contains("abcdef0123456789"))
+    }
+
+    func testLookupKeysForGeoDMPeerIDPreservePrefixOnly() {
+        let keys = WiFiPeerIdentity.lookupKeys(for: "NOSTR_ABCDEF0123456789")
+
+        XCTAssertEqual(keys, ["NOSTR_ABCDEF0123456789", "nostr_abcdef0123456789"])
+    }
 }

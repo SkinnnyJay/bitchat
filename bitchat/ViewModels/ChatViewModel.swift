@@ -4432,32 +4432,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     static func resolvePeer(from peerIndex: [String: BitchatPeer], peerID: String) -> BitchatPeer? {
         let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        let parsedPeerID = PeerID(str: trimmed)
 
-        if parsedPeerID.isGeoDM || parsedPeerID.isGeoChat {
-            if let direct = peerIndex[trimmed] {
-                return direct
-            }
-            return peerIndex[trimmed.lowercased()]
-        }
-
-        var lookupKeys: [String] = []
-        func appendLookupKey(_ key: String) {
-            let candidate = key.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !candidate.isEmpty else { return }
-            if !lookupKeys.contains(candidate) {
-                lookupKeys.append(candidate)
-            }
-        }
-
-        appendLookupKey(trimmed)
-        appendLookupKey(trimmed.lowercased())
-        for candidate in WiFiPeerIdentity.candidateIDs(for: parsedPeerID) {
-            appendLookupKey(candidate)
-            appendLookupKey(candidate.lowercased())
-        }
-
-        for key in lookupKeys {
+        for key in WiFiPeerIdentity.lookupKeys(for: trimmed) {
             if let peer = peerIndex[key] {
                 return peer
             }
@@ -4476,16 +4452,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     ) -> Bool {
         let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
-        let parsedPeerID = PeerID(str: trimmed)
-
-        if let messages = privateChats[trimmed], !messages.isEmpty {
-            return true
-        }
-        if parsedPeerID.isGeoDM || parsedPeerID.isGeoChat {
-            if let messages = privateChats[trimmed.lowercased()], !messages.isEmpty {
+        for key in WiFiPeerIdentity.lookupKeys(for: trimmed) {
+            if let messages = privateChats[key], !messages.isEmpty {
                 return true
             }
-            return false
         }
 
         let normalizedTarget = WiFiPeerIdentity.normalizedKey(trimmed)

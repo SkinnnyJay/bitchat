@@ -492,28 +492,7 @@ final class BLEService: NSObject {
     // MARK: Connectivity and peers
 
     static func peerLookupKeys(for peerID: PeerID) -> [String] {
-        var keys: [String] = []
-        func appendUnique(_ value: String) {
-            guard !value.isEmpty else { return }
-            if !keys.contains(value) {
-                keys.append(value)
-            }
-        }
-
-        for candidate in WiFiPeerIdentity.candidateIDs(for: peerID) {
-            let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { continue }
-            appendUnique(trimmed)
-            appendUnique(trimmed.lowercased())
-
-            let shortCandidate = PeerID(str: trimmed).toShort()
-            if shortCandidate.isShort {
-                appendUnique(shortCandidate.bare)
-                appendUnique(shortCandidate.bare.lowercased())
-            }
-        }
-
-        return keys
+        WiFiPeerIdentity.lookupKeys(for: peerID.id)
     }
 
     static func canonicalRoutingPeerID(for peerID: PeerID) -> PeerID? {

@@ -224,30 +224,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     // MARK: - Public Methods
 
     static func lookupKeys(for peerID: String) -> [String] {
-        let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return [] }
-        let parsedPeerID = PeerID(str: trimmed)
-
-        var keys: [String] = []
-        func appendKey(_ key: String) {
-            let candidate = key.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !candidate.isEmpty else { return }
-            if !keys.contains(candidate) {
-                keys.append(candidate)
-            }
-        }
-
-        appendKey(trimmed)
-        appendKey(trimmed.lowercased())
-        if parsedPeerID.isGeoDM || parsedPeerID.isGeoChat {
-            return keys
-        }
-        for candidate in WiFiPeerIdentity.candidateIDs(for: parsedPeerID) {
-            appendKey(candidate)
-            appendKey(candidate.lowercased())
-        }
-        appendKey(WiFiPeerIdentity.normalizedKey(trimmed))
-        return keys
+        WiFiPeerIdentity.lookupKeys(for: peerID)
     }
 
     static func resolvePeer(from peerIndex: [String: BitchatPeer], peerID: String) -> BitchatPeer? {

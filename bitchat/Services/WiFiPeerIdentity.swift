@@ -44,6 +44,28 @@ enum WiFiPeerIdentity {
         return left == right
     }
 
+    static func lookupKeys(for peerID: String) -> [String] {
+        let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        var keys: [String] = []
+        func appendKey(_ key: String) {
+            let candidate = key.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !candidate.isEmpty else { return }
+            if !keys.contains(candidate) {
+                keys.append(candidate)
+            }
+        }
+
+        appendKey(trimmed)
+        appendKey(trimmed.lowercased())
+        for candidate in candidateIDs(for: PeerID(str: trimmed)) {
+            appendKey(candidate)
+            appendKey(candidate.lowercased())
+        }
+        return keys
+    }
+
     static func candidateIDs(for peerID: PeerID) -> [String] {
         let canonicalPeerID = canonicalPeerID(peerID)
         var candidates: [String] = [canonicalPeerID.id]
