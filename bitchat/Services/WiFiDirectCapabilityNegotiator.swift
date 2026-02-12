@@ -6,8 +6,8 @@ struct WiFiDirectCapabilityNegotiator {
     static let defaultCapabilities: Set<String> = ["pm", "ack"]
     
     private let protocolVersion: Int
-    private let requiredCapabilities: Set<String>
-    private let defaultCapabilities: Set<String>
+    private let requiredCapabilitiesSet: Set<String>
+    private let defaultCapabilitiesSet: Set<String>
 
     init(
         protocolVersion: Int = WiFiDirectCapabilityNegotiator.currentProtocolVersion,
@@ -15,14 +15,14 @@ struct WiFiDirectCapabilityNegotiator {
         defaultCapabilities: Set<String> = WiFiDirectCapabilityNegotiator.defaultCapabilities
     ) {
         self.protocolVersion = protocolVersion
-        self.requiredCapabilities = requiredCapabilities
-        self.defaultCapabilities = defaultCapabilities
+        self.requiredCapabilitiesSet = requiredCapabilities
+        self.defaultCapabilitiesSet = defaultCapabilities
     }
 
     func discoveryInfo() -> [String: String] {
         [
             "v": String(protocolVersion),
-            "caps": defaultCapabilities.sorted().joined(separator: ",")
+            "caps": defaultCapabilitiesSet.sorted().joined(separator: ",")
         ]
     }
 
@@ -65,7 +65,7 @@ struct WiFiDirectCapabilityNegotiator {
         }
 
         let capabilities = Self.parseCapabilities(capabilityString)
-        return requiredCapabilities.isSubset(of: capabilities)
+        return requiredCapabilitiesSet.isSubset(of: capabilities)
     }
 
     static func parseCapabilities(_ capabilityString: String) -> Set<String> {
