@@ -338,7 +338,7 @@ final class MessageRouter {
     }
 
     private func shouldAcceptInboundWiFiEnvelope(dedupKey: String) -> Bool {
-        let now = Date()
+        let now = nowProvider()
         cleanupInboundWiFiDedup(now: now)
         if inboundWiFiDedupByKey[dedupKey] != nil {
             return false
