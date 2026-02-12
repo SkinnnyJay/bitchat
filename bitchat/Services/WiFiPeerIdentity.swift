@@ -20,20 +20,21 @@ enum WiFiPeerIdentity {
     static func normalizedKey(_ peerID: String) -> String {
         let trimmed = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
-        return PeerID(str: trimmed).toShort().id
+        let canonical = canonicalPeerID(PeerID(str: trimmed))
+        if let noiseKey = canonical.noiseKey {
+            return PeerID(publicKey: noiseKey).id
+        }
+        if canonical.prefix != .empty {
+            return canonical.bare
+        }
+        return canonical.id
     }
 
     static func isEquivalent(_ lhs: String, _ rhs: String) -> Bool {
-        let leftRaw = lhs.trimmingCharacters(in: .whitespacesAndNewlines)
-        let rightRaw = rhs.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !leftRaw.isEmpty, !rightRaw.isEmpty else { return false }
-
-        let left = PeerID(str: leftRaw)
-        let right = PeerID(str: rightRaw)
-        if left.id == right.id {
-            return true
-        }
-        return left.toShort().id == right.toShort().id
+        let left = normalizedKey(lhs)
+        let right = normalizedKey(rhs)
+        guard !left.isEmpty, !right.isEmpty else { return false }
+        return left == right
     }
 
     static func candidateIDs(for peerID: PeerID) -> [String] {
