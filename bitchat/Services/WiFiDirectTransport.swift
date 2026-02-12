@@ -103,6 +103,10 @@ private final class MPCWiFiDirectTransportImplementation: NSObject, WiFiDirectTr
         peer: localPeerID,
         serviceType: serviceType
     )
+    private var inviteBackoffByPeerID: [String: TimeInterval] = [:]
+    private var nextInviteAllowedAt: [String: Date] = [:]
+    private let initialInviteBackoffSeconds: TimeInterval = 1.0
+    private let maxInviteBackoffSeconds: TimeInterval = 30.0
 
     required init(localPeerID: String?) {
         let displayName = Self.sanitizeDisplayName(localPeerID)
@@ -165,6 +169,11 @@ private final class MPCWiFiDirectTransportImplementation: NSObject, WiFiDirectTr
 
 extension MPCWiFiDirectTransportImplementation: MCSessionDelegate {
     func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
+        let peerKey = peerID.displayName
+        if state == .connected {
+            inviteBackoffByPeerID.removeValue(forKey: peerKey)
+            nextInviteAllowedAt.removeValue(forKey: peerKey)
+        }
         let peers = session.connectedPeers.map(\.displayName).sorted()
         owner?.didUpdatePeers(peers)
     }
@@ -209,10 +218,23 @@ extension MPCWiFiDirectTransportImplementation: MCNearbyServiceAdvertiserDelegat
 
 extension MPCWiFiDirectTransportImplementation: MCNearbyServiceBrowserDelegate {
     func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String: String]?) {
+        let peerKey = peerID.displayName
+        let now = Date()
+        if let nextAllowed = nextInviteAllowedAt[peerKey], now < nextAllowed {
+            return
+        }
+
         browser.invitePeer(peerID, to: session, withContext: nil, timeout: 10)
+
+        let currentBackoff = inviteBackoffByPeerID[peerKey] ?? initialInviteBackoffSeconds
+        let nextBackoff = min(currentBackoff * 2, maxInviteBackoffSeconds)
+        inviteBackoffByPeerID[peerKey] = nextBackoff
+        nextInviteAllowedAt[peerKey] = now.addingTimeInterval(currentBackoff)
     }
 
     func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
+        nextInviteAllowedAt.removeValue(forKey: peerID.displayName)
+        inviteBackoffByPeerID.removeValue(forKey: peerID.displayName)
         let peers = session.connectedPeers.map(\.displayName).sorted()
         owner?.didUpdatePeers(peers)
     }
