@@ -28,6 +28,17 @@ final class WiFiPeerIdentityTests: XCTestCase {
         )
     }
 
+    func testNormalizedKeyConvertsPrefixedFullNoiseIDToShortFingerprint() {
+        let noiseKey = Data(repeating: 0x44, count: 32)
+        let fullNoise = noiseKey.hexEncodedString()
+        let expectedShort = PeerID(publicKey: noiseKey).id
+
+        XCTAssertEqual(
+            WiFiPeerIdentity.normalizedKey("mesh:\(fullNoise)"),
+            expectedShort
+        )
+    }
+
     func testIsEquivalentMatchesFullAndShortNoiseIDs() {
         let noiseKey = Data(repeating: 0x22, count: 32)
         let full = PeerID(hexData: noiseKey).id
