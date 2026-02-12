@@ -21,6 +21,11 @@ final class InputValidatorTests: XCTestCase {
         XCTAssertNil(InputValidator.validateMessageID(oversized))
     }
 
+    func testValidateMessageIDAcceptsMaxUTF8ByteLengthBoundary() {
+        let boundary = String(repeating: "m", count: InputValidator.Limits.maxMessageIDLength)
+        XCTAssertEqual(InputValidator.validateMessageID(boundary), boundary)
+    }
+
     func testValidateMessageIDRejectsUTF8ByteLengthOverflow() {
         // 100 smiling-face scalars => 400 UTF-8 bytes.
         let oversizedUTF8 = String(repeating: "🙂", count: 100)
