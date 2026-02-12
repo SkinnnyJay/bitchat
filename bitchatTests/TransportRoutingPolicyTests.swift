@@ -35,10 +35,34 @@ final class TransportRoutingPolicyTests: XCTestCase {
     }
 
     func testPrefersNostrForLargePayloadWhenBothAreAvailable() {
-        let policy = TransportRoutingPolicy(nostrPreferredPayloadBytes: 1024)
+        let policy = TransportRoutingPolicy(nostrPreferredPayloadBytes: 100)
         let decision = policy.routePrivateMessage(
-            .init(payloadBytes: 4096, meshReachable: true, nostrAvailable: true)
+            .init(payloadBytes: 200, meshReachable: true, nostrAvailable: true)
         )
         XCTAssertEqual(decision, .nostr)
+    }
+
+    func testPrefersMeshWhenPayloadExceedsNostrLimitEvenIfNostrPreferred() {
+        let policy = TransportRoutingPolicy(nostrPreferredPayloadBytes: 100)
+        let decision = policy.routePrivateMessage(
+            .init(
+                payloadBytes: TransportConfig.nostrEmbeddedPayloadMaxBytes + 1,
+                meshReachable: true,
+                nostrAvailable: true
+            )
+        )
+        XCTAssertEqual(decision, .mesh)
+    }
+
+    func testReturnsNilWhenOnlyNostrAvailableAndPayloadExceedsNostrLimit() {
+        let policy = TransportRoutingPolicy(nostrPreferredPayloadBytes: 100)
+        let decision = policy.routePrivateMessage(
+            .init(
+                payloadBytes: TransportConfig.nostrEmbeddedPayloadMaxBytes + 1,
+                meshReachable: false,
+                nostrAvailable: true
+            )
+        )
+        XCTAssertNil(decision)
     }
 }
