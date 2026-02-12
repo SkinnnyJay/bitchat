@@ -10,6 +10,7 @@ final class MessageRouter {
     private let wifiRoutingPolicy: WiFiDirectRoutingPolicy
     private let wifiTransport: WiFiDirectTransport?
     private let outboxPerPeerCap: Int
+    private var favoriteStatusObserver: NSObjectProtocol?
     private var outbox: [PeerID: [(content: String, nickname: String, messageID: String)]] = [:] // peerID -> queued messages
 
     init(
@@ -30,7 +31,7 @@ final class MessageRouter {
         self.wifiTransport?.startDiscovery()
 
         // Observe favorites changes to learn Nostr mapping and flush queued messages
-        NotificationCenter.default.addObserver(
+        favoriteStatusObserver = NotificationCenter.default.addObserver(
             forName: .favoriteStatusChanged,
             object: nil,
             queue: .main
@@ -54,6 +55,9 @@ final class MessageRouter {
     }
 
     deinit {
+        if let favoriteStatusObserver {
+            NotificationCenter.default.removeObserver(favoriteStatusObserver)
+        }
         wifiTransport?.stopDiscovery()
     }
 
