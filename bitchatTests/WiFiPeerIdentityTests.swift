@@ -171,4 +171,21 @@ final class WiFiPeerIdentityTests: XCTestCase {
 
         XCTAssertEqual(keys, ["NOSTR_ABCDEF0123456789", "nostr_abcdef0123456789"])
     }
+
+    func testLookupKeysForFullNoisePeerIDIncludeShortFingerprintVariant() {
+        let fullNoiseID = String(repeating: "ab", count: 32)
+        let shortID = PeerID(str: fullNoiseID).toShort().bare
+
+        let keys = WiFiPeerIdentity.lookupKeys(for: fullNoiseID)
+
+        XCTAssertTrue(keys.contains(fullNoiseID))
+        XCTAssertTrue(keys.contains(shortID))
+    }
+
+    func testLookupKeysTrimWhitespaceFromInput() {
+        let keys = WiFiPeerIdentity.lookupKeys(for: "  mesh:abcdef0123456789  ")
+
+        XCTAssertTrue(keys.contains("mesh:abcdef0123456789"))
+        XCTAssertTrue(keys.contains("abcdef0123456789"))
+    }
 }
