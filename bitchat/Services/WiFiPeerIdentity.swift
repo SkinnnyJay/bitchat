@@ -50,7 +50,7 @@ enum WiFiPeerIdentity {
             return PeerID(publicKey: noiseKey)
         }
         if peerID.prefix != .empty {
-            return PeerID(str: peerID.bare)
+            return PeerID(str: peerID.bare.trimmingCharacters(in: .whitespacesAndNewlines))
         }
         return peerID
     }

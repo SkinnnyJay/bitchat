@@ -72,4 +72,10 @@ final class WiFiPeerIdentityTests: XCTestCase {
         let normalized = WiFiPeerIdentity.normalizedOutboxPeerID(for: prefixed)
         XCTAssertEqual(normalized, PeerID(str: "peerabc000000000"))
     }
+
+    func testNormalizedOutboxPeerIDTrimsWhitespaceAfterPrefix() {
+        let prefixed = PeerID(str: "mesh:   peerabc000000000   ")
+        let normalized = WiFiPeerIdentity.normalizedOutboxPeerID(for: prefixed)
+        XCTAssertEqual(normalized, PeerID(str: "peerabc000000000"))
+    }
 }
