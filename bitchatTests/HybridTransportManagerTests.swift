@@ -285,6 +285,29 @@ final class HybridTransportManagerTests: XCTestCase {
     }
 
     @MainActor
+    func testSendPrivateDropsInvalidMessageIDEvenWhenMeshReachable() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: true)
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+        backend.setPeers([recipient.id])
+        backend.setCapabilities(["pm"], for: recipient.id)
+
+        let manager = HybridTransportManager(
+            meshTransport: mesh,
+            wifiTransport: wifi,
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 1)
+        )
+
+        let route = manager.sendPrivate("hello", to: recipient, recipientNickname: "peer", messageID: "  invalid  ")
+
+        XCTAssertEqual(route, .dropped)
+        XCTAssertEqual(backend.sentPayloads.count, 0)
+        XCTAssertEqual(mesh.sentPrivateMessages.count, 0)
+    }
+
+    @MainActor
     func testSendPrivateDropsWhenContentExceedsMaxMessageLengthForWiFiPath() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
