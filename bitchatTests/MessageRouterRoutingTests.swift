@@ -99,6 +99,10 @@ final class MessageRouterRoutingTests: XCTestCase {
         func setPeers(_ peers: [String]) {
             owner?.didUpdatePeers(peers)
         }
+
+        func simulateIncoming(_ data: Data, from peerID: String) {
+            owner?.didReceive(data, from: peerID)
+        }
     }
 
     private enum SampleError: Error {
@@ -156,5 +160,41 @@ final class MessageRouterRoutingTests: XCTestCase {
         XCTAssertEqual(backend.sentPayloads.count, 0)
         XCTAssertEqual(mesh.sentPrivateMessages.count, 1)
         XCTAssertEqual(mesh.sentPrivateMessages[0].messageID, "msg-2")
+    }
+
+    @MainActor
+    func testPostsNotificationWhenWiFiPrivateEnvelopeReceivedForLocalPeer() throws {
+        let mesh = MockTransport()
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        _ = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+
+        let expect = expectation(description: "receives WiFi envelope notification")
+        var receivedEnvelope: WiFiDirectPrivateEnvelope?
+        let token = NotificationCenter.default.addObserver(
+            forName: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            queue: .main
+        ) { note in
+            receivedEnvelope = note.userInfo?[WiFiDirectNotificationUserInfoKey.envelope] as? WiFiDirectPrivateEnvelope
+            expect.fulfill()
+        }
+
+        let envelope = WiFiDirectPrivateEnvelope(
+            senderPeerID: "peer-1",
+            recipientPeerID: mesh.myPeerID.id,
+            recipientNickname: "self",
+            messageID: "msg-3",
+            content: "hello"
+        )
+        let payload = try JSONEncoder().encode(envelope)
+        backend.simulateIncoming(payload, from: "peer-1")
+
+        wait(for: [expect], timeout: 1.0)
+        NotificationCenter.default.removeObserver(token)
+        XCTAssertEqual(receivedEnvelope?.messageID, "msg-3")
+        XCTAssertEqual(receivedEnvelope?.recipientPeerID, mesh.myPeerID.id)
     }
 }

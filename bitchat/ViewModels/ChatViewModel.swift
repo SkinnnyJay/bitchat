@@ -738,6 +738,13 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             name: Notification.Name("peerStatusUpdated"),
             object: nil
         )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWiFiDirectPrivateEnvelope(_:)),
+            name: .wifiDirectPrivateEnvelopeReceived,
+            object: nil
+        )
         
         // Listen for delivery acknowledgments
                 
@@ -2716,6 +2723,33 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Process the read receipt through the same flow as Bluetooth read receipts
         didReceiveReadReceipt(receipt)
+    }
+
+    @objc private func handleWiFiDirectPrivateEnvelope(_ notification: Notification) {
+        guard let envelope = notification.userInfo?[WiFiDirectNotificationUserInfoKey.envelope] as? WiFiDirectPrivateEnvelope else {
+            return
+        }
+
+        Task { @MainActor in
+            guard envelope.recipientPeerID == meshService.myPeerID.id else { return }
+            let senderPeerID = envelope.senderPeerID
+            let senderName = unifiedPeerService.getPeer(by: senderPeerID)?.nickname ?? resolveNickname(for: senderPeerID)
+            let privateMentions = parseMentions(from: envelope.content)
+            let msg = BitchatMessage(
+                id: envelope.messageID,
+                sender: senderName,
+                content: envelope.content,
+                timestamp: Date(timeIntervalSince1970: TimeInterval(envelope.createdAtMs) / 1000),
+                isRelay: false,
+                originalSender: nil,
+                isPrivate: true,
+                recipientNickname: nickname,
+                senderPeerID: PeerID(str: senderPeerID),
+                mentions: privateMentions.isEmpty ? nil : privateMentions
+            )
+            handlePrivateMessage(msg)
+            messageRouter.sendDeliveryAck(envelope.messageID, to: PeerID(str: senderPeerID))
+        }
     }
     
     @MainActor

@@ -24,6 +24,7 @@ final class MessageRouter {
         self.wifiRoutingPolicy = wifiRoutingPolicy
         self.wifiTransport = wifiTransport ?? WiFiDirectTransport(localPeerID: mesh.myPeerID.id)
         self.nostr.senderPeerID = mesh.myPeerID
+        self.wifiTransport?.delegate = self
         self.wifiTransport?.startDiscovery()
 
         // Observe favorites changes to learn Nostr mapping and flush queued messages
@@ -203,5 +204,29 @@ final class MessageRouter {
 
     func flushAllOutbox() {
         for key in Array(outbox.keys) { flushOutbox(for: key) }
+    }
+}
+
+extension MessageRouter: WiFiDirectTransportDelegate {
+    func wifiTransportDidUpdatePeers(_ peers: [String]) {
+        SecureLogger.debug("WiFi Direct peers updated count=\(peers.count)", category: .session)
+    }
+
+    func wifiTransportDidReceive(_ data: Data, from peerID: String) {
+        guard let envelope = try? JSONDecoder().decode(WiFiDirectPrivateEnvelope.self, from: data),
+              envelope.messageType == "private",
+              envelope.recipientPeerID == mesh.myPeerID.id else {
+            return
+        }
+
+        NotificationCenter.default.post(
+            name: .wifiDirectPrivateEnvelopeReceived,
+            object: nil,
+            userInfo: [WiFiDirectNotificationUserInfoKey.envelope: envelope]
+        )
+    }
+
+    func wifiTransportDidChangeAvailability(_ isAvailable: Bool) {
+        SecureLogger.debug("WiFi Direct availability changed available=\(isAvailable)", category: .session)
     }
 }
