@@ -538,8 +538,10 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         if let noisePublicKey = snapshot.noisePublicKey, noisePublicKey.count == 32 {
             return noisePublicKey
         }
-        if let peerIDNoiseKey = snapshot.peerID.noiseKey, peerIDNoiseKey.count == 32 {
-            return peerIDNoiseKey
+        for lookupKey in lookupKeys(for: snapshot.peerID.id) {
+            if let peerIDNoiseKey = PeerID(str: lookupKey).noiseKey, peerIDNoiseKey.count == 32 {
+                return peerIDNoiseKey
+            }
         }
         return nil
     }

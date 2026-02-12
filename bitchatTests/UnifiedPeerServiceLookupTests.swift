@@ -683,6 +683,22 @@ final class UnifiedPeerServiceLookupTests: XCTestCase {
         )
     }
 
+    func testResolvedNoisePublicKeyFallsBackThroughUppercasePrefixedNoiseID() {
+        let peerIDNoise = String(repeating: "ef", count: 32)
+        let snapshot = TransportPeerSnapshot(
+            peerID: PeerID(str: "NOISE:\(peerIDNoise)"),
+            nickname: "peer",
+            isConnected: true,
+            noisePublicKey: nil,
+            lastSeen: Date()
+        )
+
+        XCTAssertEqual(
+            UnifiedPeerService.resolvedNoisePublicKey(for: snapshot),
+            Data(hexString: peerIDNoise)
+        )
+    }
+
     func testResolvedNoisePublicKeyRejectsInvalidLengths() {
         let snapshot = TransportPeerSnapshot(
             peerID: PeerID(str: "abcdef0123456789"),
