@@ -436,7 +436,9 @@ final class MessageRouter {
     }
 
     func queuedMessageCount(for peerID: PeerID) -> Int {
-        outbox[normalizedOutboxPeerID(for: peerID)]?.count ?? 0
+        let key = normalizedOutboxPeerID(for: peerID)
+        pruneExpiredOutboxMessages(for: key)
+        return outbox[key]?.count ?? 0
     }
 
     private func pruneExpiredOutboxMessages(for peerID: PeerID) {

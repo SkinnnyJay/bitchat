@@ -813,6 +813,33 @@ final class MessageRouterRoutingTests: XCTestCase {
     }
 
     @MainActor
+    func testQueuedMessageCountPrunesExpiredOutboxMessages() {
+        let recipient = PeerID(str: "peerabc000000000")
+        let mesh = MockTransport()
+        mesh.setReachable(recipient, isReachable: false)
+        let nostr = NostrTransport(keychain: MockKeychain())
+        let backend = MockWiFiBackend(localPeerID: mesh.myPeerID.id)
+        backend.isAvailable = false
+        let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
+
+        var now = Date()
+        let router = MessageRouter(
+            mesh: mesh,
+            nostr: nostr,
+            routingPolicy: TransportRoutingPolicy(nostrPreferredPayloadBytes: 8_192),
+            wifiRoutingPolicy: WiFiDirectRoutingPolicy(preferredPayloadBytes: 8),
+            wifiTransport: wifi,
+            nowProvider: { now }
+        )
+
+        router.sendPrivate("queued", to: recipient, recipientNickname: "peer", messageID: "mid-expired-count")
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 1)
+
+        now = now.addingTimeInterval(TransportConfig.messageRouterOutboxMessageMaxAgeSeconds + 1)
+        XCTAssertEqual(router.queuedMessageCount(for: recipient), 0)
+    }
+
+    @MainActor
     func testFlushOutboxUsesWiFiFallbackBelowThresholdWhenNoOtherRouteExists() {
         let recipient = PeerID(str: "peerabc000000000")
         let mesh = MockTransport()
