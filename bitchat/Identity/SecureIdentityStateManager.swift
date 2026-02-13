@@ -329,6 +329,7 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
             // Optionally persist claimed nickname into social identity
             if let claimed = claimedNickname {
                 let sanitizedClaimed = Self.sanitizedClaimedNickname(claimed)
+                let previousClaimedNickname = self.cache.socialIdentities[fingerprint]?.claimedNickname
                 var identity = self.cache.socialIdentities[fingerprint] ?? SocialIdentity(
                     fingerprint: fingerprint,
                     localPetname: nil,
@@ -345,6 +346,12 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
                 } else if self.cache.socialIdentities[fingerprint] == nil {
                     self.cache.socialIdentities[fingerprint] = identity
                 }
+                self.cache.nicknameIndex = Self.updatedNicknameIndex(
+                    self.cache.nicknameIndex,
+                    fingerprint: fingerprint,
+                    oldNickname: previousClaimedNickname,
+                    newNickname: identity.claimedNickname
+                )
             }
 
             self.saveIdentityCache()

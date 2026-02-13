@@ -43,6 +43,19 @@ final class SecureIdentityStateManagerTests: XCTestCase {
         XCTAssertEqual(updated["same"], [fingerprint])
     }
 
+    func testUpdatedNicknameIndexAddsFingerprintWhenNoOldNickname() {
+        let fingerprint = "fp123"
+
+        let updated = SecureIdentityStateManager.updatedNicknameIndex(
+            [:],
+            fingerprint: fingerprint,
+            oldNickname: nil,
+            newNickname: "new"
+        )
+
+        XCTAssertEqual(updated["new"], [fingerprint])
+    }
+
     func testCanonicalNostrPubkeyTrimsLowercasesAndValidatesLength() {
         let uppercase = String(repeating: "AB", count: 32)
 
