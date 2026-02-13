@@ -19,6 +19,7 @@ import unicodedata
 
 MAX_TOKEN_BYTES = 256
 MAX_SWIFT_FILE_BYTES = 5 * 1024 * 1024
+DISALLOWED_CONTROL_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn"}
 
 
 def escape_diagnostic_text(text: str) -> str:
@@ -27,6 +28,10 @@ def escape_diagnostic_text(text: str) -> str:
 
 def format_path_for_diagnostics(path: Path | str) -> str:
     return escape_diagnostic_text(str(path))
+
+
+def contains_disallowed_control_characters(value: str) -> bool:
+    return any(unicodedata.category(character) in DISALLOWED_CONTROL_CATEGORIES for character in value)
 
 
 def format_open_read_error(error: OSError) -> str:
@@ -225,10 +230,7 @@ def main() -> int:
     if any(character.isspace() for character in token):
         print("Configured token must not contain whitespace characters.")
         return 1
-    if any(ord(character) < 32 or ord(character) == 127 for character in token):
-        print("Configured token must not contain control characters.")
-        return 1
-    if any(unicodedata.category(character) in {"Cf", "Cs", "Co", "Cn"} for character in token):
+    if contains_disallowed_control_characters(token):
         print("Configured token must not contain control characters.")
         return 1
     if len(token.encode("utf-8")) > MAX_TOKEN_BYTES:
@@ -247,7 +249,7 @@ def main() -> int:
         if not trimmed_root:
             invalid_roots[raw_root] = "is empty after trimming"
             continue
-        if any(ord(character) < 32 or ord(character) == 127 for character in trimmed_root):
+        if contains_disallowed_control_characters(trimmed_root):
             invalid_roots[raw_root] = "contains control characters"
             continue
 

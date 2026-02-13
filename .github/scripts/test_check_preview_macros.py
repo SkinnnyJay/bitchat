@@ -298,6 +298,11 @@ class PreviewMacroUtilityTests(unittest.TestCase):
             "line1\\nline2\\t\\x01",
         )
 
+    def test_detects_disallowed_unicode_control_categories(self) -> None:
+        self.assertTrue(check_preview_macros.contains_disallowed_control_characters("a\u2060b"))
+        self.assertTrue(check_preview_macros.contains_disallowed_control_characters("a\x7fb"))
+        self.assertFalse(check_preview_macros.contains_disallowed_control_characters("abc"))
+
     def test_formats_open_error_for_symlink_loop(self) -> None:
         error = OSError(errno.ELOOP, "too many levels of symbolic links")
         self.assertEqual(
@@ -447,6 +452,14 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("One or more scan roots are invalid", result.stdout)
             self.assertIn("contains control characters", result.stdout)
             self.assertIn("\\x01", result.stdout)
+
+    def test_fails_when_scan_root_contains_unicode_format_character(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = self.run_script("--root", f"{temp_dir}\u2060")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("One or more scan roots are invalid", result.stdout)
+            self.assertIn("contains control characters", result.stdout)
+            self.assertIn("\\u2060", result.stdout)
 
     def test_fails_when_no_swift_files_found_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -678,6 +691,15 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
     def test_fails_when_token_contains_unicode_format_character(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             result = self.run_script("--root", temp_dir, "--token", "#My\u2060Preview")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "Configured token must not contain control characters.",
+                result.stdout,
+            )
+
+    def test_fails_when_token_contains_non_ascii_control_character(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = self.run_script("--root", temp_dir, "--token", "#My\u009fPreview")
             self.assertEqual(result.returncode, 1)
             self.assertIn(
                 "Configured token must not contain control characters.",
