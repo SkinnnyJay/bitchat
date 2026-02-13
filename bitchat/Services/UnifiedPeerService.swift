@@ -500,9 +500,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     }
 
     static func canonicalFingerprint(_ fingerprint: String) -> String? {
-        let trimmed = fingerprint.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard trimmed.count == 64, Data(hexString: trimmed) != nil else { return nil }
-        return trimmed
+        FingerprintNormalizer.canonical(fingerprint)
     }
 
     static func buildPeerIndex(from peers: [BitchatPeer]) -> [String: BitchatPeer] {

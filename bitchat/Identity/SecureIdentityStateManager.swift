@@ -167,9 +167,7 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     }
 
     static func canonicalFingerprint(_ value: String) -> String? {
-        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard normalized.count == 64, Data(hexString: normalized)?.count == 32 else { return nil }
-        return normalized
+        FingerprintNormalizer.canonical(value)
     }
 
     static func canonicalShortPeerIDPrefix(_ peerID: PeerID) -> String? {
