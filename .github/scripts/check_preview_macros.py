@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import stat
 import sys
+from typing import Iterator
 import unicodedata
 
 MAX_TOKEN_BYTES = 256
@@ -35,6 +36,7 @@ MAX_REPORTED_PARSE_ERROR_FILES = 200
 MAX_STORED_ERROR_REASON_CHARS = 2048
 MAX_TRACKED_TOKEN_MATCH_FILES = 200
 MAX_REPORTED_TOKEN_MATCH_FILES = 200
+MAX_SWIFT_FILE_LINES = 1_000_000
 MAX_REPORTED_LINE_NUMBERS_PER_FILE = 50
 MAX_TRACKED_LINE_NUMBERS_PER_FILE = 200
 MAX_BLOCK_COMMENT_NESTING = 4096
@@ -120,6 +122,29 @@ def truncate_error_reason_for_storage(reason: str) -> str:
         return reason
     omitted_chars = len(reason) - MAX_STORED_ERROR_REASON_CHARS
     return f"{reason[:MAX_STORED_ERROR_REASON_CHARS]}... +{omitted_chars} chars truncated"
+
+
+def iter_content_lines(content: str) -> Iterator[tuple[int, str]]:
+    line_number = 0
+    start = 0
+    cursor = 0
+    content_length = len(content)
+
+    while cursor < content_length:
+        character = content[cursor]
+        if character == "\n" or character == "\r":
+            line_number += 1
+            yield line_number, content[start:cursor]
+            if character == "\r" and cursor + 1 < content_length and content[cursor + 1] == "\n":
+                cursor += 1
+            cursor += 1
+            start = cursor
+            continue
+        cursor += 1
+
+    if start < content_length:
+        line_number += 1
+        yield line_number, content[start:content_length]
 
 
 def parse_args() -> argparse.Namespace:
@@ -210,7 +235,14 @@ def find_token_matches_with_state(
             return False
         return line[index - len(escape_prefix) : index] == escape_prefix
 
-    for line_number, line in enumerate(content.splitlines(), start=1):
+    for line_number, line in iter_content_lines(content):
+        if line_number > MAX_SWIFT_FILE_LINES:
+            return (
+                matches,
+                match_count,
+                "Swift file exceeds maximum supported line count "
+                f"({MAX_SWIFT_FILE_LINES})",
+            )
         cursor = 0
         code_chars: list[str] = []
 

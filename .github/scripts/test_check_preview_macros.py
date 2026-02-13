@@ -298,6 +298,18 @@ class PreviewMacroDetectionTests(unittest.TestCase):
             "raw string delimiter exceeds maximum supported hash count (1) at line 1",
         )
 
+    def test_reports_parse_state_for_excessive_line_count(self) -> None:
+        content = "line1\nline2\n#Preview { Text(\"real preview\") }\n"
+        with mock.patch.object(check_preview_macros, "MAX_SWIFT_FILE_LINES", 2):
+            matches, parse_error = check_preview_macros.find_token_line_numbers_with_state(
+                content, "#Preview"
+            )
+        self.assertEqual(matches, [])
+        self.assertEqual(
+            parse_error,
+            "Swift file exceeds maximum supported line count (2)",
+        )
+
     def test_randomized_inputs_never_raise_parser_exceptions(self) -> None:
         rng = random.Random(20260213)
         alphabet = string.ascii_letters + string.digits + string.punctuation + " \t\nαβ🙂"
@@ -405,6 +417,13 @@ class PreviewMacroUtilityTests(unittest.TestCase):
         self.assertIn(
             "cannot open/read file",
             check_preview_macros.format_open_read_error(error),
+        )
+
+    def test_iter_content_lines_handles_mixed_newline_sequences(self) -> None:
+        content = "a\r\nb\rc\n\n"
+        self.assertEqual(
+            list(check_preview_macros.iter_content_lines(content)),
+            [(1, "a"), (2, "b"), (3, "c"), (4, "")],
         )
 
     def test_builds_error_path_from_bytes_filename(self) -> None:
@@ -1899,6 +1918,25 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
                 "raw string delimiter exceeds maximum supported hash count (1) at line 1",
                 output,
             )
+            self.assertIn("Failure summary: 0 unreadable, 1 parse errors, 0 token matches.", output)
+
+    def test_fails_closed_on_excessive_file_line_count(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "TooManyLines.swift"
+            swift_file.write_text("line1\nline2\nline3\n", encoding="utf-8")
+
+            with mock.patch.object(check_preview_macros, "MAX_SWIFT_FILE_LINES", 2):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not reliably parse one or more Swift files", output)
+            self.assertIn("TooManyLines.swift", output)
+            self.assertIn("Swift file exceeds maximum supported line count (2)", output)
             self.assertIn("Failure summary: 0 unreadable, 1 parse errors, 0 token matches.", output)
 
 
