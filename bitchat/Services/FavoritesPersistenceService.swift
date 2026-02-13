@@ -39,12 +39,33 @@ final class FavoritesPersistenceService: ObservableObject {
         peerNoisePublicKey.count == 32
     }
 
+    static func sanitizedNostrPublicKey(_ peerNostrPublicKey: String?) -> String? {
+        guard let peerNostrPublicKey else { return nil }
+        let trimmed = peerNostrPublicKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     static func sanitizedPeerNickname(_ peerNickname: String?) -> String {
         if let peerNickname,
            let sanitizedNickname = InputValidator.validateNickname(peerNickname) {
             return sanitizedNickname
         }
         return "user"
+    }
+
+    static func sanitizedFavoriteRelationship(_ relationship: FavoriteRelationship) -> FavoriteRelationship? {
+        guard isValidFavoriteNoisePublicKey(relationship.peerNoisePublicKey) else {
+            return nil
+        }
+        return FavoriteRelationship(
+            peerNoisePublicKey: relationship.peerNoisePublicKey,
+            peerNostrPublicKey: sanitizedNostrPublicKey(relationship.peerNostrPublicKey),
+            peerNickname: sanitizedPeerNickname(relationship.peerNickname),
+            isFavorite: relationship.isFavorite,
+            theyFavoritedUs: relationship.theyFavoritedUs,
+            favoritedAt: relationship.favoritedAt,
+            lastUpdated: relationship.lastUpdated
+        )
     }
     
     private init() {
@@ -75,7 +96,8 @@ final class FavoritesPersistenceService: ObservableObject {
         
         let relationship = FavoriteRelationship(
             peerNoisePublicKey: peerNoisePublicKey,
-            peerNostrPublicKey: peerNostrPublicKey ?? existing?.peerNostrPublicKey,
+            peerNostrPublicKey: Self.sanitizedNostrPublicKey(peerNostrPublicKey)
+                ?? Self.sanitizedNostrPublicKey(existing?.peerNostrPublicKey),
             peerNickname: sanitizedPeerNickname,
             isFavorite: true,
             theyFavoritedUs: existing?.theyFavoritedUs ?? false,
@@ -152,7 +174,8 @@ final class FavoritesPersistenceService: ObservableObject {
         
         let relationship = FavoriteRelationship(
             peerNoisePublicKey: peerNoisePublicKey,
-            peerNostrPublicKey: peerNostrPublicKey ?? existing?.peerNostrPublicKey,
+            peerNostrPublicKey: Self.sanitizedNostrPublicKey(peerNostrPublicKey)
+                ?? Self.sanitizedNostrPublicKey(existing?.peerNostrPublicKey),
             peerNickname: displayName,
             isFavorite: existing?.isFavorite ?? false,
             theyFavoritedUs: favorited,
@@ -203,7 +226,7 @@ final class FavoritesPersistenceService: ObservableObject {
     func getFavoriteStatus(forPeerID peerID: PeerID) -> FavoriteRelationship? {
         let canonicalPeerID = peerID.toShort()
         guard canonicalPeerID.isShort else { return nil }
-        for (pubkey, rel) in favorites where PeerID(publicKey: pubkey) == canonicalPeerID {
+        for (pubkey, rel) in favorites where WiFiPeerIdentity.isEquivalent(PeerID(publicKey: pubkey).id, canonicalPeerID.id) {
             return rel
         }
         return nil
@@ -261,7 +284,14 @@ final class FavoritesPersistenceService: ObservableObject {
         
         do {
             let decoder = JSONDecoder()
-            let relationships = try decoder.decode([FavoriteRelationship].self, from: data)
+            let decodedRelationships = try decoder.decode([FavoriteRelationship].self, from: data)
+            let relationships = decodedRelationships.compactMap(Self.sanitizedFavoriteRelationship)
+            if relationships.count < decodedRelationships.count {
+                SecureLogger.warning(
+                    "⚠️ Dropping invalid favorite entries during load (\(decodedRelationships.count - relationships.count) removed)",
+                    category: .session
+                )
+            }
             
             SecureLogger.info("✅ Loaded \(relationships.count) favorite relationships", category: .session)
             
@@ -296,7 +326,7 @@ final class FavoritesPersistenceService: ObservableObject {
             }
             
             // If we cleaned up duplicates, save the cleaned list
-            if cleanedRelationships.count < relationships.count {
+            if cleanedRelationships.count < decodedRelationships.count {
                 // Cleaned up duplicates
                 
                 // Clear and rebuild favorites dictionary
