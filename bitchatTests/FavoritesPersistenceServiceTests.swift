@@ -37,6 +37,10 @@ final class FavoritesPersistenceServiceTests: XCTestCase {
             FavoritesPersistenceService.sanitizedNostrPublicKey("  \(npub ?? "")  "),
             npub
         )
+        XCTAssertEqual(
+            FavoritesPersistenceService.sanitizedNostrPublicKey(npub?.uppercased()),
+            npub
+        )
         XCTAssertNil(FavoritesPersistenceService.sanitizedNostrPublicKey("   "))
     }
 

@@ -44,8 +44,9 @@ final class FavoritesPersistenceService: ObservableObject {
         let trimmed = peerNostrPublicKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
-        if let (hrp, data) = try? Bech32.decode(trimmed), hrp == "npub", data.count == 32 {
-            return trimmed
+        let normalizedBech32 = trimmed.lowercased()
+        if let (hrp, data) = try? Bech32.decode(normalizedBech32), hrp == "npub", data.count == 32 {
+            return normalizedBech32
         }
 
         let lowercased = trimmed.lowercased()
