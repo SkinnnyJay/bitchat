@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import re
 import sys
 
 
@@ -34,6 +35,53 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def find_token_line_numbers(content: str, token: str) -> list[int]:
+    """
+    Return 1-based line numbers where `token` appears as an invocation-like
+    directive at start-of-code (ignoring comments and leading whitespace).
+    """
+    pattern = re.compile(rf"^\s*{re.escape(token)}\b")
+    matches: list[int] = []
+    in_block_comment = False
+
+    for line_number, line in enumerate(content.splitlines(), start=1):
+        cursor = 0
+        line_has_match = False
+
+        while cursor < len(line):
+            if in_block_comment:
+                block_end = line.find("*/", cursor)
+                if block_end == -1:
+                    cursor = len(line)
+                    continue
+                cursor = block_end + 2
+                in_block_comment = False
+                continue
+
+            block_start = line.find("/*", cursor)
+            code_segment = line[cursor:] if block_start == -1 else line[cursor:block_start]
+            inline_comment = code_segment.find("//")
+            if inline_comment != -1:
+                code_segment = code_segment[:inline_comment]
+                block_start = -1
+
+            if pattern.search(code_segment):
+                matches.append(line_number)
+                line_has_match = True
+                break
+
+            if block_start == -1:
+                cursor = len(line)
+            else:
+                cursor = block_start + 2
+                in_block_comment = True
+
+        if line_has_match:
+            continue
+
+    return matches
+
+
 def main() -> int:
     args = parse_args()
 
@@ -46,18 +94,23 @@ def main() -> int:
         return 1
 
     matches: list[Path] = []
+    matches_with_lines: dict[Path, list[int]] = {}
     scanned_files = 0
 
     for root in roots:
         for swift_file in root.rglob("*.swift"):
             scanned_files += 1
-            if args.token in swift_file.read_text(encoding="utf-8", errors="ignore"):
+            content = swift_file.read_text(encoding="utf-8", errors="ignore")
+            line_numbers = find_token_line_numbers(content, args.token)
+            if line_numbers:
                 matches.append(swift_file)
+                matches_with_lines[swift_file] = line_numbers
 
     if matches:
         print(f"Found unsupported token '{args.token}' in Swift sources:")
         for match in sorted(matches):
-            print(f" - {match}")
+            line_list = ", ".join(str(line) for line in matches_with_lines.get(match, []))
+            print(f" - {match} (lines: {line_list})")
         return 1
 
     joined_roots = ", ".join(str(root) for root in roots)
