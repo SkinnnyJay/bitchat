@@ -55,11 +55,13 @@ jobs:
             ${{ runner.os }}-${{ runner.arch }}-swiftpm-
 
       - name: Build the package
+        timeout-minutes: 8
         run: |
           set -o pipefail
           swift build -Xswiftc -warnings-as-errors 2>&1 | tee build.log
 
       - name: Run Tests
+        timeout-minutes: 12
         run: |
           set -o pipefail
           swift test --parallel --disable-swift-testing -Xswiftc -warnings-as-errors 2>&1 | tee test.log  # so it only runs xctests: https://github.com/swiftlang/swift-package-manager/issues/8529#issuecomment-2815711345
