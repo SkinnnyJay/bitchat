@@ -21,6 +21,7 @@ MAX_TOKEN_BYTES = 256
 MAX_SWIFT_FILE_BYTES = 5 * 1024 * 1024
 MAX_SCANNED_SWIFT_FILES = 100000
 MAX_TOTAL_SCANNED_SWIFT_BYTES = 512 * 1024 * 1024
+MAX_VISITED_DIRECTORIES = 200000
 MAX_ROOT_BYTES = 4096
 MAX_ROOT_COUNT = 128
 MAX_REPORTED_INVALID_ROOTS = 200
@@ -464,9 +465,11 @@ def main() -> int:
     parse_error_file_paths: set[Path] = set()
     scan_limit_reached = False
     scanned_bytes_limit_reached = False
+    directory_limit_reached = False
     unreadable_limit_reached = False
     parse_error_limit_reached = False
     scanned_swift_bytes = 0
+    visited_directories = 0
 
     def report_path(path: Path) -> Path:
         try:
@@ -523,10 +526,19 @@ def main() -> int:
         scanned_swift_bytes += byte_count
         return True
 
+    def try_increment_visited_directories() -> bool:
+        nonlocal visited_directories, directory_limit_reached
+        if visited_directories >= MAX_VISITED_DIRECTORIES:
+            directory_limit_reached = True
+            return False
+        visited_directories += 1
+        return True
+
     def should_abort_scan() -> bool:
         return (
             scan_limit_reached
             or scanned_bytes_limit_reached
+            or directory_limit_reached
             or unreadable_limit_reached
             or parse_error_limit_reached
         )
@@ -543,6 +555,8 @@ def main() -> int:
             followlinks=False,
         ):
             if should_abort_scan():
+                break
+            if not try_increment_visited_directories():
                 break
             symlinked_subdirectories: list[Path] = []
             for subdirectory in list(subdirectories):
@@ -770,6 +784,12 @@ def main() -> int:
             "Scan aborted after reaching maximum Swift file limit "
             f"({MAX_SCANNED_SWIFT_FILES})."
         )
+    if directory_limit_reached:
+        has_failure = True
+        print(
+            "Scan aborted after reaching maximum directory-visit limit "
+            f"({MAX_VISITED_DIRECTORIES})."
+        )
     if scanned_bytes_limit_reached:
         has_failure = True
         print(
@@ -797,6 +817,7 @@ def main() -> int:
             f"{token_match_count} token matches."
         )
         print(f"Scanned {scanned_files} Swift files before failure.")
+        print(f"Visited {visited_directories} directories before failure.")
         print(f"Read {scanned_swift_bytes} Swift bytes before failure.")
         return 1
 
