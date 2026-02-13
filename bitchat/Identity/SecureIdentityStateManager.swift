@@ -171,7 +171,22 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     }
 
     static func canonicalShortPeerIDPrefix(_ peerID: PeerID) -> String? {
-        let canonical = PeerID(str: peerID.id.trimmingCharacters(in: .whitespacesAndNewlines)).toShort()
+        let trimmedPeerID = peerID.id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedPeerID.isEmpty else { return nil }
+        let lowercasePeerID = trimmedPeerID.lowercased()
+        let canonicalSource: String
+        if let matchedPrefix = PeerID.Prefix.allCases.first(where: { prefix in
+            prefix != .empty && lowercasePeerID.hasPrefix(prefix.rawValue)
+        }) {
+            let suffix = String(trimmedPeerID.dropFirst(matchedPrefix.rawValue.count))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !suffix.isEmpty else { return nil }
+            canonicalSource = matchedPrefix.rawValue + suffix
+        } else {
+            canonicalSource = trimmedPeerID
+        }
+
+        let canonical = PeerID(str: canonicalSource).toShort()
         guard canonical.isShort else { return nil }
         return canonical.bare.lowercased()
     }

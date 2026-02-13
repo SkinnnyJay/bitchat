@@ -1421,12 +1421,20 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         senderPeerID: String,
         nostrKeyMapping: [String: String]
     ) -> String? {
-        guard senderPeerID.hasPrefix("nostr") else { return nil }
-        if let mapped = nostrKeyMapping[senderPeerID],
+        let trimmedSenderPeerID = senderPeerID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowercaseSenderPeerID = trimmedSenderPeerID.lowercased()
+        guard lowercaseSenderPeerID.hasPrefix("nostr:") || lowercaseSenderPeerID.hasPrefix("nostr_") else { return nil }
+        if let mapped = nostrKeyMapping[trimmedSenderPeerID] ?? nostrKeyMapping[lowercaseSenderPeerID],
            let canonicalMapped = canonicalNostrPubkeyHex(mapped) {
             return canonicalMapped
         }
-        return canonicalNostrPubkeyHex(senderPeerID)
+        let bareSenderPubkey: String
+        if lowercaseSenderPeerID.hasPrefix("nostr:") || lowercaseSenderPeerID.hasPrefix("nostr_") {
+            bareSenderPubkey = String(trimmedSenderPeerID.dropFirst(6))
+        } else {
+            bareSenderPubkey = trimmedSenderPeerID
+        }
+        return canonicalNostrPubkeyHex(bareSenderPubkey)
     }
 
     static func isRecipientForLocalPeer(_ recipientIDData: Data?, localPeerID: String) -> Bool {

@@ -126,11 +126,15 @@ struct WiFiDirectCapabilityNegotiator {
         let stringValue: String?
         if let string = value as? String {
             stringValue = string
+        } else if let number = value as? NSNumber {
+            if CFGetTypeID(number) == CFBooleanGetTypeID() {
+                stringValue = nil
+            } else {
+                stringValue = number.stringValue
+            }
         } else if let bool = value as? Bool {
             _ = bool
             stringValue = nil
-        } else if let number = value as? NSNumber {
-            stringValue = number.stringValue
         } else {
             stringValue = nil
         }

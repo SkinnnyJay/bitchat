@@ -9,22 +9,28 @@ enum WiFiPeerIdentity {
         if peerID.prefix != .empty {
             let bare = peerID.bare.trimmingCharacters(in: .whitespacesAndNewlines)
             if bare.isEmpty {
-                return peerID
+                return PeerID(str: "")
             }
-            return PeerID(str: peerID.prefix.rawValue + bare)
+            let normalizedBare = shouldPreservePrefix(peerID.prefix) ? bare.lowercased() : bare
+            return PeerID(str: peerID.prefix.rawValue + normalizedBare)
         }
 
         let trimmed = peerID.id.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            return peerID
+            return PeerID(str: "")
         }
 
         let lowercaseTrimmed = trimmed.lowercased()
         if let matchedPrefix = PeerID.Prefix.allCases.first(where: { prefix in
             prefix != .empty && lowercaseTrimmed.hasPrefix(prefix.rawValue)
         }) {
-            let suffix = trimmed.dropFirst(matchedPrefix.rawValue.count)
-            return PeerID(str: matchedPrefix.rawValue + suffix)
+            let suffix = String(trimmed.dropFirst(matchedPrefix.rawValue.count))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !suffix.isEmpty else {
+                return PeerID(str: "")
+            }
+            let normalizedSuffix = shouldPreservePrefix(matchedPrefix) ? suffix.lowercased() : suffix
+            return PeerID(str: matchedPrefix.rawValue + normalizedSuffix)
         }
 
         return PeerID(str: trimmed)
@@ -77,6 +83,7 @@ enum WiFiPeerIdentity {
 
     static func candidateIDs(for peerID: PeerID) -> [String] {
         let canonicalPeerID = canonicalPeerID(peerID)
+        guard !canonicalPeerID.id.isEmpty else { return [] }
         var candidates: [String] = [canonicalPeerID.id]
         let preservePrefix = shouldPreservePrefix(canonicalPeerID.prefix)
         if canonicalPeerID.prefix != .empty,
