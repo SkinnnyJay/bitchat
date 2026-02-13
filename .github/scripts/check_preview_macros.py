@@ -777,6 +777,14 @@ def main() -> int:
                         if not record_unreadable(swift_file, "unsupported non-regular Swift path"):
                             break
                         continue
+                    descriptor_identity = (descriptor_stat.st_dev, descriptor_stat.st_ino)
+                    if descriptor_identity != file_identity:
+                        if not record_unreadable(
+                            swift_file,
+                            "file identity changed during open/read (possible race)",
+                        ):
+                            break
+                        continue
                     file_size_bytes = descriptor_stat.st_size
                     if file_size_bytes > MAX_SWIFT_FILE_BYTES:
                         if not record_unreadable(
