@@ -25,6 +25,7 @@ MAX_TOTAL_SCANNED_SWIFT_BYTES = 512 * 1024 * 1024
 MAX_VISITED_DIRECTORIES = 200000
 MAX_DIRECTORY_ENTRIES_PER_DIRECTORY = 200000
 MAX_TOTAL_DIRECTORY_ENTRIES = 2_000_000
+MAX_SEEN_SWIFT_PATH_KEYS = 300_000
 MAX_TOTAL_PARSED_SWIFT_LINES = 20_000_000
 MAX_ROOT_BYTES = 4096
 MAX_ROOT_COUNT = 128
@@ -534,6 +535,7 @@ def main() -> int:
     directory_entries_limit_reached = False
     directory_entries_limit_path: Path | None = None
     total_directory_entries_limit_reached = False
+    seen_path_keys_limit_reached = False
     parsed_lines_limit_reached = False
     unreadable_limit_reached = False
     parse_error_limit_reached = False
@@ -612,10 +614,21 @@ def main() -> int:
             or directory_limit_reached
             or directory_entries_limit_reached
             or total_directory_entries_limit_reached
+            or seen_path_keys_limit_reached
             or parsed_lines_limit_reached
             or unreadable_limit_reached
             or parse_error_limit_reached
         )
+
+    def try_add_seen_file_key(path: Path) -> bool:
+        nonlocal seen_path_keys_limit_reached
+        if path in seen_files:
+            return True
+        if len(seen_files) >= MAX_SEEN_SWIFT_PATH_KEYS:
+            seen_path_keys_limit_reached = True
+            return False
+        seen_files.add(path)
+        return True
 
     for root in roots:
         def record_walk_error(error: OSError) -> None:
@@ -676,7 +689,8 @@ def main() -> int:
                     if swift_file.is_symlink():
                         if unresolved_key in seen_files:
                             continue
-                        seen_files.add(unresolved_key)
+                        if not try_add_seen_file_key(unresolved_key):
+                            break
                         if not try_increment_scanned_files():
                             break
                         if not record_unreadable(swift_file, "symlinked Swift file not scanned"):
@@ -685,7 +699,8 @@ def main() -> int:
                 except OSError as error:
                     if unresolved_key in seen_files:
                         continue
-                    seen_files.add(unresolved_key)
+                    if not try_add_seen_file_key(unresolved_key):
+                        break
                     if not try_increment_scanned_files():
                         break
                     if not record_unreadable(swift_file, f"cannot inspect file ({error})"):
@@ -696,7 +711,8 @@ def main() -> int:
                 except (RuntimeError, OSError) as error:
                     if unresolved_key in seen_files:
                         continue
-                    seen_files.add(unresolved_key)
+                    if not try_add_seen_file_key(unresolved_key):
+                        break
                     if not try_increment_scanned_files():
                         break
                     if not record_unreadable(swift_file, f"cannot resolve path ({error})"):
@@ -704,7 +720,8 @@ def main() -> int:
                     continue
                 if resolved_file in seen_files:
                     continue
-                seen_files.add(resolved_file)
+                if not try_add_seen_file_key(resolved_file):
+                    break
                 try:
                     resolved_stat = resolved_file.stat()
                 except OSError as error:
@@ -900,6 +917,12 @@ def main() -> int:
             "Scan aborted after reaching maximum total directory-entry limit "
             f"({MAX_TOTAL_DIRECTORY_ENTRIES})."
         )
+    if seen_path_keys_limit_reached:
+        has_failure = True
+        print(
+            "Scan aborted after reaching maximum tracked Swift path-key limit "
+            f"({MAX_SEEN_SWIFT_PATH_KEYS})."
+        )
     if parsed_lines_limit_reached:
         has_failure = True
         print(
@@ -935,6 +958,7 @@ def main() -> int:
         print(f"Scanned {scanned_files} Swift files before failure.")
         print(f"Visited {visited_directories} directories before failure.")
         print(f"Processed {processed_directory_entries} directory entries before failure.")
+        print(f"Tracked {len(seen_files)} unique Swift path keys before failure.")
         print(f"Parsed {parsed_swift_lines} Swift lines before failure.")
         print(f"Read {scanned_swift_bytes} Swift bytes before failure.")
         return 1
