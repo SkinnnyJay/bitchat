@@ -1417,6 +1417,18 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         return "nostr:" + keySource.lowercased()
     }
 
+    static func resolvedBlockedNostrPubkey(
+        senderPeerID: String,
+        nostrKeyMapping: [String: String]
+    ) -> String? {
+        guard senderPeerID.hasPrefix("nostr") else { return nil }
+        if let mapped = nostrKeyMapping[senderPeerID],
+           let canonicalMapped = canonicalNostrPubkeyHex(mapped) {
+            return canonicalMapped
+        }
+        return canonicalNostrPubkeyHex(senderPeerID)
+    }
+
     static func isRecipientForLocalPeer(_ recipientIDData: Data?, localPeerID: String) -> Bool {
         guard let recipientIDData else { return true }
         guard recipientIDData.count == 8 else { return false }
@@ -6091,9 +6103,12 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             // Check mesh/known peers first
             if isPeerBlocked(peerID) { return true }
             // Check geohash (Nostr) blocks using mapping to full pubkey
-            if peerID.hasPrefix("nostr") {
-                if let full = nostrKeyMapping[peerID]?.lowercased() {
-                    if identityManager.isNostrBlocked(pubkeyHexLowercased: full) { return true }
+            if let blockedNostrPubkey = Self.resolvedBlockedNostrPubkey(
+                senderPeerID: peerID,
+                nostrKeyMapping: nostrKeyMapping
+            ) {
+                if identityManager.isNostrBlocked(pubkeyHexLowercased: blockedNostrPubkey) {
+                    return true
                 }
             }
             return false

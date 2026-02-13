@@ -414,4 +414,42 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
 
         XCTAssertEqual(normalized, "nostr:abc_def")
     }
+
+    func testResolvedBlockedNostrPubkeyPrefersCanonicalMappedValue() {
+        let hex = String(repeating: "ab", count: 32)
+        let npub = try? Bech32.encode(hrp: "npub", data: Data(hexString: hex) ?? Data())
+
+        let resolved = ChatViewModel.resolvedBlockedNostrPubkey(
+            senderPeerID: "nostr_\(String(hex.prefix(16)))",
+            nostrKeyMapping: ["nostr_\(String(hex.prefix(16)))": npub ?? ""]
+        )
+
+        XCTAssertEqual(resolved, hex)
+    }
+
+    func testResolvedBlockedNostrPubkeyFallsBackToSenderPeerIDCanonicalization() {
+        let hex = String(repeating: "11", count: 32)
+
+        let resolved = ChatViewModel.resolvedBlockedNostrPubkey(
+            senderPeerID: "nostr:\(hex.uppercased())",
+            nostrKeyMapping: [:]
+        )
+
+        XCTAssertEqual(resolved, hex)
+    }
+
+    func testResolvedBlockedNostrPubkeyRejectsUnknownOrInvalidSenderIdentifiers() {
+        XCTAssertNil(
+            ChatViewModel.resolvedBlockedNostrPubkey(
+                senderPeerID: "mesh:abcdef0123456789",
+                nostrKeyMapping: [:]
+            )
+        )
+        XCTAssertNil(
+            ChatViewModel.resolvedBlockedNostrPubkey(
+                senderPeerID: "nostr_abcdef0123456789",
+                nostrKeyMapping: [:]
+            )
+        )
+    }
 }
