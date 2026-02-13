@@ -697,6 +697,37 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
                     result.stdout,
                 )
 
+    def test_deduplicates_symlinked_directory_error_across_mixed_root_forms(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            nested_dir = temp_path / "nested"
+            nested_dir.mkdir(parents=True, exist_ok=True)
+            symlinked_directory = nested_dir / "linked"
+
+            with tempfile.TemporaryDirectory() as target_dir:
+                try:
+                    symlinked_directory.symlink_to(pathlib.Path(target_dir), target_is_directory=True)
+                except (NotImplementedError, OSError) as error:
+                    self.skipTest(f"Symlink directory setup not supported in environment: {error}")
+
+                root_relative = os.path.relpath(temp_dir, pathlib.Path.cwd())
+                result = self.run_script(
+                    "--root",
+                    root_relative,
+                    "--root",
+                    str(nested_dir),
+                    "--allow-empty",
+                )
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Could not read one or more Swift files", result.stdout)
+            self.assertEqual(result.stdout.count("symlinked directory not traversed"), 1, msg=result.stdout)
+            self.assertEqual(result.stdout.count("/nested/linked:"), 1, msg=result.stdout)
+            self.assertIn(
+                "Failure summary: 1 unreadable, 0 parse errors, 0 token matches.",
+                result.stdout,
+            )
+
     def test_fails_closed_when_root_contains_symlinked_swift_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)

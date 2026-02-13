@@ -257,6 +257,15 @@ def main() -> int:
     unreadable_files: dict[Path, str] = {}
     parse_error_files: dict[Path, str] = {}
 
+    def report_path(path: Path) -> Path:
+        try:
+            return Path(os.path.abspath(path))
+        except OSError:
+            return path
+
+    def record_unreadable(path: Path, reason: str) -> None:
+        unreadable_files[report_path(path)] = reason
+
     for root in roots:
         traversal_errors: dict[Path, str] = {}
 
@@ -299,14 +308,14 @@ def main() -> int:
                             continue
                         seen_files.add(unresolved_key)
                         scanned_files += 1
-                        unreadable_files[swift_file] = "symlinked Swift file not scanned"
+                        record_unreadable(swift_file, "symlinked Swift file not scanned")
                         continue
                 except OSError as error:
                     if unresolved_key in seen_files:
                         continue
                     seen_files.add(unresolved_key)
                     scanned_files += 1
-                    unreadable_files[swift_file] = f"cannot inspect file ({error})"
+                    record_unreadable(swift_file, f"cannot inspect file ({error})")
                     continue
                 try:
                     resolved_file = swift_file.resolve()
@@ -315,7 +324,7 @@ def main() -> int:
                         continue
                     seen_files.add(unresolved_key)
                     scanned_files += 1
-                    unreadable_files[swift_file] = f"cannot resolve path ({error})"
+                    record_unreadable(swift_file, f"cannot resolve path ({error})")
                     continue
                 if resolved_file in seen_files:
                     continue
@@ -324,7 +333,7 @@ def main() -> int:
                 try:
                     content = swift_file.read_text(encoding="utf-8")
                 except (OSError, UnicodeDecodeError) as error:
-                    unreadable_files[swift_file] = str(error)
+                    record_unreadable(swift_file, str(error))
                     continue
                 line_numbers, parse_error = find_token_line_numbers_with_state(content, token)
                 if parse_error is not None:
@@ -335,7 +344,7 @@ def main() -> int:
                     matches_with_lines[swift_file] = line_numbers
 
         for error_path, error_message in traversal_errors.items():
-            unreadable_files[error_path] = error_message
+            record_unreadable(error_path, error_message)
 
     has_failure = False
 
