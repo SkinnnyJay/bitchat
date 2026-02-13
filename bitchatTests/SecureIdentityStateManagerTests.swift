@@ -42,4 +42,17 @@ final class SecureIdentityStateManagerTests: XCTestCase {
 
         XCTAssertEqual(updated["same"], [fingerprint])
     }
+
+    func testCanonicalNostrPubkeyTrimsLowercasesAndValidatesLength() {
+        let uppercase = String(repeating: "AB", count: 32)
+
+        let canonical = SecureIdentityStateManager.canonicalNostrPubkey("  \(uppercase)  ")
+
+        XCTAssertEqual(canonical, String(repeating: "ab", count: 32))
+    }
+
+    func testCanonicalNostrPubkeyRejectsInvalidInput() {
+        XCTAssertNil(SecureIdentityStateManager.canonicalNostrPubkey("abc"))
+        XCTAssertNil(SecureIdentityStateManager.canonicalNostrPubkey(String(repeating: "zz", count: 32)))
+    }
 }

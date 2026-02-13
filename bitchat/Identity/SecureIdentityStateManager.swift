@@ -162,6 +162,12 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
         InputValidator.validateNickname(value ?? "") ?? "user"
     }
 
+    static func canonicalNostrPubkey(_ value: String) -> String? {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard normalized.count == 64, Data(hexString: normalized)?.count == 32 else { return nil }
+        return normalized
+    }
+
     static func updatedNicknameIndex(
         _ index: [String: Set<String>],
         fingerprint: String,
@@ -457,13 +463,14 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     // MARK: - Geohash (Nostr) Blocking
     
     func isNostrBlocked(pubkeyHexLowercased: String) -> Bool {
+        guard let key = Self.canonicalNostrPubkey(pubkeyHexLowercased) else { return false }
         queue.sync {
-            return cache.blockedNostrPubkeys.contains(pubkeyHexLowercased.lowercased())
+            return cache.blockedNostrPubkeys.contains(key)
         }
     }
     
     func setNostrBlocked(_ pubkeyHexLowercased: String, isBlocked: Bool) {
-        let key = pubkeyHexLowercased.lowercased()
+        guard let key = Self.canonicalNostrPubkey(pubkeyHexLowercased) else { return }
         queue.async(flags: .barrier) {
             if isBlocked {
                 self.cache.blockedNostrPubkeys.insert(key)
