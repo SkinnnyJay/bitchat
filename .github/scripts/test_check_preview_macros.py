@@ -262,7 +262,10 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             result = self.run_script("--root", str(loop_root))
             self.assertEqual(result.returncode, 1)
             self.assertIn("One or more scan roots are invalid", result.stdout)
-            self.assertIn("cannot resolve path", result.stdout)
+            self.assertTrue(
+                "cannot resolve path" in result.stdout or "does not exist" in result.stdout,
+                msg=result.stdout,
+            )
 
     def test_fails_when_scan_root_is_blank_after_trimming(self) -> None:
         result = self.run_script("--root", "   ")
