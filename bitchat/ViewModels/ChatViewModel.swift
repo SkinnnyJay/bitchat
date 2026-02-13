@@ -984,20 +984,19 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
 
         processedNostrEvents.insert(event.id)
+        guard let canonicalSenderPubkey = Self.canonicalNostrPubkeyHex(event.pubkey),
+              let key16 = Self.geohashConversationKey(for: canonicalSenderPubkey),
+              let key8 = Self.geohashShortMappingKey(for: canonicalSenderPubkey) else { return }
         
         if let gh = currentGeohash,
            let myGeoIdentity = try? NostrIdentityBridge.deriveIdentity(forGeohash: gh),
-           myGeoIdentity.publicKeyHex.lowercased() == event.pubkey.lowercased() {
+           myGeoIdentity.publicKeyHex.lowercased() == canonicalSenderPubkey {
             // Skip very recent self-echo from relay, but allow older events (e.g., after app restart)
             let eventTime = Date(timeIntervalSince1970: TimeInterval(event.created_at))
             if Date().timeIntervalSince(eventTime) < 15 {
                 return
             }
         }
-        
-        guard let canonicalSenderPubkey = Self.canonicalNostrPubkeyHex(event.pubkey),
-              let key16 = Self.geohashConversationKey(for: canonicalSenderPubkey),
-              let key8 = Self.geohashShortMappingKey(for: canonicalSenderPubkey) else { return }
 
         if let nickTag = event.tags.first(where: { $0.first == "n" }), nickTag.count >= 2 {
             let nick = nickTag[1].trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1747,10 +1746,13 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Deduplicate
         if processedNostrEvents.contains(event.id) { return }
         recordProcessedEvent(event.id)
+        guard let canonicalSenderPubkey = Self.canonicalNostrPubkeyHex(event.pubkey),
+              let key16 = Self.geohashConversationKey(for: canonicalSenderPubkey),
+              let key8 = Self.geohashShortMappingKey(for: canonicalSenderPubkey) else { return }
         
         // Log incoming tags for diagnostics
         let tagSummary = event.tags.map { "[" + $0.joined(separator: ",") + "]" }.joined(separator: ",")
-        SecureLogger.debug("GeoTeleport: recv pub=\(event.pubkey.prefix(8))… tags=\(tagSummary)", category: .session)
+        SecureLogger.debug("GeoTeleport: recv pub=\(canonicalSenderPubkey.prefix(8))… tags=\(tagSummary)", category: .session)
         
         // Track teleport tag for participants – only our format ["t", "teleport"]
         let hasTeleportTag: Bool = event.tags.contains { tag in
@@ -1759,7 +1761,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         let isSelf: Bool = {
             if let gh = currentGeohash, let my = try? NostrIdentityBridge.deriveIdentity(forGeohash: gh) {
-                return my.publicKeyHex.lowercased() == event.pubkey.lowercased()
+                return my.publicKeyHex.lowercased() == canonicalSenderPubkey
             }
             return false
         }()
@@ -1767,7 +1769,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         if hasTeleportTag {
             // Avoid marking our own key from historical events; rely on manager.teleported for self
             if !isSelf {
-                let key = event.pubkey.lowercased()
+                let key = canonicalSenderPubkey
                 Task { @MainActor in
                     teleportedGeo = teleportedGeo.union([key])
                     SecureLogger.info("GeoTeleport: mark peer teleported key=\(key.prefix(8))… total=\(teleportedGeo.count)", category: .session)
@@ -1783,10 +1785,6 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             }
         }
         
-        guard let canonicalSenderPubkey = Self.canonicalNostrPubkeyHex(event.pubkey),
-              let key16 = Self.geohashConversationKey(for: canonicalSenderPubkey),
-              let key8 = Self.geohashShortMappingKey(for: canonicalSenderPubkey) else { return }
-
         // Cache nickname from tag if present
         if let nickTag = event.tags.first(where: { $0.first == "n" }), nickTag.count >= 2 {
             let nick = nickTag[1].trimmingCharacters(in: .whitespacesAndNewlines)
