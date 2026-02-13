@@ -147,4 +147,26 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
         )
         XCTAssertNil(ChatViewModel.sanitizedFavoriteNotificationNostrPubkey("   "))
     }
+
+    func testCanonicalNostrPubkeyHexAcceptsAndLowercasesHexInput() {
+        let uppercaseHex = String(repeating: "AB", count: 32)
+
+        let canonical = ChatViewModel.canonicalNostrPubkeyHex(uppercaseHex)
+
+        XCTAssertEqual(canonical, String(repeating: "ab", count: 32))
+    }
+
+    func testCanonicalNostrPubkeyHexDecodesNpubInput() {
+        let hex = String(repeating: "11", count: 32)
+        let npub = try? Bech32.encode(hrp: "npub", data: Data(hexString: hex) ?? Data())
+
+        let canonical = ChatViewModel.canonicalNostrPubkeyHex(npub ?? "")
+
+        XCTAssertEqual(canonical, hex)
+    }
+
+    func testCanonicalNostrPubkeyHexRejectsInvalidInput() {
+        XCTAssertNil(ChatViewModel.canonicalNostrPubkeyHex("npub123"))
+        XCTAssertNil(ChatViewModel.canonicalNostrPubkeyHex(String(repeating: "zz", count: 32)))
+    }
 }

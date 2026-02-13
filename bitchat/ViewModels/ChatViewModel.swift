@@ -1369,6 +1369,21 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         return trimmed.isEmpty ? nil : trimmed
     }
 
+    static func canonicalNostrPubkeyHex(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let lowercased = trimmed.lowercased()
+        if let data = Data(hexString: lowercased), data.count == 32 {
+            return lowercased
+        }
+
+        guard let (hrp, data) = try? Bech32.decode(trimmed), hrp == "npub", data.count == 32 else {
+            return nil
+        }
+        return data.hexEncodedString()
+    }
+
     static func resolvedFavoriteNotificationPeerID(from peerID: String, resolvedPeer: BitchatPeer?) -> PeerID? {
         let candidate = resolvedPeer?.peerID ?? PeerID(str: peerID.trimmingCharacters(in: .whitespacesAndNewlines))
         return candidate.isValid ? candidate : nil
@@ -5912,23 +5927,20 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     @MainActor
     private func findNoiseKey(for nostrPubkey: String) -> Data? {
+        guard let canonicalHex = Self.canonicalNostrPubkeyHex(nostrPubkey) else {
+            SecureLogger.warning("⚠️ Invalid Nostr public key format", category: .session)
+            return nil
+        }
         // Convert hex to npub if needed for comparison
+        guard let pubkeyData = Data(hexString: canonicalHex), pubkeyData.count == 32 else {
+            return nil
+        }
         let npubToMatch: String
-        if nostrPubkey.hasPrefix("npub") {
-            npubToMatch = nostrPubkey
-        } else {
-            // Try to convert hex to npub
-            guard let pubkeyData = Data(hexString: nostrPubkey) else { 
-                SecureLogger.warning("⚠️ Invalid hex public key format: \(nostrPubkey.prefix(16))...", category: .session)
-                return nil 
-            }
-            
-            do {
-                npubToMatch = try Bech32.encode(hrp: "npub", data: pubkeyData)
-            } catch {
-                SecureLogger.warning("⚠️ Failed to convert hex to npub: \(error)", category: .session)
-                return nil
-            }
+        do {
+            npubToMatch = try Bech32.encode(hrp: "npub", data: pubkeyData)
+        } catch {
+            SecureLogger.warning("⚠️ Failed to convert hex to npub: \(error)", category: .session)
+            return nil
         }
         
         // Search through favorites for matching Nostr pubkey
@@ -5941,14 +5953,15 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 }
                 
                 // Also try hex comparison if stored value is hex
-                if !storedNostrKey.hasPrefix("npub") && storedNostrKey == nostrPubkey {
+                if !storedNostrKey.hasPrefix("npub"),
+                   Self.canonicalNostrPubkeyHex(storedNostrKey) == canonicalHex {
                     SecureLogger.debug("✅ Found Noise key for Nostr sender (hex match)", category: .session)
                     return noiseKey
                 }
             }
         }
         
-        SecureLogger.debug("⚠️ No matching Noise key found for Nostr pubkey: \(nostrPubkey.prefix(16))... (tried npub: \(npubToMatch.prefix(16))...)", category: .session)
+        SecureLogger.debug("⚠️ No matching Noise key found for Nostr pubkey: \(canonicalHex.prefix(16))... (tried npub: \(npubToMatch.prefix(16))...)", category: .session)
         return nil
     }
     
