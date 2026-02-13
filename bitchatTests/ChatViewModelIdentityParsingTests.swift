@@ -165,6 +165,7 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
         let canonical = ChatViewModel.canonicalNostrPubkeyHex(npub ?? "")
 
         XCTAssertEqual(canonical, hex)
+        XCTAssertEqual(ChatViewModel.canonicalNostrPubkeyHex(npub?.uppercased() ?? ""), hex)
     }
 
     func testCanonicalNostrPubkeyHexRejectsInvalidInput() {

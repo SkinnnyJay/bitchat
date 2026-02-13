@@ -1376,7 +1376,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             return lowercased
         }
 
-        guard let (hrp, data) = try? Bech32.decode(trimmed), hrp == "npub", data.count == 32 else {
+        guard let (hrp, data) = try? Bech32.decode(lowercased), hrp == "npub", data.count == 32 else {
             return nil
         }
         return data.hexEncodedString()
