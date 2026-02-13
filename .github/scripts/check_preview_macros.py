@@ -19,6 +19,7 @@ import unicodedata
 
 MAX_TOKEN_BYTES = 256
 MAX_SWIFT_FILE_BYTES = 5 * 1024 * 1024
+MAX_SCANNED_SWIFT_FILES = 100000
 MAX_ROOT_BYTES = 4096
 MAX_ROOT_COUNT = 128
 MAX_REPORTED_INVALID_ROOTS = 200
@@ -396,6 +397,7 @@ def main() -> int:
     seen_file_identities: set[tuple[int, int]] = set()
     unreadable_files: dict[Path, str] = {}
     parse_error_files: dict[Path, str] = {}
+    scan_limit_reached = False
 
     def report_path(path: Path) -> Path:
         try:
@@ -405,6 +407,14 @@ def main() -> int:
 
     def record_unreadable(path: Path, reason: str) -> None:
         unreadable_files[report_path(path)] = reason
+
+    def try_increment_scanned_files() -> bool:
+        nonlocal scanned_files, scan_limit_reached
+        if scanned_files >= MAX_SCANNED_SWIFT_FILES:
+            scan_limit_reached = True
+            return False
+        scanned_files += 1
+        return True
 
     for root in roots:
         traversal_errors: dict[Path, str] = {}
@@ -447,14 +457,16 @@ def main() -> int:
                         if unresolved_key in seen_files:
                             continue
                         seen_files.add(unresolved_key)
-                        scanned_files += 1
+                        if not try_increment_scanned_files():
+                            break
                         record_unreadable(swift_file, "symlinked Swift file not scanned")
                         continue
                 except OSError as error:
                     if unresolved_key in seen_files:
                         continue
                     seen_files.add(unresolved_key)
-                    scanned_files += 1
+                    if not try_increment_scanned_files():
+                        break
                     record_unreadable(swift_file, f"cannot inspect file ({error})")
                     continue
                 try:
@@ -463,7 +475,8 @@ def main() -> int:
                     if unresolved_key in seen_files:
                         continue
                     seen_files.add(unresolved_key)
-                    scanned_files += 1
+                    if not try_increment_scanned_files():
+                        break
                     record_unreadable(swift_file, f"cannot resolve path ({error})")
                     continue
                 if resolved_file in seen_files:
@@ -472,14 +485,16 @@ def main() -> int:
                 try:
                     resolved_stat = resolved_file.stat()
                 except OSError as error:
-                    scanned_files += 1
+                    if not try_increment_scanned_files():
+                        break
                     record_unreadable(swift_file, f"cannot inspect file metadata ({error})")
                     continue
                 file_identity = (resolved_stat.st_dev, resolved_stat.st_ino)
                 if file_identity in seen_file_identities:
                     continue
+                if not try_increment_scanned_files():
+                    break
                 seen_file_identities.add(file_identity)
-                scanned_files += 1
                 open_flags = os.O_RDONLY
                 open_requires_nonblocking_support = hasattr(os, "O_NONBLOCK")
                 if open_requires_nonblocking_support:
@@ -552,9 +567,14 @@ def main() -> int:
                         tracked_matches.append(reported_swift_file)
                         matches_with_lines[reported_swift_file] = line_numbers
                         matches_with_line_counts[reported_swift_file] = line_number_count
+            if scan_limit_reached:
+                break
 
         for error_path, error_message in traversal_errors.items():
             record_unreadable(error_path, error_message)
+
+        if scan_limit_reached:
+            break
 
     has_failure = False
 
@@ -608,6 +628,13 @@ def main() -> int:
         omitted_match_count = token_match_count - len(reported_matches)
         if omitted_match_count > 0:
             print(f" ... and {omitted_match_count} more files not shown.")
+
+    if scan_limit_reached:
+        has_failure = True
+        print(
+            "Scan aborted after reaching maximum Swift file limit "
+            f"({MAX_SCANNED_SWIFT_FILES})."
+        )
 
     if has_failure:
         print(
