@@ -243,4 +243,51 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
     func testNostrDisplaySuffixFallsBackToRawInputWhenInvalid() {
         XCTAssertEqual(ChatViewModel.nostrDisplaySuffix(from: "xyz"), "xyz")
     }
+
+    func testNostrConversationPeerIDPrefersValidatedNoiseKey() {
+        let noiseKey = Data(repeating: 0x22, count: 32)
+
+        let conversationPeerID = ChatViewModel.nostrConversationPeerID(
+            actualSenderNoiseKey: noiseKey,
+            senderPubkey: "invalid"
+        )
+
+        XCTAssertEqual(conversationPeerID, noiseKey.hexEncodedString())
+    }
+
+    func testNostrConversationPeerIDFallsBackToCanonicalNostrKey() {
+        let hex = String(repeating: "ab", count: 32)
+
+        let conversationPeerID = ChatViewModel.nostrConversationPeerID(
+            actualSenderNoiseKey: nil,
+            senderPubkey: hex.uppercased()
+        )
+
+        XCTAssertEqual(
+            conversationPeerID,
+            "nostr_" + String(hex.prefix(TransportConfig.nostrConvKeyPrefixLength))
+        )
+    }
+
+    func testNostrConversationPeerIDRejectsInvalidFallbackSenderPubkey() {
+        XCTAssertNil(
+            ChatViewModel.nostrConversationPeerID(
+                actualSenderNoiseKey: nil,
+                senderPubkey: "invalid"
+            )
+        )
+    }
+
+    func testValidatedMessageIDFromPayloadDataAcceptsCanonicalValue() {
+        let messageID = "msg_123"
+
+        let validated = ChatViewModel.validatedMessageID(from: Data(messageID.utf8))
+
+        XCTAssertEqual(validated, messageID)
+    }
+
+    func testValidatedMessageIDFromPayloadDataRejectsInvalidValue() {
+        XCTAssertNil(ChatViewModel.validatedMessageID(from: Data("  msg ".utf8)))
+        XCTAssertNil(ChatViewModel.validatedMessageID(from: Data([0xFF, 0xFE])))
+    }
 }

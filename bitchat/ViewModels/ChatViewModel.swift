@@ -1389,6 +1389,18 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         return String(senderPubkey.suffix(4))
     }
 
+    static func nostrConversationPeerID(actualSenderNoiseKey: Data?, senderPubkey: String) -> String? {
+        if let noiseKey = validatedNoisePublicKey(actualSenderNoiseKey) {
+            return noiseKey.hexEncodedString()
+        }
+        return geohashConversationKey(for: senderPubkey)
+    }
+
+    static func validatedMessageID(from payloadData: Data) -> String? {
+        guard let rawMessageID = String(data: payloadData, encoding: .utf8) else { return nil }
+        return InputValidator.validateMessageID(rawMessageID)
+    }
+
     static func favoriteNotificationState(from content: String) -> Bool? {
         let normalized = content.trimmingCharacters(in: .whitespacesAndNewlines)
         if normalized.hasPrefix("[FAVORITED]") || normalized.hasPrefix("FAVORITED") {
@@ -5442,10 +5454,14 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         guard let currentIdentity = try? NostrIdentityBridge.getCurrentNostrIdentity() else { return }
         
         do {
-            let (content, senderPubkey, rumorTimestamp) = try NostrProtocol.decryptPrivateMessage(
+            let (content, senderPubkeyRaw, rumorTimestamp) = try NostrProtocol.decryptPrivateMessage(
                 giftWrap: giftWrap,
                 recipientIdentity: currentIdentity
             )
+            guard let senderPubkey = Self.canonicalNostrPubkeyHex(senderPubkeyRaw) else {
+                SecureLogger.warning("Dropping Nostr DM with invalid sender pubkey", category: .session)
+                return
+            }
             
             // Expect embedded BitChat packet content
             guard content.hasPrefix("bitchat1:") else {
@@ -5480,9 +5496,17 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             let senderNoiseKey = findNoiseKey(for: senderPubkey)
             let actualSenderNoiseKey = senderNoiseKey // may be nil
             let messageTimestamp = Date(timeIntervalSince1970: TimeInterval(rumorTimestamp))
-            let senderNickname = (actualSenderNoiseKey != nil) ? (FavoritesPersistenceService.shared.getFavoriteStatus(for: actualSenderNoiseKey!)?.peerNickname ?? "Unknown") : "Unknown"
+            let favoriteNickname = actualSenderNoiseKey.flatMap {
+                FavoritesPersistenceService.shared.getFavoriteStatus(for: $0)?.peerNickname
+            }
+            let senderNickname = Self.sanitizedFavoriteNotificationSenderNickname(
+                favoriteNickname ?? "user"
+            )
             // Stable target ID if we know Noise key; otherwise temporary Nostr-based peer
-            let targetPeerID = actualSenderNoiseKey?.hexEncodedString() ?? ("nostr_" + senderPubkey.prefix(TransportConfig.nostrConvKeyPrefixLength))
+            guard let targetPeerID = Self.nostrConversationPeerID(
+                actualSenderNoiseKey: actualSenderNoiseKey,
+                senderPubkey: senderPubkey
+            ) else { return }
 
             switch noisePayload.type {
             case .privateMessage:
@@ -5496,7 +5520,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 )
 
             case .delivered:
-                guard let messageID = String(data: noisePayload.data, encoding: .utf8) else { return }
+                guard let messageID = Self.validatedMessageID(from: noisePayload.data) else { return }
                 let peerName = senderNickname
                 // Update status to delivered
                 if let messages = privateChats[targetPeerID], let idx = messages.firstIndex(where: { $0.id == messageID }) {
@@ -5505,7 +5529,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 }
 
             case .readReceipt:
-                guard let messageID = String(data: noisePayload.data, encoding: .utf8) else { return }
+                guard let messageID = Self.validatedMessageID(from: noisePayload.data) else { return }
                 let peerName = senderNickname
                 if let messages = privateChats[targetPeerID], let idx = messages.firstIndex(where: { $0.id == messageID }) {
                     privateChats[targetPeerID]?[idx].deliveryStatus = .read(by: peerName, at: Date())
