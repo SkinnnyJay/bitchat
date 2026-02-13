@@ -470,7 +470,7 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             result = self.run_script("--root", relative_root)
             self.assertEqual(result.returncode, 1)
             self.assertIn(
-                f"{swift_file.resolve()} (lines: 1)",
+                f"{os.path.abspath(swift_file)} (lines: 1)",
                 result.stdout,
             )
 
@@ -1048,7 +1048,7 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             result = self.run_script("--root", relative_root)
             self.assertEqual(result.returncode, 1)
             self.assertIn("Could not reliably parse one or more Swift files", result.stdout)
-            self.assertIn(str(swift_file.resolve()), result.stdout)
+            self.assertIn(os.path.abspath(swift_file), result.stdout)
             self.assertIn("unmatched block comment closer", result.stdout)
 
     def test_fails_closed_on_unterminated_multiline_string(self) -> None:
