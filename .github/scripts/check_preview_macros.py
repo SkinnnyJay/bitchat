@@ -75,9 +75,11 @@ def utf8_byte_length_or_none(value: str) -> int | None:
 
 def stat_timestamp_ns_or_none(stats: object, nanoseconds_attr: str, seconds_attr: str) -> int | None:
     nanoseconds_value = getattr(stats, nanoseconds_attr, None)
-    if isinstance(nanoseconds_value, int):
+    if isinstance(nanoseconds_value, int) and not isinstance(nanoseconds_value, bool):
         return nanoseconds_value
     seconds_value = getattr(stats, seconds_attr, None)
+    if isinstance(seconds_value, bool):
+        return None
     if isinstance(seconds_value, (int, float)):
         if isinstance(seconds_value, float) and not math.isfinite(seconds_value):
             return None

@@ -401,6 +401,25 @@ class PreviewMacroUtilityTests(unittest.TestCase):
             )
         )
 
+    def test_returns_none_for_boolean_stat_timestamp_values(self) -> None:
+        ns_bool_stats = type("StatLike", (), {"st_mtime_ns": True, "st_mtime": 2.0})()
+        seconds_bool_stats = type("StatLike", (), {"st_mtime": False})()
+        self.assertEqual(
+            check_preview_macros.stat_timestamp_ns_or_none(
+                ns_bool_stats,
+                "st_mtime_ns",
+                "st_mtime",
+            ),
+            2_000_000_000,
+        )
+        self.assertIsNone(
+            check_preview_macros.stat_timestamp_ns_or_none(
+                seconds_bool_stats,
+                "st_mtime_ns",
+                "st_mtime",
+            )
+        )
+
     def test_returns_none_when_stat_timestamp_fields_are_missing(self) -> None:
         stats = type("StatLike", (), {})()
         self.assertIsNone(
