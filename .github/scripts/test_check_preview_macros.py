@@ -299,6 +299,51 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not read one or more Swift files", result.stdout)
             self.assertIn("Corrupt.swift", result.stdout)
 
+    def test_fails_closed_on_unterminated_block_comment(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "UnterminatedBlockComment.swift"
+            swift_file.write_text(
+                textwrap.dedent(
+                    """
+                    /* unterminated comment
+                    #Preview {
+                        Text("not reliably parseable")
+                    }
+                    """
+                ).strip() + "\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Could not reliably parse one or more Swift files", result.stdout)
+            self.assertIn("UnterminatedBlockComment.swift", result.stdout)
+            self.assertIn("unterminated block comment", result.stdout)
+
+    def test_fails_closed_on_unterminated_multiline_string(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "UnterminatedMultilineString.swift"
+            swift_file.write_text(
+                textwrap.dedent(
+                    '''
+                    let value = """
+                    still in string
+                    #Preview {
+                        Text("not reliably parseable")
+                    }
+                    '''
+                ).strip() + "\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Could not reliably parse one or more Swift files", result.stdout)
+            self.assertIn("UnterminatedMultilineString.swift", result.stdout)
+            self.assertIn("unterminated multiline string literal", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

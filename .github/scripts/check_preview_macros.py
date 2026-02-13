@@ -43,7 +43,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def find_token_line_numbers(content: str, token: str) -> list[int]:
+def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[int], str | None]:
     """
     Return 1-based line numbers where `token` appears as an invocation-like
     directive at start-of-code (ignoring comments and leading whitespace).
@@ -152,6 +152,16 @@ def find_token_line_numbers(content: str, token: str) -> list[int]:
         if pattern.search(code_segment):
             matches.append(line_number)
 
+    if block_comment_depth > 0:
+        return matches, "unterminated block comment"
+    if active_string_hashes is not None and active_string_is_multiline:
+        return matches, "unterminated multiline string literal"
+
+    return matches, None
+
+
+def find_token_line_numbers(content: str, token: str) -> list[int]:
+    matches, _ = find_token_line_numbers_with_state(content, token)
     return matches
 
 
@@ -181,6 +191,7 @@ def main() -> int:
     scanned_files = 0
     seen_files: set[Path] = set()
     unreadable_files: dict[Path, str] = {}
+    parse_error_files: dict[Path, str] = {}
 
     for root in roots:
         for swift_file in sorted(root.rglob("*.swift")):
@@ -194,7 +205,10 @@ def main() -> int:
             except (OSError, UnicodeDecodeError) as error:
                 unreadable_files[swift_file] = str(error)
                 continue
-            line_numbers = find_token_line_numbers(content, token)
+            line_numbers, parse_error = find_token_line_numbers_with_state(content, token)
+            if parse_error is not None:
+                parse_error_files[swift_file] = parse_error
+                continue
             if line_numbers:
                 matches.append(swift_file)
                 matches_with_lines[swift_file] = line_numbers
@@ -203,6 +217,12 @@ def main() -> int:
         print("Could not read one or more Swift files:")
         for swift_file in sorted(unreadable_files):
             print(f" - {swift_file}: {unreadable_files[swift_file]}")
+        return 1
+
+    if parse_error_files:
+        print("Could not reliably parse one or more Swift files:")
+        for swift_file in sorted(parse_error_files):
+            print(f" - {swift_file}: {parse_error_files[swift_file]}")
         return 1
 
     if scanned_files == 0 and not args.allow_empty:
