@@ -313,8 +313,4 @@ extension NostrTransport {
         let canonical = senderPeerID.toShort()
         return canonical.isShort ? canonical : nil
     }
-
-    private func isValidNpub(_ npub: String) -> Bool {
-        Self.canonicalRecipientNpub(from: npub) != nil
-    }
 }
