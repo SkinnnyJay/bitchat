@@ -12,6 +12,7 @@ import argparse
 import os
 from pathlib import Path
 import re
+import stat
 import sys
 
 
@@ -228,12 +229,20 @@ def main() -> int:
         seen_roots.add(root_key)
         roots.append(root)
 
-        if not root.exists():
+        try:
+            root_lstat = root.lstat()
+        except FileNotFoundError:
             invalid_roots[str(root)] = "does not exist"
-        elif not root.is_dir():
-            invalid_roots[str(root)] = "is not a directory"
-        elif root.is_symlink():
+            continue
+        except OSError as error:
+            invalid_roots[str(root)] = f"cannot access path ({error})"
+            continue
+
+        if stat.S_ISLNK(root_lstat.st_mode):
             invalid_roots[str(root)] = "is a symlinked directory (not traversed)"
+            continue
+        if not stat.S_ISDIR(root_lstat.st_mode):
+            invalid_roots[str(root)] = "is not a directory"
 
     if invalid_roots:
         print("One or more scan roots are invalid:")

@@ -307,6 +307,31 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
         self.assertIn("One or more scan roots are invalid", result.stdout)
         self.assertIn("does not exist", result.stdout)
 
+    def test_fails_when_scan_root_path_is_inaccessible(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            inaccessible_parent = temp_path / "inaccessible"
+            inaccessible_parent.mkdir(parents=True, exist_ok=True)
+            nested_root = inaccessible_parent / "nested"
+
+            try:
+                os.chmod(inaccessible_parent, 0)
+            except OSError as error:
+                self.skipTest(f"Could not adjust parent permissions for root accessibility test: {error}")
+
+            if os.access(inaccessible_parent, os.R_OK | os.X_OK):
+                os.chmod(inaccessible_parent, 0o755)
+                self.skipTest("Permission restrictions are not enforced in this environment.")
+
+            try:
+                result = self.run_script("--root", str(nested_root))
+            finally:
+                os.chmod(inaccessible_parent, 0o755)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("One or more scan roots are invalid", result.stdout)
+            self.assertIn("cannot access path", result.stdout)
+
     def test_fails_when_scan_root_is_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)
