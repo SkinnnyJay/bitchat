@@ -104,9 +104,14 @@ def main() -> int:
     matches: list[Path] = []
     matches_with_lines: dict[Path, list[int]] = {}
     scanned_files = 0
+    seen_files: set[Path] = set()
 
     for root in roots:
         for swift_file in root.rglob("*.swift"):
+            resolved_file = swift_file.resolve()
+            if resolved_file in seen_files:
+                continue
+            seen_files.add(resolved_file)
             scanned_files += 1
             content = swift_file.read_text(encoding="utf-8", errors="ignore")
             line_numbers = find_token_line_numbers(content, args.token)
