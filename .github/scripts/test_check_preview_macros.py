@@ -301,6 +301,17 @@ class PreviewMacroUtilityTests(unittest.TestCase):
         self.assertEqual(check_preview_macros.utf8_byte_length_or_none("🙂"), 4)
         self.assertIsNone(check_preview_macros.utf8_byte_length_or_none("\ud800"))
 
+    def test_formats_line_numbers_for_diagnostics(self) -> None:
+        self.assertEqual(
+            check_preview_macros.format_line_numbers_for_diagnostics([1, 2, 3]),
+            "1, 2, 3",
+        )
+        with mock.patch.object(check_preview_macros, "MAX_REPORTED_LINE_NUMBERS_PER_FILE", 2):
+            self.assertEqual(
+                check_preview_macros.format_line_numbers_for_diagnostics([1, 2, 3, 4]),
+                "1, 2 ... +2 more",
+            )
+
     def test_escapes_control_characters_for_diagnostics(self) -> None:
         self.assertEqual(
             check_preview_macros.escape_diagnostic_text("line1\nline2\t\x01"),
@@ -593,6 +604,30 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(output.count("(lines:"), 2)
             self.assertIn("... and 1 more files not shown.", output)
             self.assertIn("Failure summary: 0 unreadable, 0 parse errors, 3 token matches.", output)
+
+    def test_limits_reported_line_numbers_per_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "ManyPreviews.swift"
+            swift_file.write_text(
+                textwrap.dedent(
+                    """
+                    #Preview { Text("1") }
+                    #Preview { Text("2") }
+                    #Preview { Text("3") }
+                    #Preview { Text("4") }
+                    #Preview { Text("5") }
+                    """
+                ).strip() + "\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(check_preview_macros, "MAX_REPORTED_LINE_NUMBERS_PER_FILE", 3):
+                return_code, output = self.run_main_with_args(roots=[temp_dir], token="#Preview")
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("ManyPreviews.swift (lines: 1, 2, 3 ... +2 more)", output)
+            self.assertIn("Failure summary: 0 unreadable, 0 parse errors, 1 token matches.", output)
 
     def test_limits_reported_unreadable_files(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -24,6 +24,7 @@ MAX_ROOT_COUNT = 128
 MAX_REPORTED_UNREADABLE_FILES = 200
 MAX_REPORTED_PARSE_ERROR_FILES = 200
 MAX_REPORTED_TOKEN_MATCH_FILES = 200
+MAX_REPORTED_LINE_NUMBERS_PER_FILE = 50
 DISALLOWED_CONTROL_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn"}
 
 
@@ -44,6 +45,15 @@ def utf8_byte_length_or_none(value: str) -> int | None:
 
 def contains_disallowed_control_characters(value: str) -> bool:
     return any(unicodedata.category(character) in DISALLOWED_CONTROL_CATEGORIES for character in value)
+
+
+def format_line_numbers_for_diagnostics(line_numbers: list[int]) -> str:
+    reported_line_numbers = line_numbers[:MAX_REPORTED_LINE_NUMBERS_PER_FILE]
+    line_numbers_text = ", ".join(str(line) for line in reported_line_numbers)
+    omitted_line_numbers = len(line_numbers) - MAX_REPORTED_LINE_NUMBERS_PER_FILE
+    if omitted_line_numbers > 0:
+        return f"{line_numbers_text} ... +{omitted_line_numbers} more"
+    return line_numbers_text
 
 
 def format_open_read_error(error: OSError) -> str:
@@ -528,7 +538,7 @@ def main() -> int:
         print(f"Found unsupported token '{token}' in Swift sources:")
         sorted_matches = sorted(matches)
         for match in sorted_matches[:MAX_REPORTED_TOKEN_MATCH_FILES]:
-            line_list = ", ".join(str(line) for line in matches_with_lines.get(match, []))
+            line_list = format_line_numbers_for_diagnostics(matches_with_lines.get(match, []))
             print(f" - {format_path_for_diagnostics(match)} (lines: {line_list})")
         omitted_match_count = len(sorted_matches) - MAX_REPORTED_TOKEN_MATCH_FILES
         if omitted_match_count > 0:
