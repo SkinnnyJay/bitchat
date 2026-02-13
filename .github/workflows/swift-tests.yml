@@ -30,27 +30,7 @@ jobs:
         uses: swift-actions/setup-swift@v2
 
       - name: Guard against #Preview macro regressions
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          matches = []
-          for path in Path("bitchat").rglob("*.swift"):
-            try:
-              text = path.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
-              text = path.read_text(encoding="utf-8", errors="ignore")
-            if "#Preview" in text:
-              matches.append(str(path))
-
-          if matches:
-            print("Found unsupported #Preview macro usage:")
-            for match in matches:
-              print(f" - {match}")
-            raise SystemExit(1)
-
-          print("No #Preview macro usage detected.")
-          PY
+        run: python3 .github/scripts/check_preview_macros.py
 
       - name: Capture toolchain fingerprints
         id: toolchain
