@@ -219,6 +219,28 @@ extension NostrTransport {
 // MARK: - Private Helpers
 
 extension NostrTransport {
+    static func canonicalRecipientHex(from recipientKey: String) -> String? {
+        let normalized = recipientKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return nil }
+
+        let lowercased = normalized.lowercased()
+        if let data = Data(hexString: lowercased), data.count == 32 {
+            return lowercased
+        }
+
+        guard let (hrp, data) = try? Bech32.decode(lowercased), hrp == "npub", data.count == 32 else {
+            return nil
+        }
+        return data.hexEncodedString()
+    }
+
+    static func canonicalRecipientNpub(from recipientKey: String) -> String? {
+        guard let canonicalHex = canonicalRecipientHex(from: recipientKey),
+              let data = Data(hexString: canonicalHex),
+              data.count == 32 else { return nil }
+        return try? Bech32.encode(hrp: "npub", data: data)
+    }
+
     private func processReadQueueIfNeeded() {
         guard !isSendingReadAcks else { return }
         guard !readQueue.isEmpty else { return }
@@ -261,15 +283,7 @@ extension NostrTransport {
     }
 
     private func decodeRecipientHex(fromNpub recipientNpub: String) -> String? {
-        let normalizedNpub = recipientNpub.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedNpub.isEmpty else { return nil }
-        do {
-            let (hrp, data) = try Bech32.decode(normalizedNpub)
-            guard hrp == "npub", data.count == 32 else { return nil }
-            return data.hexEncodedString()
-        } catch {
-            return nil
-        }
+        Self.canonicalRecipientHex(from: recipientNpub)
     }
 
     @MainActor
@@ -278,8 +292,8 @@ extension NostrTransport {
             if let data = Data(hexString: candidate), data.count == 32,
                let favorite = FavoritesPersistenceService.shared.getFavoriteStatus(for: data),
                let npub = favorite.peerNostrPublicKey,
-               isValidNpub(npub) {
-                return npub
+               let canonicalNpub = Self.canonicalRecipientNpub(from: npub) {
+                return canonicalNpub
             }
 
             if candidate.count == 16 {
@@ -287,8 +301,8 @@ extension NostrTransport {
                 guard shortPeerID.isValid else { continue }
                 if let favorite = FavoritesPersistenceService.shared.getFavoriteStatus(forPeerID: shortPeerID),
                    let npub = favorite.peerNostrPublicKey,
-                   isValidNpub(npub) {
-                    return npub
+                   let canonicalNpub = Self.canonicalRecipientNpub(from: npub) {
+                    return canonicalNpub
                 }
             }
         }
@@ -301,9 +315,6 @@ extension NostrTransport {
     }
 
     private func isValidNpub(_ npub: String) -> Bool {
-        let normalized = npub.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalized.isEmpty else { return false }
-        guard let (hrp, data) = try? Bech32.decode(normalized) else { return false }
-        return hrp == "npub" && data.count == 32
+        Self.canonicalRecipientNpub(from: npub) != nil
     }
 }
