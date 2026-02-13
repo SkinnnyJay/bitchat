@@ -238,6 +238,51 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
         )
         return sanitized
     }
+
+    static func applyingFavoriteMutation(
+        existingIdentity: SocialIdentity?,
+        fingerprint: String,
+        isFavorite: Bool
+    ) -> SocialIdentity {
+        if var identity = existingIdentity {
+            identity.isFavorite = isFavorite
+            identity.claimedNickname = sanitizedClaimedNickname(identity.claimedNickname)
+            return identity
+        }
+        return SocialIdentity(
+            fingerprint: fingerprint,
+            localPetname: nil,
+            claimedNickname: sanitizedClaimedNickname("Unknown"),
+            trustLevel: .unknown,
+            isFavorite: isFavorite,
+            isBlocked: false,
+            notes: nil
+        )
+    }
+
+    static func applyingBlockedMutation(
+        existingIdentity: SocialIdentity?,
+        fingerprint: String,
+        isBlocked: Bool
+    ) -> SocialIdentity {
+        if var identity = existingIdentity {
+            identity.isBlocked = isBlocked
+            if isBlocked {
+                identity.isFavorite = false
+            }
+            identity.claimedNickname = sanitizedClaimedNickname(identity.claimedNickname)
+            return identity
+        }
+        return SocialIdentity(
+            fingerprint: fingerprint,
+            localPetname: nil,
+            claimedNickname: sanitizedClaimedNickname("Unknown"),
+            trustLevel: .unknown,
+            isFavorite: false,
+            isBlocked: isBlocked,
+            notes: nil
+        )
+    }
     
     init(_ keychain: KeychainManagerProtocol) {
         self.keychain = keychain
@@ -458,23 +503,19 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     
     func setFavorite(_ fingerprint: String, isFavorite: Bool) {
         queue.async(flags: .barrier) {
-            if var identity = self.cache.socialIdentities[fingerprint] {
-                identity.isFavorite = isFavorite
-                identity.claimedNickname = Self.sanitizedClaimedNickname(identity.claimedNickname)
-                self.cache.socialIdentities[fingerprint] = identity
-            } else {
-                // Create new social identity for this fingerprint
-                let newIdentity = SocialIdentity(
-                    fingerprint: fingerprint,
-                    localPetname: nil,
-                    claimedNickname: Self.sanitizedClaimedNickname("Unknown"),
-                    trustLevel: .unknown,
-                    isFavorite: isFavorite,
-                    isBlocked: false,
-                    notes: nil
-                )
-                self.cache.socialIdentities[fingerprint] = newIdentity
-            }
+            let existingIdentity = self.cache.socialIdentities[fingerprint]
+            let identity = Self.applyingFavoriteMutation(
+                existingIdentity: existingIdentity,
+                fingerprint: fingerprint,
+                isFavorite: isFavorite
+            )
+            self.cache.socialIdentities[fingerprint] = identity
+            self.cache.nicknameIndex = Self.updatedNicknameIndex(
+                self.cache.nicknameIndex,
+                fingerprint: fingerprint,
+                oldNickname: existingIdentity?.claimedNickname,
+                newNickname: identity.claimedNickname
+            )
             self.saveIdentityCache()
         }
     }
@@ -497,26 +538,19 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
         SecureLogger.info("User \(isBlocked ? "blocked" : "unblocked"): \(fingerprint)", category: .security)
         
         queue.async(flags: .barrier) {
-            if var identity = self.cache.socialIdentities[fingerprint] {
-                identity.isBlocked = isBlocked
-                if isBlocked {
-                    identity.isFavorite = false  // Can't be both favorite and blocked
-                }
-                identity.claimedNickname = Self.sanitizedClaimedNickname(identity.claimedNickname)
-                self.cache.socialIdentities[fingerprint] = identity
-            } else {
-                // Create new social identity for this fingerprint
-                let newIdentity = SocialIdentity(
-                    fingerprint: fingerprint,
-                    localPetname: nil,
-                    claimedNickname: Self.sanitizedClaimedNickname("Unknown"),
-                    trustLevel: .unknown,
-                    isFavorite: false,
-                    isBlocked: isBlocked,
-                    notes: nil
-                )
-                self.cache.socialIdentities[fingerprint] = newIdentity
-            }
+            let existingIdentity = self.cache.socialIdentities[fingerprint]
+            let identity = Self.applyingBlockedMutation(
+                existingIdentity: existingIdentity,
+                fingerprint: fingerprint,
+                isBlocked: isBlocked
+            )
+            self.cache.socialIdentities[fingerprint] = identity
+            self.cache.nicknameIndex = Self.updatedNicknameIndex(
+                self.cache.nicknameIndex,
+                fingerprint: fingerprint,
+                oldNickname: existingIdentity?.claimedNickname,
+                newNickname: identity.claimedNickname
+            )
             self.saveIdentityCache()
         }
     }

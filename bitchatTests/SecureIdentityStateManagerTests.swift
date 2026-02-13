@@ -73,6 +73,48 @@ final class SecureIdentityStateManagerTests: XCTestCase {
         XCTAssertNil(SecureIdentityStateManager.canonicalNostrPubkey(String(repeating: "zz", count: 32)))
     }
 
+    func testApplyingFavoriteMutationSanitizesClaimedNicknameAndUpdatesFavorite() {
+        let existing = SocialIdentity(
+            fingerprint: "fp1",
+            localPetname: nil,
+            claimedNickname: "   ",
+            trustLevel: .unknown,
+            isFavorite: false,
+            isBlocked: false,
+            notes: nil
+        )
+
+        let updated = SecureIdentityStateManager.applyingFavoriteMutation(
+            existingIdentity: existing,
+            fingerprint: "fp1",
+            isFavorite: true
+        )
+
+        XCTAssertTrue(updated.isFavorite)
+        XCTAssertEqual(updated.claimedNickname, "user")
+    }
+
+    func testApplyingBlockedMutationClearsFavoriteWhenBlocking() {
+        let existing = SocialIdentity(
+            fingerprint: "fp1",
+            localPetname: nil,
+            claimedNickname: "alice",
+            trustLevel: .unknown,
+            isFavorite: true,
+            isBlocked: false,
+            notes: nil
+        )
+
+        let updated = SecureIdentityStateManager.applyingBlockedMutation(
+            existingIdentity: existing,
+            fingerprint: "fp1",
+            isBlocked: true
+        )
+
+        XCTAssertTrue(updated.isBlocked)
+        XCTAssertFalse(updated.isFavorite)
+    }
+
     func testApplyingNostrBlockReportsChangesOnlyWhenSetMutates() {
         let key = String(repeating: "ab", count: 32)
 
