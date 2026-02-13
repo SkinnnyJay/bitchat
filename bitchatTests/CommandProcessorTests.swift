@@ -125,8 +125,10 @@ final class CommandProcessorTests: XCTestCase {
         let npub = try? Bech32.encode(hrp: "npub", data: Data(hexString: hex) ?? Data())
 
         let canonical = CommandProcessor.canonicalNostrBlockKey(npub ?? "")
+        let canonicalUpper = CommandProcessor.canonicalNostrBlockKey(npub?.uppercased() ?? "")
 
         XCTAssertEqual(canonical, hex)
+        XCTAssertEqual(canonicalUpper, hex)
     }
 
     func testCanonicalNostrBlockKeyRejectsInvalidValues() {
