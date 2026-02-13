@@ -1832,6 +1832,10 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("RaceMetadata.swift", output)
             self.assertIn("file metadata changed during read (possible race", output)
+            self.assertRegex(
+                output,
+                r"file metadata changed during read \(possible race: mtime \d+ -> \d+, ctime \d+ -> \d+\)",
+            )
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 1 Swift files before failure.", output)
 
@@ -1865,6 +1869,10 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("RaceLinks.swift", output)
             self.assertIn("file link count changed during read (possible race", output)
+            self.assertRegex(
+                output,
+                r"file link count changed during read \(possible race: \d+ -> \d+\)",
+            )
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 1 Swift files before failure.", output)
 
@@ -1898,6 +1906,10 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("RaceOwnership.swift", output)
             self.assertIn("file ownership changed during read (possible race", output)
+            self.assertRegex(
+                output,
+                r"file ownership changed during read \(possible race: uid \d+ -> \d+, gid \d+ -> \d+\)",
+            )
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 1 Swift files before failure.", output)
 
@@ -1931,6 +1943,10 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("RaceMode.swift", output)
             self.assertIn("file mode changed during read (possible race", output)
+            self.assertRegex(
+                output,
+                r"file mode changed during read \(possible race: 0o[0-7]+ -> 0o[0-7]+\)",
+            )
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 1 Swift files before failure.", output)
 
