@@ -155,13 +155,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     private func normalizedSenderKey(for message: BitchatMessage) -> String {
         if let spid = message.senderPeerID?.id {
             if spid.hasPrefix("nostr:") || spid.hasPrefix("nostr_") {
-                let bare: String = {
-                    if spid.hasPrefix("nostr:") { return String(spid.dropFirst(6)) }
-                    if spid.hasPrefix("nostr_") { return String(spid.dropFirst(6)) }
-                    return spid
-                }()
-                let full = (nostrKeyMapping[spid] ?? bare).lowercased()
-                return "nostr:" + full
+                return Self.normalizedNostrSenderRateKey(
+                    senderPeerID: spid,
+                    mappedFullKey: nostrKeyMapping[spid]
+                )
             } else if spid.count == 16, let full = getNoiseKeyForShortID(spid)?.lowercased() {
                 return "noise:" + full
             } else {
@@ -1405,6 +1402,19 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         guard let storedNostrKey,
               let storedCanonicalHex = canonicalNostrPubkeyHex(storedNostrKey) else { return false }
         return storedCanonicalHex == senderCanonicalHex
+    }
+
+    static func normalizedNostrSenderRateKey(senderPeerID: String, mappedFullKey: String?) -> String {
+        let bare: String = {
+            if senderPeerID.hasPrefix("nostr:") { return String(senderPeerID.dropFirst(6)) }
+            if senderPeerID.hasPrefix("nostr_") { return String(senderPeerID.dropFirst(6)) }
+            return senderPeerID
+        }()
+        let keySource = (mappedFullKey ?? bare).trimmingCharacters(in: .whitespacesAndNewlines)
+        if let canonical = canonicalNostrPubkeyHex(keySource) {
+            return "nostr:" + canonical
+        }
+        return "nostr:" + keySource.lowercased()
     }
 
     static func isRecipientForLocalPeer(_ recipientIDData: Data?, localPeerID: String) -> Bool {

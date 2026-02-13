@@ -384,4 +384,34 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
             )
         )
     }
+
+    func testNormalizedNostrSenderRateKeyUsesMappedCanonicalHex() {
+        let hex = String(repeating: "ab", count: 32)
+        let npub = try? Bech32.encode(hrp: "npub", data: Data(hexString: hex) ?? Data())
+
+        let normalized = ChatViewModel.normalizedNostrSenderRateKey(
+            senderPeerID: "nostr_0011",
+            mappedFullKey: npub
+        )
+
+        XCTAssertEqual(normalized, "nostr:\(hex)")
+    }
+
+    func testNormalizedNostrSenderRateKeyFallsBackToBareSenderIDWhenUnmapped() {
+        let normalized = ChatViewModel.normalizedNostrSenderRateKey(
+            senderPeerID: "nostr_abcdef0123456789",
+            mappedFullKey: nil
+        )
+
+        XCTAssertEqual(normalized, "nostr:abcdef0123456789")
+    }
+
+    func testNormalizedNostrSenderRateKeyLowercasesInvalidUncanonicalizedSource() {
+        let normalized = ChatViewModel.normalizedNostrSenderRateKey(
+            senderPeerID: "nostr:ABC_DEF",
+            mappedFullKey: nil
+        )
+
+        XCTAssertEqual(normalized, "nostr:abc_def")
+    }
 }
