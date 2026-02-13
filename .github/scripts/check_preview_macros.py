@@ -24,6 +24,7 @@ MAX_SCANNED_SWIFT_FILES = 100000
 MAX_TOTAL_SCANNED_SWIFT_BYTES = 512 * 1024 * 1024
 MAX_VISITED_DIRECTORIES = 200000
 MAX_DIRECTORY_ENTRIES_PER_DIRECTORY = 200000
+MAX_TOTAL_DIRECTORY_ENTRIES = 2_000_000
 MAX_ROOT_BYTES = 4096
 MAX_ROOT_COUNT = 128
 MAX_REPORTED_INVALID_ROOTS = 200
@@ -516,10 +517,12 @@ def main() -> int:
     directory_limit_reached = False
     directory_entries_limit_reached = False
     directory_entries_limit_path: Path | None = None
+    total_directory_entries_limit_reached = False
     unreadable_limit_reached = False
     parse_error_limit_reached = False
     scanned_swift_bytes = 0
     visited_directories = 0
+    processed_directory_entries = 0
 
     def report_path(path: Path) -> Path:
         try:
@@ -590,6 +593,7 @@ def main() -> int:
             or scanned_bytes_limit_reached
             or directory_limit_reached
             or directory_entries_limit_reached
+            or total_directory_entries_limit_reached
             or unreadable_limit_reached
             or parse_error_limit_reached
         )
@@ -614,6 +618,10 @@ def main() -> int:
                 directory_entries_limit_reached = True
                 directory_entries_limit_path = Path(directory)
                 break
+            if processed_directory_entries > MAX_TOTAL_DIRECTORY_ENTRIES - directory_entry_count:
+                total_directory_entries_limit_reached = True
+                break
+            processed_directory_entries += directory_entry_count
             symlinked_subdirectories: list[Path] = []
             for subdirectory in list(subdirectories):
                 subdirectory_path = Path(directory) / subdirectory
@@ -863,6 +871,12 @@ def main() -> int:
                 f"({MAX_DIRECTORY_ENTRIES_PER_DIRECTORY}) at "
                 f"{format_path_for_diagnostics(directory_entries_limit_path)}."
             )
+    if total_directory_entries_limit_reached:
+        has_failure = True
+        print(
+            "Scan aborted after reaching maximum total directory-entry limit "
+            f"({MAX_TOTAL_DIRECTORY_ENTRIES})."
+        )
     if scanned_bytes_limit_reached:
         has_failure = True
         print(
@@ -891,6 +905,7 @@ def main() -> int:
         )
         print(f"Scanned {scanned_files} Swift files before failure.")
         print(f"Visited {visited_directories} directories before failure.")
+        print(f"Processed {processed_directory_entries} directory entries before failure.")
         print(f"Read {scanned_swift_bytes} Swift bytes before failure.")
         return 1
 
