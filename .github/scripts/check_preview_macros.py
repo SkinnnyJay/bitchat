@@ -13,7 +13,6 @@ import errno
 import math
 import os
 from pathlib import Path
-import re
 import stat
 import sys
 from typing import Iterator
@@ -284,7 +283,6 @@ def find_token_matches_with_state(
     if content.startswith("\ufeff"):
         content = content[1:]
 
-    pattern = re.compile(re.escape(token))
     token_requires_right_boundary = is_swift_identifier_continuation_character(token[-1])
     matches: list[int] = []
     match_count = 0
@@ -470,13 +468,19 @@ def find_token_matches_with_state(
             )
 
         code_segment = "".join(code_chars)
-        for match in pattern.finditer(code_segment):
+        search_start = 0
+        while True:
+            match_start = code_segment.find(token, search_start)
+            if match_start < 0:
+                break
+            match_end = match_start + len(token)
             if not has_token_boundaries(
                 code_segment,
-                match.start(),
-                match.end(),
+                match_start,
+                match_end,
                 requires_right_boundary=token_requires_right_boundary,
             ):
+                search_start = match_start + 1
                 continue
             match_count += 1
             if max_tracked_line_numbers is None or len(matches) < max_tracked_line_numbers:
