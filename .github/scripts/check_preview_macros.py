@@ -351,30 +351,35 @@ def main() -> int:
                     continue
                 seen_file_identities.add(file_identity)
                 scanned_files += 1
+                open_flags = os.O_RDONLY
+                if hasattr(os, "O_NONBLOCK"):
+                    open_flags |= os.O_NONBLOCK
+                descriptor = -1
                 try:
-                    path_stat = swift_file.stat()
-                except OSError as error:
-                    record_unreadable(swift_file, f"cannot inspect file size ({error})")
-                    continue
-                if not stat.S_ISREG(path_stat.st_mode):
-                    record_unreadable(swift_file, "unsupported non-regular Swift path")
-                    continue
-                try:
-                    with swift_file.open("rb") as file_handle:
-                        file_size_bytes = os.fstat(file_handle.fileno()).st_size
-                        if file_size_bytes > MAX_SWIFT_FILE_BYTES:
-                            record_unreadable(
-                                swift_file,
-                                (
-                                    "file exceeds max supported size "
-                                    f"({file_size_bytes} bytes > {MAX_SWIFT_FILE_BYTES} bytes)"
-                                ),
-                            )
-                            continue
+                    descriptor = os.open(swift_file, open_flags)
+                    descriptor_stat = os.fstat(descriptor)
+                    if not stat.S_ISREG(descriptor_stat.st_mode):
+                        record_unreadable(swift_file, "unsupported non-regular Swift path")
+                        continue
+                    file_size_bytes = descriptor_stat.st_size
+                    if file_size_bytes > MAX_SWIFT_FILE_BYTES:
+                        record_unreadable(
+                            swift_file,
+                            (
+                                "file exceeds max supported size "
+                                f"({file_size_bytes} bytes > {MAX_SWIFT_FILE_BYTES} bytes)"
+                            ),
+                        )
+                        continue
+                    with os.fdopen(descriptor, "rb") as file_handle:
+                        descriptor = -1
                         raw_content = file_handle.read(MAX_SWIFT_FILE_BYTES + 1)
                 except OSError as error:
                     record_unreadable(swift_file, str(error))
                     continue
+                finally:
+                    if descriptor >= 0:
+                        os.close(descriptor)
                 if len(raw_content) > MAX_SWIFT_FILE_BYTES:
                     record_unreadable(
                         swift_file,
