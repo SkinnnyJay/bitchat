@@ -617,10 +617,21 @@ def main() -> int:
             invalid_roots[str(root)] = f"cannot access path ({error})"
             continue
 
-        if stat.S_ISLNK(root_lstat.st_mode):
+        root_mode = stat_nonnegative_integer_or_none(root_lstat, "st_mode")
+        if root_mode is None:
+            invalid_roots[str(root)] = "cannot read path mode metadata (non-integer/negative st_mode)"
+            continue
+        try:
+            root_is_symlink = stat.S_ISLNK(root_mode)
+            root_is_directory = stat.S_ISDIR(root_mode)
+        except (OverflowError, ValueError):
+            invalid_roots[str(root)] = "cannot classify path mode metadata (invalid st_mode)"
+            continue
+
+        if root_is_symlink:
             invalid_roots[str(root)] = "is a symlinked directory (not traversed)"
             continue
-        if not stat.S_ISDIR(root_lstat.st_mode):
+        if not root_is_directory:
             invalid_roots[str(root)] = "is not a directory"
             continue
 

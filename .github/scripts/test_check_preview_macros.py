@@ -851,6 +851,48 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("One or more scan roots are invalid", result.stdout)
             self.assertIn("is not a directory", result.stdout)
 
+    def test_fails_when_scan_root_mode_metadata_is_non_integer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target_root = pathlib.Path(temp_dir)
+            original_lstat = pathlib.Path.lstat
+
+            def fake_lstat(path: pathlib.Path) -> os.stat_result | object:
+                if path == target_root:
+                    return type("StatLike", (), {"st_mode": True})()
+                return original_lstat(path)
+
+            with mock.patch.object(pathlib.Path, "lstat", new=fake_lstat):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("One or more scan roots are invalid", output)
+            self.assertIn("cannot read path mode metadata", output)
+
+    def test_fails_when_scan_root_mode_metadata_is_negative(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target_root = pathlib.Path(temp_dir)
+            original_lstat = pathlib.Path.lstat
+
+            def fake_lstat(path: pathlib.Path) -> os.stat_result | object:
+                if path == target_root:
+                    return type("StatLike", (), {"st_mode": -1})()
+                return original_lstat(path)
+
+            with mock.patch.object(pathlib.Path, "lstat", new=fake_lstat):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("One or more scan roots are invalid", output)
+            self.assertIn("cannot read path mode metadata", output)
+
     def test_fails_when_scan_root_is_symlinked_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)
