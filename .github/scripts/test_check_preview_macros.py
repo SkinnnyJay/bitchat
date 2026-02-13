@@ -77,7 +77,19 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
     def test_fails_when_scan_root_missing(self) -> None:
         result = self.run_script("--root", "this/path/does/not/exist")
         self.assertEqual(result.returncode, 1)
-        self.assertIn("One or more scan roots do not exist", result.stdout)
+        self.assertIn("One or more scan roots are invalid", result.stdout)
+        self.assertIn("does not exist", result.stdout)
+
+    def test_fails_when_scan_root_is_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            file_root = temp_path / "not_a_directory.txt"
+            file_root.write_text("hello\n", encoding="utf-8")
+
+            result = self.run_script("--root", str(file_root))
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("One or more scan roots are invalid", result.stdout)
+            self.assertIn("is not a directory", result.stdout)
 
     def test_fails_when_no_swift_files_found_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

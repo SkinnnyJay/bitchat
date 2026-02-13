@@ -94,11 +94,17 @@ def main() -> int:
     args = parse_args()
 
     roots = [Path(raw) for raw in (args.root or ["bitchat", "bitchatShareExtension"])]
-    missing_roots = [root for root in roots if not root.exists()]
-    if missing_roots:
-        print("One or more scan roots do not exist:")
-        for root in missing_roots:
-            print(f" - {root}")
+    invalid_roots: dict[Path, str] = {}
+    for root in roots:
+        if not root.exists():
+            invalid_roots[root] = "does not exist"
+        elif not root.is_dir():
+            invalid_roots[root] = "is not a directory"
+
+    if invalid_roots:
+        print("One or more scan roots are invalid:")
+        for root in sorted(invalid_roots):
+            print(f" - {root} ({invalid_roots[root]})")
         return 1
 
     matches: list[Path] = []
