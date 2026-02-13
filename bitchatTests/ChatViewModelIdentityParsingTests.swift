@@ -438,6 +438,17 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
         XCTAssertEqual(resolved, hex)
     }
 
+    func testResolvedBlockedNostrPubkeyFallsBackWhenMappedValueIsInvalid() {
+        let hex = String(repeating: "22", count: 32)
+
+        let resolved = ChatViewModel.resolvedBlockedNostrPubkey(
+            senderPeerID: "nostr:\(hex)",
+            nostrKeyMapping: ["nostr:\(hex)": "npub123"]
+        )
+
+        XCTAssertEqual(resolved, hex)
+    }
+
     func testResolvedBlockedNostrPubkeyRejectsUnknownOrInvalidSenderIdentifiers() {
         XCTAssertNil(
             ChatViewModel.resolvedBlockedNostrPubkey(
