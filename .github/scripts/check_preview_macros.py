@@ -798,9 +798,11 @@ def main() -> int:
                         continue
                     if not try_record_scanned_bytes(file_size_bytes):
                         break
+                    post_read_descriptor_stat = descriptor_stat
                     with os.fdopen(descriptor, "rb") as file_handle:
                         descriptor = -1
                         raw_content = file_handle.read(MAX_SWIFT_FILE_BYTES + 1)
+                        post_read_descriptor_stat = os.fstat(file_handle.fileno())
                 except OSError as error:
                     if not record_unreadable(swift_file, format_open_read_error(error)):
                         break
@@ -808,6 +810,13 @@ def main() -> int:
                 finally:
                     if descriptor >= 0:
                         os.close(descriptor)
+                if post_read_descriptor_stat.st_size != file_size_bytes:
+                    if not record_unreadable(
+                        swift_file,
+                        "file size changed during read (possible race)",
+                    ):
+                        break
+                    continue
                 if len(raw_content) > file_size_bytes:
                     if not try_record_scanned_bytes(len(raw_content) - file_size_bytes):
                         break
