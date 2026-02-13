@@ -86,7 +86,6 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         // Phase 1: Add all mesh peers (connected and reachable)
         for peerInfo in meshPeers {
             guard Self.shouldIncludeMeshSnapshot(peerInfo, localPeerID: meshService.myPeerID) else { continue }
-            let peerID = peerInfo.peerID
             let resolvedNoisePublicKey = Self.resolvedNoisePublicKey(for: peerInfo)
             
             let peer = buildPeerFromMesh(
@@ -526,17 +525,17 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     }
 
     static func buildConnectedPeerLookupKeys(from connectedPeerIDs: Set<String>) -> Set<String> {
-        var lookupKeys: Set<String> = []
+        var collectedLookupKeys: Set<String> = []
         for connectedPeerID in connectedPeerIDs {
             for key in lookupKeys(for: connectedPeerID) {
-                lookupKeys.insert(key)
+                collectedLookupKeys.insert(key)
             }
             let normalized = WiFiPeerIdentity.normalizedKey(connectedPeerID)
             if !normalized.isEmpty {
-                lookupKeys.insert(normalized)
+                collectedLookupKeys.insert(normalized)
             }
         }
-        return lookupKeys
+        return collectedLookupKeys
     }
 
     static func isPeerOnline(

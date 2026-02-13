@@ -461,7 +461,7 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     
     func getSocialIdentity(for fingerprint: String) -> SocialIdentity? {
         guard let canonicalFingerprint = Self.canonicalFingerprint(fingerprint) else { return nil }
-        queue.sync {
+        return queue.sync {
             return cache.socialIdentities[canonicalFingerprint]
         }
     }
@@ -549,7 +549,7 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     /// Find cryptographic identities whose fingerprint prefix matches a peerID (16-hex) short ID
     func getCryptoIdentitiesByPeerIDPrefix(_ peerID: PeerID) -> [CryptographicIdentity] {
         guard let canonicalPrefix = Self.canonicalShortPeerIDPrefix(peerID) else { return [] }
-        queue.sync {
+        return queue.sync {
             return cryptographicIdentities.values.filter { $0.fingerprint.hasPrefix(canonicalPrefix) }
         }
     }
@@ -591,7 +591,7 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     // MARK: - Favorites Management
     
     func getFavorites() -> Set<String> {
-        queue.sync {
+        return queue.sync {
             let favorites = cache.socialIdentities.values
                 .filter { $0.isFavorite }
                 .map { $0.fingerprint }
@@ -629,7 +629,7 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     
     func isFavorite(fingerprint: String) -> Bool {
         guard let canonicalFingerprint = Self.canonicalFingerprint(fingerprint) else { return false }
-        queue.sync {
+        return queue.sync {
             return cache.socialIdentities[canonicalFingerprint]?.isFavorite ?? false
         }
     }
@@ -638,7 +638,7 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     
     func isBlocked(fingerprint: String) -> Bool {
         guard let canonicalFingerprint = Self.canonicalFingerprint(fingerprint) else { return false }
-        queue.sync {
+        return queue.sync {
             return cache.socialIdentities[canonicalFingerprint]?.isBlocked ?? false
         }
     }
@@ -677,7 +677,7 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     
     func isNostrBlocked(pubkeyHexLowercased: String) -> Bool {
         guard let key = Self.canonicalNostrPubkey(pubkeyHexLowercased) else { return false }
-        queue.sync {
+        return queue.sync {
             return cache.blockedNostrPubkeys.contains(key)
         }
     }
@@ -697,7 +697,7 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     }
     
     func getBlockedNostrPubkeys() -> Set<String> {
-        queue.sync { cache.blockedNostrPubkeys }
+        return queue.sync { cache.blockedNostrPubkeys }
     }
     
     // MARK: - Ephemeral Session Management
@@ -781,13 +781,13 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     
     func isVerified(fingerprint: String) -> Bool {
         guard let canonicalFingerprint = Self.canonicalFingerprint(fingerprint) else { return false }
-        queue.sync {
+        return queue.sync {
             return cache.verifiedFingerprints.contains(canonicalFingerprint)
         }
     }
     
     func getVerifiedFingerprints() -> Set<String> {
-        queue.sync {
+        return queue.sync {
             return cache.verifiedFingerprints
         }
     }
