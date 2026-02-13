@@ -43,6 +43,7 @@ jobs:
           xcodebuild -version
 
       - name: Cache SwiftPM build artifacts
+        id: swiftpm-cache
         uses: actions/cache@v4
         with:
           path: |
@@ -63,6 +64,18 @@ jobs:
           set -o pipefail
           swift test --parallel --disable-swift-testing -Xswiftc -warnings-as-errors 2>&1 | tee test.log  # so it only runs xctests: https://github.com/swiftlang/swift-package-manager/issues/8529#issuecomment-2815711345
 
+      - name: Publish CI summary
+        if: always()
+        run: |
+          {
+            echo "### Swift CI Summary"
+            echo ""
+            echo "- Swift fingerprint: \`${{ steps.toolchain.outputs.swift_fingerprint }}\`"
+            echo "- Xcode fingerprint: \`${{ steps.toolchain.outputs.xcode_fingerprint }}\`"
+            echo "- SwiftPM cache hit: \`${{ steps.swiftpm-cache.outputs.cache-hit || 'false' }}\`"
+            echo "- Workflow run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload Swift build/test logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -72,3 +85,4 @@ jobs:
             build.log
             test.log
           if-no-files-found: ignore
+          retention-days: 14
