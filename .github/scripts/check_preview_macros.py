@@ -232,6 +232,8 @@ def main() -> int:
             invalid_roots[str(root)] = "does not exist"
         elif not root.is_dir():
             invalid_roots[str(root)] = "is not a directory"
+        elif root.is_symlink():
+            invalid_roots[str(root)] = "is a symlinked directory (not traversed)"
 
     if invalid_roots:
         print("One or more scan roots are invalid:")
