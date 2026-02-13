@@ -330,6 +330,11 @@ class PreviewMacroUtilityTests(unittest.TestCase):
             "line1\\nline2\\t\\x01",
         )
 
+    def test_truncates_escaped_diagnostics_when_too_long(self) -> None:
+        with mock.patch.object(check_preview_macros, "MAX_DIAGNOSTIC_TEXT_CHARS", 10):
+            escaped = check_preview_macros.escape_diagnostic_text("abcdefghijklmnop")
+        self.assertEqual(escaped, "abcdefghij... +6 chars truncated")
+
     def test_detects_disallowed_unicode_control_categories(self) -> None:
         self.assertTrue(check_preview_macros.contains_disallowed_control_characters("a\u2060b"))
         self.assertTrue(check_preview_macros.contains_disallowed_control_characters("a\x7fb"))
@@ -396,6 +401,19 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("One or more scan roots are invalid", result.stdout)
         self.assertIn("does not exist", result.stdout)
+
+    def test_truncates_long_invalid_root_diagnostics(self) -> None:
+        long_missing_root = "missing-" + ("x" * 80)
+        with mock.patch.object(check_preview_macros, "MAX_DIAGNOSTIC_TEXT_CHARS", 24):
+            return_code, output = self.run_main_with_args(
+                roots=[long_missing_root],
+                token="#Preview",
+                allow_empty=True,
+            )
+        self.assertEqual(return_code, 1)
+        self.assertIn("One or more scan roots are invalid", output)
+        self.assertIn("chars truncated", output)
+        self.assertIn("does not exist", output)
 
     def test_fails_when_scan_root_path_is_inaccessible(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

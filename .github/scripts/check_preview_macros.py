@@ -27,11 +27,16 @@ MAX_REPORTED_PARSE_ERROR_FILES = 200
 MAX_REPORTED_TOKEN_MATCH_FILES = 200
 MAX_REPORTED_LINE_NUMBERS_PER_FILE = 50
 MAX_REPORTED_ROOTS_IN_SUMMARY = 20
+MAX_DIAGNOSTIC_TEXT_CHARS = 512
 DISALLOWED_CONTROL_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn"}
 
 
 def escape_diagnostic_text(text: str) -> str:
-    return text.encode("unicode_escape").decode("ascii")
+    escaped = text.encode("unicode_escape").decode("ascii")
+    if len(escaped) <= MAX_DIAGNOSTIC_TEXT_CHARS:
+        return escaped
+    omitted_chars = len(escaped) - MAX_DIAGNOSTIC_TEXT_CHARS
+    return f"{escaped[:MAX_DIAGNOSTIC_TEXT_CHARS]}... +{omitted_chars} chars truncated"
 
 
 def format_path_for_diagnostics(path: Path | str) -> str:
