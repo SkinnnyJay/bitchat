@@ -915,8 +915,15 @@ def main() -> int:
                         ):
                             break
                         continue
-                    file_uid = getattr(descriptor_stat, "st_uid", None)
-                    file_gid = getattr(descriptor_stat, "st_gid", None)
+                    file_uid = stat_nonnegative_integer_or_none(descriptor_stat, "st_uid")
+                    file_gid = stat_nonnegative_integer_or_none(descriptor_stat, "st_gid")
+                    if file_uid is None or file_gid is None:
+                        if not record_unreadable(
+                            swift_file,
+                            "cannot read file ownership metadata (non-integer/negative st_uid/st_gid)",
+                        ):
+                            break
+                        continue
                     if file_size_bytes > MAX_SWIFT_FILE_BYTES:
                         if not record_unreadable(
                             swift_file,
@@ -1007,16 +1014,22 @@ def main() -> int:
                     ):
                         break
                     continue
-                if (
-                    getattr(post_read_descriptor_stat, "st_uid", None) != file_uid
-                    or getattr(post_read_descriptor_stat, "st_gid", None) != file_gid
-                ):
+                post_read_uid = stat_nonnegative_integer_or_none(post_read_descriptor_stat, "st_uid")
+                post_read_gid = stat_nonnegative_integer_or_none(post_read_descriptor_stat, "st_gid")
+                if post_read_uid is None or post_read_gid is None:
+                    if not record_unreadable(
+                        swift_file,
+                        "cannot read post-read file ownership metadata (non-integer/negative st_uid/st_gid)",
+                    ):
+                        break
+                    continue
+                if post_read_uid != file_uid or post_read_gid != file_gid:
                     if not record_unreadable(
                         swift_file,
                         "file ownership changed during read "
                         "(possible race: "
-                        f"uid {file_uid} -> {getattr(post_read_descriptor_stat, 'st_uid', None)}, "
-                        f"gid {file_gid} -> {getattr(post_read_descriptor_stat, 'st_gid', None)})",
+                        f"uid {file_uid} -> {post_read_uid}, "
+                        f"gid {file_gid} -> {post_read_gid})",
                     ):
                         break
                     continue
