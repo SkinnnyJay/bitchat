@@ -1382,6 +1382,17 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         return data.hexEncodedString()
     }
 
+    static func favoriteNotificationState(from content: String) -> Bool? {
+        let normalized = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalized.hasPrefix("[FAVORITED]") || normalized.hasPrefix("FAVORITED") {
+            return true
+        }
+        if normalized.hasPrefix("[UNFAVORITED]") || normalized.hasPrefix("UNFAVORITED") {
+            return false
+        }
+        return nil
+    }
+
     static func resolvedFavoriteNotificationPeerID(from peerID: String, resolvedPeer: BitchatPeer?) -> PeerID? {
         let candidate = resolvedPeer?.peerID ?? PeerID(str: peerID.trimmingCharacters(in: .whitespacesAndNewlines))
         return candidate.isValid ? candidate : nil
@@ -5680,13 +5691,13 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     @MainActor
     private func handleFavoriteNotification(content: String, from nostrPubkey: String) {
-        let isFavorite = content.hasPrefix("FAVORITED")
+        guard let isFavorite = Self.favoriteNotificationState(from: content) else { return }
         guard let senderNoiseKey = findNoiseKey(for: nostrPubkey) else { return }
         
         FavoritesPersistenceService.shared.updatePeerFavoritedUs(
             peerNoisePublicKey: senderNoiseKey,
             favorited: isFavorite,
-            peerNostrPublicKey: nostrPubkey
+            peerNostrPublicKey: Self.canonicalNostrPubkeyHex(nostrPubkey)
         )
     }
     
@@ -5766,7 +5777,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     @MainActor
     private func handleFavoriteNotificationFromMesh(_ content: String, from peerID: String, senderNickname: String) {
         // Parse the message format: "[FAVORITED]:npub..." or "[UNFAVORITED]:npub..."
-        let isFavorite = content.hasPrefix("[FAVORITED]")
+        guard let isFavorite = Self.favoriteNotificationState(from: content) else { return }
         let parts = content.split(separator: ":")
         let sanitizedSenderNickname = Self.sanitizedFavoriteNotificationSenderNickname(senderNickname)
         

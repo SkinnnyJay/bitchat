@@ -172,4 +172,18 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
         XCTAssertNil(ChatViewModel.canonicalNostrPubkeyHex("npub123"))
         XCTAssertNil(ChatViewModel.canonicalNostrPubkeyHex(String(repeating: "zz", count: 32)))
     }
+
+    func testFavoriteNotificationStateParsesFavoriteFormats() {
+        XCTAssertEqual(ChatViewModel.favoriteNotificationState(from: "[FAVORITED]:npub..."), true)
+        XCTAssertEqual(ChatViewModel.favoriteNotificationState(from: "FAVORITED"), true)
+    }
+
+    func testFavoriteNotificationStateParsesUnfavoriteFormats() {
+        XCTAssertEqual(ChatViewModel.favoriteNotificationState(from: "[UNFAVORITED]:npub..."), false)
+        XCTAssertEqual(ChatViewModel.favoriteNotificationState(from: "UNFAVORITED"), false)
+    }
+
+    func testFavoriteNotificationStateRejectsUnknownContent() {
+        XCTAssertNil(ChatViewModel.favoriteNotificationState(from: "hello"))
+    }
 }
