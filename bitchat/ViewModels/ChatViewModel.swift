@@ -1981,7 +1981,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
     private func recordGeoParticipant(pubkeyHex: String) {
         guard let gh = currentGeohash else { return }
-        let key = pubkeyHex.lowercased()
+        guard let key = Self.canonicalNostrPubkeyHex(pubkeyHex) else { return }
         var map = geoParticipants[gh] ?? [:]
         map[key] = Date()
         geoParticipants[gh] = map
@@ -1989,7 +1989,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
 
     private func recordGeoParticipant(pubkeyHex: String, geohash: String) {
-        let key = pubkeyHex.lowercased()
+        guard let key = Self.canonicalNostrPubkeyHex(pubkeyHex) else { return }
         var map = geoParticipants[geohash] ?? [:]
         map[key] = Date()
         geoParticipants[geohash] = map
