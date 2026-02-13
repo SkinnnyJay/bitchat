@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import stat
 import sys
+import unicodedata
 
 MAX_TOKEN_BYTES = 256
 MAX_SWIFT_FILE_BYTES = 5 * 1024 * 1024
@@ -217,6 +218,9 @@ def main() -> int:
         print("Configured token must not contain whitespace characters.")
         return 1
     if any(ord(character) < 32 or ord(character) == 127 for character in token):
+        print("Configured token must not contain control characters.")
+        return 1
+    if any(unicodedata.category(character) in {"Cf", "Cs", "Co", "Cn"} for character in token):
         print("Configured token must not contain control characters.")
         return 1
     if len(token.encode("utf-8")) > MAX_TOKEN_BYTES:

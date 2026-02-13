@@ -661,6 +661,15 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_fails_when_token_contains_unicode_format_character(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = self.run_script("--root", temp_dir, "--token", "#My\u2060Preview")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "Configured token must not contain control characters.",
+                result.stdout,
+            )
+
     def test_fails_when_token_exceeds_max_utf8_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             oversized_token = "#" + ("a" * check_preview_macros.MAX_TOKEN_BYTES)
