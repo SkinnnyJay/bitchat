@@ -685,6 +685,32 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("... and 1 more files not shown.", output)
             self.assertIn("Failure summary: 0 unreadable, 0 parse errors, 3 token matches.", output)
 
+    def test_preserves_token_match_counts_when_internal_file_tracking_is_capped(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            for index in range(3):
+                (temp_path / f"Example{index}.swift").write_text(
+                    textwrap.dedent(
+                        f"""
+                        struct Example{index}: View {{
+                            var body: some View {{ Text("ok") }}
+                        }}
+                        #Preview {{
+                            Example{index}()
+                        }}
+                        """
+                    ).strip() + "\n",
+                    encoding="utf-8",
+                )
+
+            with mock.patch.object(check_preview_macros, "MAX_TRACKED_TOKEN_MATCH_FILES", 1):
+                return_code, output = self.run_main_with_args(roots=[temp_dir], token="#Preview")
+
+            self.assertEqual(return_code, 1)
+            self.assertEqual(output.count("(lines:"), 1)
+            self.assertIn("... and 2 more files not shown.", output)
+            self.assertIn("Failure summary: 0 unreadable, 0 parse errors, 3 token matches.", output)
+
     def test_limits_reported_line_numbers_per_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)

@@ -24,6 +24,7 @@ MAX_ROOT_COUNT = 128
 MAX_REPORTED_INVALID_ROOTS = 200
 MAX_REPORTED_UNREADABLE_FILES = 200
 MAX_REPORTED_PARSE_ERROR_FILES = 200
+MAX_TRACKED_TOKEN_MATCH_FILES = 200
 MAX_REPORTED_TOKEN_MATCH_FILES = 200
 MAX_REPORTED_LINE_NUMBERS_PER_FILE = 50
 MAX_TRACKED_LINE_NUMBERS_PER_FILE = 200
@@ -386,9 +387,10 @@ def main() -> int:
             print(f" ... and {omitted_invalid_roots} more invalid roots not shown.")
         return 1
 
-    matches: list[Path] = []
+    tracked_matches: list[Path] = []
     matches_with_lines: dict[Path, list[int]] = {}
     matches_with_line_counts: dict[Path, int] = {}
+    token_match_count = 0
     scanned_files = 0
     seen_files: set[Path] = set()
     seen_file_identities: set[tuple[int, int]] = set()
@@ -545,9 +547,11 @@ def main() -> int:
                     parse_error_files[reported_swift_file] = parse_error
                     continue
                 if line_number_count > 0:
-                    matches.append(reported_swift_file)
-                    matches_with_lines[reported_swift_file] = line_numbers
-                    matches_with_line_counts[reported_swift_file] = line_number_count
+                    token_match_count += 1
+                    if len(tracked_matches) < MAX_TRACKED_TOKEN_MATCH_FILES:
+                        tracked_matches.append(reported_swift_file)
+                        matches_with_lines[reported_swift_file] = line_numbers
+                        matches_with_line_counts[reported_swift_file] = line_number_count
 
         for error_path, error_message in traversal_errors.items():
             record_unreadable(error_path, error_message)
@@ -590,17 +594,18 @@ def main() -> int:
             f"failing to avoid false green checks. Roots: [{joined_roots}]"
         )
 
-    if matches:
+    if token_match_count > 0:
         has_failure = True
         print(f"Found unsupported token '{token}' in Swift sources:")
-        sorted_matches = sorted(matches)
-        for match in sorted_matches[:MAX_REPORTED_TOKEN_MATCH_FILES]:
+        sorted_tracked_matches = sorted(tracked_matches)
+        reported_matches = sorted_tracked_matches[:MAX_REPORTED_TOKEN_MATCH_FILES]
+        for match in reported_matches:
             line_list = format_line_numbers_for_diagnostics(
                 matches_with_lines.get(match, []),
                 matches_with_line_counts.get(match),
             )
             print(f" - {format_path_for_diagnostics(match)} (lines: {line_list})")
-        omitted_match_count = len(sorted_matches) - MAX_REPORTED_TOKEN_MATCH_FILES
+        omitted_match_count = token_match_count - len(reported_matches)
         if omitted_match_count > 0:
             print(f" ... and {omitted_match_count} more files not shown.")
 
@@ -609,7 +614,7 @@ def main() -> int:
             "Failure summary: "
             f"{len(unreadable_files)} unreadable, "
             f"{len(parse_error_files)} parse errors, "
-            f"{len(matches)} token matches."
+            f"{token_match_count} token matches."
         )
         print(f"Scanned {scanned_files} Swift files before failure.")
         return 1
