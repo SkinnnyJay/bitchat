@@ -216,6 +216,22 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn(f"Roots: [{temp_dir}]", result.stdout)
 
+    def test_deduplicates_canonical_equivalent_root_arguments(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            alias_root = str(pathlib.Path(temp_dir) / ".")
+            result = self.run_script("--root", temp_dir, "--root", alias_root)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(f"Roots: [{temp_dir}]", result.stdout)
+
+    def test_supports_tilde_expansion_for_roots(self) -> None:
+        home_dir = pathlib.Path.home()
+        with tempfile.TemporaryDirectory(dir=str(home_dir)) as temp_dir:
+            relative = pathlib.Path(temp_dir).relative_to(home_dir)
+            tilde_root = f"~/{relative.as_posix()}"
+            result = self.run_script("--root", tilde_root, "--allow-empty")
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("No unsupported token '#Preview' detected", result.stdout)
+
     def test_allow_empty_succeeds_when_no_swift_files_found(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             result = self.run_script("--root", temp_dir, "--allow-empty")

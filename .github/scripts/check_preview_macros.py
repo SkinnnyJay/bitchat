@@ -186,8 +186,11 @@ def main() -> int:
             invalid_roots[raw_root] = "is empty after trimming"
             continue
 
-        root = Path(trimmed_root)
-        root_key = root.expanduser().resolve(strict=False)
+        root = Path(trimmed_root).expanduser()
+        try:
+            root_key = root.resolve(strict=False)
+        except OSError:
+            root_key = root.absolute()
         if root_key in seen_roots:
             continue
         seen_roots.add(root_key)
