@@ -5,6 +5,7 @@ Unit tests for preview guard token detection behavior.
 
 from __future__ import annotations
 
+import errno
 import os
 import pathlib
 import random
@@ -288,6 +289,36 @@ class PreviewMacroDetectionTests(unittest.TestCase):
                 self.assertGreaterEqual(line_number, 1)
             if parse_error is not None:
                 self.assertIsInstance(parse_error, str)
+
+
+class PreviewMacroUtilityTests(unittest.TestCase):
+    def test_formats_open_error_for_symlink_loop(self) -> None:
+        error = OSError(errno.ELOOP, "too many levels of symbolic links")
+        self.assertEqual(
+            check_preview_macros.format_open_read_error(error),
+            "symlinked Swift file not scanned",
+        )
+
+    def test_formats_open_error_for_permission_denied(self) -> None:
+        error = OSError(errno.EACCES, "permission denied")
+        self.assertIn(
+            "permission denied",
+            check_preview_macros.format_open_read_error(error),
+        )
+
+    def test_formats_open_error_for_disappeared_path(self) -> None:
+        error = OSError(errno.ENOENT, "no such file or directory")
+        self.assertIn(
+            "path disappeared during scan",
+            check_preview_macros.format_open_read_error(error),
+        )
+
+    def test_formats_open_error_for_generic_failure(self) -> None:
+        error = OSError(errno.EIO, "input/output error")
+        self.assertIn(
+            "cannot open/read file",
+            check_preview_macros.format_open_read_error(error),
+        )
 
 
 class PreviewMacroScriptBehaviorTests(unittest.TestCase):

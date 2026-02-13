@@ -20,6 +20,16 @@ MAX_TOKEN_BYTES = 256
 MAX_SWIFT_FILE_BYTES = 5 * 1024 * 1024
 
 
+def format_open_read_error(error: OSError) -> str:
+    if error.errno == errno.ELOOP:
+        return "symlinked Swift file not scanned"
+    if error.errno in {errno.EACCES, errno.EPERM}:
+        return f"cannot open/read file (permission denied: {error})"
+    if error.errno == errno.ENOENT:
+        return f"path disappeared during scan ({error})"
+    return f"cannot open/read file ({error})"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Fail if unsupported preview macro tokens are found in Swift files."
@@ -277,15 +287,6 @@ def main() -> int:
 
     def record_unreadable(path: Path, reason: str) -> None:
         unreadable_files[report_path(path)] = reason
-
-    def format_open_read_error(error: OSError) -> str:
-        if error.errno == errno.ELOOP:
-            return "symlinked Swift file not scanned"
-        if error.errno in {errno.EACCES, errno.EPERM}:
-            return f"cannot open/read file (permission denied: {error})"
-        if error.errno == errno.ENOENT:
-            return f"path disappeared during scan ({error})"
-        return f"cannot open/read file ({error})"
 
     for root in roots:
         traversal_errors: dict[Path, str] = {}
