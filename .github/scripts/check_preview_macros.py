@@ -264,6 +264,7 @@ def main() -> int:
     matches_with_lines: dict[Path, list[int]] = {}
     scanned_files = 0
     seen_files: set[Path] = set()
+    seen_file_identities: set[tuple[int, int]] = set()
     unreadable_files: dict[Path, str] = {}
     parse_error_files: dict[Path, str] = {}
 
@@ -339,6 +340,16 @@ def main() -> int:
                 if resolved_file in seen_files:
                     continue
                 seen_files.add(resolved_file)
+                try:
+                    resolved_stat = resolved_file.stat()
+                except OSError as error:
+                    scanned_files += 1
+                    record_unreadable(swift_file, f"cannot inspect file metadata ({error})")
+                    continue
+                file_identity = (resolved_stat.st_dev, resolved_stat.st_ino)
+                if file_identity in seen_file_identities:
+                    continue
+                seen_file_identities.add(file_identity)
                 scanned_files += 1
                 try:
                     path_stat = swift_file.stat()

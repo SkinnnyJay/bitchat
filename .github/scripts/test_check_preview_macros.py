@@ -642,6 +642,21 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0)
             self.assertIn("across 1 Swift files.", result.stdout)
 
+    def test_deduplicates_hardlinked_swift_files_by_file_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            canonical_swift = temp_path / "Canonical.swift"
+            hardlinked_swift = temp_path / "Linked.swift"
+            canonical_swift.write_text("struct Canonical {}\n", encoding="utf-8")
+            try:
+                os.link(canonical_swift, hardlinked_swift)
+            except (AttributeError, NotImplementedError, OSError) as error:
+                self.skipTest(f"Hard-link setup not supported in environment: {error}")
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("across 1 Swift files.", result.stdout)
+
     def test_fails_closed_when_swift_file_is_not_utf8_decodable(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)
