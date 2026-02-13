@@ -43,6 +43,7 @@ MAX_TRACKED_TOKEN_MATCH_FILES = 200
 MAX_REPORTED_TOKEN_MATCH_FILES = 200
 MAX_SWIFT_FILE_LINES = 1_000_000
 MAX_SWIFT_LINE_CHARS = 200_000
+MAX_TOKEN_CANDIDATE_CHECKS_PER_LINE = 50_000
 MAX_REPORTED_LINE_NUMBERS_PER_FILE = 50
 MAX_TRACKED_LINE_NUMBERS_PER_FILE = 200
 MAX_BLOCK_COMMENT_NESTING = 4096
@@ -469,10 +470,20 @@ def find_token_matches_with_state(
 
         code_segment = "".join(code_chars)
         search_start = 0
+        token_candidate_checks = 0
         while True:
             match_start = code_segment.find(token, search_start)
             if match_start < 0:
                 break
+            token_candidate_checks += 1
+            if token_candidate_checks > MAX_TOKEN_CANDIDATE_CHECKS_PER_LINE:
+                return (
+                    matches,
+                    match_count,
+                    "token candidate checks exceed maximum supported count "
+                    f"({MAX_TOKEN_CANDIDATE_CHECKS_PER_LINE}) at line {line_number}",
+                    processed_line_count,
+                )
             match_end = match_start + len(token)
             if not has_token_boundaries(
                 code_segment,
