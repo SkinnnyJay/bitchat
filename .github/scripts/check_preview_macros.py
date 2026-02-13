@@ -119,6 +119,16 @@ def stat_positive_integer_or_none(stats: object, attr: str) -> int | None:
     return value
 
 
+def stat_is_regular_file_or_none(stats: object, mode_attr: str = "st_mode") -> bool | None:
+    mode = stat_nonnegative_integer_or_none(stats, mode_attr)
+    if mode is None:
+        return None
+    try:
+        return stat.S_ISREG(mode)
+    except (OverflowError, ValueError):
+        return None
+
+
 def contains_disallowed_control_characters(value: str) -> bool:
     return any(unicodedata.category(character) in DISALLOWED_CONTROL_CATEGORIES for character in value)
 
@@ -851,7 +861,15 @@ def main() -> int:
                         if not record_unreadable(swift_file, f"cannot inspect file metadata ({error})"):
                             break
                         continue
-                    if not stat.S_ISREG(pre_open_stat.st_mode):
+                    pre_open_is_regular = stat_is_regular_file_or_none(pre_open_stat)
+                    if pre_open_is_regular is None:
+                        if not record_unreadable(
+                            swift_file,
+                            "cannot read file mode metadata (non-integer/negative st_mode)",
+                        ):
+                            break
+                        continue
+                    if not pre_open_is_regular:
                         if not record_unreadable(swift_file, "unsupported non-regular Swift path"):
                             break
                         continue
@@ -859,7 +877,15 @@ def main() -> int:
                 try:
                     descriptor = os.open(swift_file, open_flags)
                     descriptor_stat = os.fstat(descriptor)
-                    if not stat.S_ISREG(descriptor_stat.st_mode):
+                    descriptor_is_regular = stat_is_regular_file_or_none(descriptor_stat)
+                    if descriptor_is_regular is None:
+                        if not record_unreadable(
+                            swift_file,
+                            "cannot read file mode metadata (non-integer/negative st_mode)",
+                        ):
+                            break
+                        continue
+                    if not descriptor_is_regular:
                         if not record_unreadable(swift_file, "unsupported non-regular Swift path"):
                             break
                         continue
