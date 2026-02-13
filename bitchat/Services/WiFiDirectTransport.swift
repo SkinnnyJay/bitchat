@@ -204,7 +204,7 @@ private final class MPCWiFiDirectTransportImplementation: NSObject, WiFiDirectTr
     required init(localPeerID: String?) {
         let displayName = Self.sanitizeDisplayName(localPeerID)
         self.localPeerID = MCPeerID(displayName: displayName)
-        session = MCSession(peer: localPeerID, securityIdentity: nil, encryptionPreference: .required)
+        session = MCSession(peer: self.localPeerID, securityIdentity: nil, encryptionPreference: .required)
         super.init()
         session.delegate = self
         advertiser.delegate = self

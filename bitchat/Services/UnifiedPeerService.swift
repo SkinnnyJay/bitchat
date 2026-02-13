@@ -721,7 +721,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
 
     static func bestPeerForNicknameMatch(_ peers: [BitchatPeer]) -> BitchatPeer? {
         guard !peers.isEmpty else { return nil }
-        peers.max { lhs, rhs in
+        return peers.max { lhs, rhs in
             if nicknameMatchPriority(lhs) != nicknameMatchPriority(rhs) {
                 return nicknameMatchPriority(lhs) < nicknameMatchPriority(rhs)
             }
