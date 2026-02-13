@@ -198,6 +198,9 @@ def main() -> int:
     if "\n" in token or "\r" in token:
         print("Configured token must be single-line; newline characters are not allowed.")
         return 1
+    if any(character.isspace() for character in token):
+        print("Configured token must not contain whitespace characters.")
+        return 1
 
     raw_roots = args.root or ["bitchat", "bitchatShareExtension"]
     roots: list[Path] = []
