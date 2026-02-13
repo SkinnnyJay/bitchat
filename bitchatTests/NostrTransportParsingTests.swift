@@ -30,9 +30,20 @@ final class NostrTransportParsingTests: XCTestCase {
         XCTAssertEqual(decodedHex, hex)
     }
 
+    func testCanonicalRecipientNpubAcceptsAndNormalizesNpubInput() {
+        let hex = String(repeating: "33", count: 32)
+        let npub = try? Bech32.encode(hrp: "npub", data: Data(hexString: hex) ?? Data())
+
+        let canonical = NostrTransport.canonicalRecipientNpub(from: npub?.uppercased() ?? "")
+        let decodedHex = canonical.flatMap(NostrTransport.canonicalRecipientHex(from:))
+
+        XCTAssertEqual(decodedHex, hex)
+    }
+
     func testCanonicalRecipientHelpersRejectMalformedInput() {
         XCTAssertNil(NostrTransport.canonicalRecipientHex(from: "npub123"))
         XCTAssertNil(NostrTransport.canonicalRecipientHex(from: String(repeating: "zz", count: 32)))
         XCTAssertNil(NostrTransport.canonicalRecipientNpub(from: "npub123"))
+        XCTAssertNil(NostrTransport.canonicalRecipientNpub(from: "abc"))
     }
 }
