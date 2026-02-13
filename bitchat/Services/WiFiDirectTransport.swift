@@ -105,7 +105,10 @@ final class WiFiDirectTransport: NSObject {
     }
 
     deinit {
-        stopDiscovery()
+        if isDiscovering {
+            impl.stopDiscovery()
+        }
+        impl.resetState()
     }
 
     func didReceive(_ data: Data, from peerID: String) {
