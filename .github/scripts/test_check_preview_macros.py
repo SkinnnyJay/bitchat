@@ -1688,6 +1688,10 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("Race.swift", output)
             self.assertIn("file identity changed during open/read (possible race", output)
+            self.assertRegex(
+                output,
+                r"file identity changed during open/read \(possible race: \d+:\d+ -> \d+:\d+\)",
+            )
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 1 Swift files before failure.", output)
 
@@ -1721,6 +1725,10 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("RaceSize.swift", output)
             self.assertIn("file size changed during read (possible race", output)
+            self.assertRegex(
+                output,
+                r"file size changed during read \(possible race: \d+ -> \d+ bytes\)",
+            )
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 1 Swift files before failure.", output)
 
@@ -1754,6 +1762,10 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("RaceIdentity.swift", output)
             self.assertIn("file identity changed during read (possible race", output)
+            self.assertRegex(
+                output,
+                r"file identity changed during read \(possible race: \d+:\d+ -> \d+:\d+\)",
+            )
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 1 Swift files before failure.", output)
 
