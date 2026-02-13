@@ -23,7 +23,9 @@ MAX_SCANNED_SWIFT_FILES = 100000
 MAX_ROOT_BYTES = 4096
 MAX_ROOT_COUNT = 128
 MAX_REPORTED_INVALID_ROOTS = 200
+MAX_TRACKED_UNREADABLE_FILES = 200
 MAX_REPORTED_UNREADABLE_FILES = 200
+MAX_TRACKED_PARSE_ERROR_FILES = 200
 MAX_REPORTED_PARSE_ERROR_FILES = 200
 MAX_TRACKED_TOKEN_MATCH_FILES = 200
 MAX_REPORTED_TOKEN_MATCH_FILES = 200
@@ -395,8 +397,10 @@ def main() -> int:
     scanned_files = 0
     seen_files: set[Path] = set()
     seen_file_identities: set[tuple[int, int]] = set()
-    unreadable_files: dict[Path, str] = {}
-    parse_error_files: dict[Path, str] = {}
+    tracked_unreadable_files: dict[Path, str] = {}
+    unreadable_file_paths: set[Path] = set()
+    tracked_parse_error_files: dict[Path, str] = {}
+    parse_error_file_paths: set[Path] = set()
     scan_limit_reached = False
 
     def report_path(path: Path) -> Path:
@@ -406,7 +410,23 @@ def main() -> int:
             return path
 
     def record_unreadable(path: Path, reason: str) -> None:
-        unreadable_files[report_path(path)] = reason
+        reported_path = report_path(path)
+        if reported_path in unreadable_file_paths:
+            if reported_path in tracked_unreadable_files:
+                tracked_unreadable_files[reported_path] = reason
+            return
+        unreadable_file_paths.add(reported_path)
+        if len(tracked_unreadable_files) < MAX_TRACKED_UNREADABLE_FILES:
+            tracked_unreadable_files[reported_path] = reason
+
+    def record_parse_error(path: Path, reason: str) -> None:
+        if path in parse_error_file_paths:
+            if path in tracked_parse_error_files:
+                tracked_parse_error_files[path] = reason
+            return
+        parse_error_file_paths.add(path)
+        if len(tracked_parse_error_files) < MAX_TRACKED_PARSE_ERROR_FILES:
+            tracked_parse_error_files[path] = reason
 
     def try_increment_scanned_files() -> bool:
         nonlocal scanned_files, scan_limit_reached
@@ -559,7 +579,7 @@ def main() -> int:
                 )
                 reported_swift_file = report_path(swift_file)
                 if parse_error is not None:
-                    parse_error_files[reported_swift_file] = parse_error
+                    record_parse_error(reported_swift_file, parse_error)
                     continue
                 if line_number_count > 0:
                     token_match_count += 1
@@ -578,35 +598,37 @@ def main() -> int:
 
     has_failure = False
 
-    if unreadable_files:
+    if unreadable_file_paths:
         has_failure = True
         print("Could not read one or more Swift files:")
-        sorted_unreadable_files = sorted(unreadable_files)
-        for swift_file in sorted_unreadable_files[:MAX_REPORTED_UNREADABLE_FILES]:
+        sorted_tracked_unreadable_files = sorted(tracked_unreadable_files)
+        reported_unreadable_files = sorted_tracked_unreadable_files[:MAX_REPORTED_UNREADABLE_FILES]
+        for swift_file in reported_unreadable_files:
             print(
                 " - "
                 f"{format_path_for_diagnostics(swift_file)}: "
-                f"{escape_diagnostic_text(unreadable_files[swift_file])}"
+                f"{escape_diagnostic_text(tracked_unreadable_files[swift_file])}"
             )
-        omitted_unreadable_count = len(sorted_unreadable_files) - MAX_REPORTED_UNREADABLE_FILES
+        omitted_unreadable_count = len(unreadable_file_paths) - len(reported_unreadable_files)
         if omitted_unreadable_count > 0:
             print(f" ... and {omitted_unreadable_count} more unreadable files not shown.")
 
-    if parse_error_files:
+    if parse_error_file_paths:
         has_failure = True
         print("Could not reliably parse one or more Swift files:")
-        sorted_parse_error_files = sorted(parse_error_files)
-        for swift_file in sorted_parse_error_files[:MAX_REPORTED_PARSE_ERROR_FILES]:
+        sorted_tracked_parse_error_files = sorted(tracked_parse_error_files)
+        reported_parse_error_files = sorted_tracked_parse_error_files[:MAX_REPORTED_PARSE_ERROR_FILES]
+        for swift_file in reported_parse_error_files:
             print(
                 " - "
                 f"{format_path_for_diagnostics(swift_file)}: "
-                f"{escape_diagnostic_text(parse_error_files[swift_file])}"
+                f"{escape_diagnostic_text(tracked_parse_error_files[swift_file])}"
             )
-        omitted_parse_error_count = len(sorted_parse_error_files) - MAX_REPORTED_PARSE_ERROR_FILES
+        omitted_parse_error_count = len(parse_error_file_paths) - len(reported_parse_error_files)
         if omitted_parse_error_count > 0:
             print(f" ... and {omitted_parse_error_count} more parse-error files not shown.")
 
-    if scanned_files == 0 and not args.allow_empty and not unreadable_files:
+    if scanned_files == 0 and not args.allow_empty and not unreadable_file_paths:
         has_failure = True
         joined_roots = format_roots_for_diagnostics(roots)
         print(
@@ -639,8 +661,8 @@ def main() -> int:
     if has_failure:
         print(
             "Failure summary: "
-            f"{len(unreadable_files)} unreadable, "
-            f"{len(parse_error_files)} parse errors, "
+            f"{len(unreadable_file_paths)} unreadable, "
+            f"{len(parse_error_file_paths)} parse errors, "
             f"{token_match_count} token matches."
         )
         print(f"Scanned {scanned_files} Swift files before failure.")
