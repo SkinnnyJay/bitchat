@@ -133,6 +133,17 @@ final class MessageRouterRoutingTests: XCTestCase {
         case failed
     }
 
+    private var retainedRouters: [MessageRouter] = []
+
+    override func tearDown() {
+        retainedRouters.removeAll()
+        super.tearDown()
+    }
+
+    private func trackRouterLifetime(_ router: MessageRouter) {
+        retainedRouters.append(router)
+    }
+
     @MainActor
     func testRoutesLargeReachablePrivateMessageViaWiFi() throws {
         let recipient = PeerID(str: "peerabc000000000")
@@ -709,6 +720,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "receives WiFi envelope notification")
         var receivedEnvelope: WiFiDirectPrivateEnvelope?
@@ -745,6 +757,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "receives only one deduped private envelope")
         var count = 0
@@ -787,6 +800,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "dedups across full/short sender IDs")
         var count = 0
@@ -831,6 +845,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "should not receive notification")
         expect.isInverted = true
@@ -864,6 +879,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "should not receive sender-mismatch private notification")
         expect.isInverted = true
@@ -897,6 +913,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "should not receive private notification for invalid sender ID")
         expect.isInverted = true
@@ -935,6 +952,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "accepts sender full-id over short transport identity")
         let token = NotificationCenter.default.addObserver(
@@ -971,6 +989,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "accepts sender short-id over full transport identity")
         let token = NotificationCenter.default.addObserver(
@@ -1008,6 +1027,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "accepts recipient full-id with local short-id")
         let token = NotificationCenter.default.addObserver(
@@ -1985,6 +2005,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "receives WiFi ack envelope notification")
         var receivedEnvelope: WiFiDirectAckEnvelope?
@@ -2021,6 +2042,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "should not receive sender-mismatch ack notification")
         expect.isInverted = true
@@ -2054,6 +2076,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "should not receive ack for invalid sender ID")
         expect.isInverted = true
@@ -2092,6 +2115,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "accepts ack sender full-id over short transport identity")
         let token = NotificationCenter.default.addObserver(
@@ -2128,6 +2152,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "accepts ack sender short-id over full transport identity")
         let token = NotificationCenter.default.addObserver(
@@ -2165,6 +2190,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "accepts ack recipient full-id with local short-id")
         let token = NotificationCenter.default.addObserver(
@@ -2197,6 +2223,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "receives only one deduped ack envelope")
         var count = 0
@@ -2239,6 +2266,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "ack dedups across full/short sender IDs")
         var count = 0
@@ -2283,6 +2311,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expectPrivate = expectation(description: "no oversized private notification")
         expectPrivate.isInverted = true
@@ -2320,6 +2349,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "should not receive oversized-content private envelope")
         expect.isInverted = true
@@ -2354,6 +2384,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let fixedNow = Date()
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { fixedNow })
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "should not receive stale private envelope")
         expect.isInverted = true
@@ -2395,6 +2426,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "should not receive ack with empty message id")
         expect.isInverted = true
@@ -2428,6 +2460,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "should not receive private notification with oversized message id")
         expect.isInverted = true
@@ -2461,6 +2494,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "should not receive ack with oversized message id")
         expect.isInverted = true
@@ -2494,6 +2528,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "should not receive private notification with surrounding whitespace message id")
         expect.isInverted = true
@@ -2528,6 +2563,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let fixedNow = Date()
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { fixedNow })
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "should not receive future ack envelope")
         expect.isInverted = true
@@ -2570,6 +2606,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let fixedNow = Date()
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { fixedNow })
+        trackRouterLifetime(router)
 
         var receivedCount = 0
         let token = NotificationCenter.default.addObserver(
@@ -2616,6 +2653,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         var now = Date()
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { now })
+        trackRouterLifetime(router)
 
         var receivedCount = 0
         let token = NotificationCenter.default.addObserver(
@@ -2697,6 +2735,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let fixedNow = Date()
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { fixedNow })
+        trackRouterLifetime(router)
 
         var receivedCount = 0
         let token = NotificationCenter.default.addObserver(
@@ -2747,6 +2786,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let fixedNow = Date()
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { fixedNow })
+        trackRouterLifetime(router)
 
         var receivedCount = 0
         let token = NotificationCenter.default.addObserver(
@@ -2796,6 +2836,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let fixedNow = Date()
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { fixedNow })
+        trackRouterLifetime(router)
 
         var receivedCount = 0
         let token = NotificationCenter.default.addObserver(
@@ -2858,6 +2899,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let fixedNow = Date()
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { fixedNow })
+        trackRouterLifetime(router)
 
         var receivedCount = 0
         let token = NotificationCenter.default.addObserver(
@@ -2934,6 +2976,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let fixedNow = Date()
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { fixedNow })
+        trackRouterLifetime(router)
 
         var receivedCount = 0
         let token = NotificationCenter.default.addObserver(
@@ -3011,6 +3054,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let fixedNow = Date()
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi, nowProvider: { fixedNow })
+        trackRouterLifetime(router)
 
         let oversizedSenderID = String(repeating: "a", count: TransportConfig.messageRouterInboundWiFiSenderIDMaxBytes + 1)
         let expect = expectation(description: "oversized sender should not emit notification")
@@ -3068,6 +3112,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "should not receive private notification")
         expect.isInverted = true
@@ -3104,6 +3149,7 @@ final class MessageRouterRoutingTests: XCTestCase {
         let wifi = WiFiDirectTransport(localPeerID: mesh.myPeerID.id, backend: backend)
 
         let router = MessageRouter(mesh: mesh, nostr: nostr, wifiTransport: wifi)
+        trackRouterLifetime(router)
 
         let expect = expectation(description: "should not receive ack notification")
         expect.isInverted = true
