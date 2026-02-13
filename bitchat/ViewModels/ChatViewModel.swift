@@ -1057,9 +1057,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         guard !processedNostrEvents.contains(giftWrap.id) else { return }
         recordProcessedEvent(giftWrap.id)
         
-        guard let (content, senderPubkey, rumorTs) = try? NostrProtocol.decryptPrivateMessage(giftWrap: giftWrap, recipientIdentity: id),
+        guard let (content, senderPubkeyRaw, rumorTs) = try? NostrProtocol.decryptPrivateMessage(giftWrap: giftWrap, recipientIdentity: id),
               content.hasPrefix("bitchat1:"),
-              Data(hexString: senderPubkey)?.count == 32,
+              let senderPubkey = Self.canonicalNostrPubkeyHex(senderPubkeyRaw),
               let packetData = Self.base64URLDecode(String(content.dropFirst("bitchat1:".count))),
               let packet = BitchatPacket.from(packetData),
               packet.type == MessageType.noiseEncrypted.rawValue,
@@ -1151,21 +1151,21 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     private func sendDeliveryAckIfNeeded(to messageId: String, senderPubKey: String, from id: NostrIdentity) {
         guard let safeMessageID = InputValidator.validateMessageID(messageId) else { return }
-        guard Data(hexString: senderPubKey)?.count == 32 else { return }
+        guard let canonicalSenderPubkey = Self.canonicalNostrPubkeyHex(senderPubKey) else { return }
         guard !hasSentGeoDeliveryAck(safeMessageID) else { return }
         let nt = NostrTransport(keychain: keychain)
         nt.senderPeerID = meshService.myPeerID
-        nt.sendDeliveryAckGeohash(for: safeMessageID, toRecipientHex: senderPubKey, from: id)
+        nt.sendDeliveryAckGeohash(for: safeMessageID, toRecipientHex: canonicalSenderPubkey, from: id)
         recordSentGeoDeliveryAck(safeMessageID)
     }
     
     private func sendReadReceiptIfNeeded(to messageId: String, senderPubKey: String, from id: NostrIdentity) {
         guard let safeMessageID = InputValidator.validateMessageID(messageId) else { return }
-        guard Data(hexString: senderPubKey)?.count == 32 else { return }
+        guard let canonicalSenderPubkey = Self.canonicalNostrPubkeyHex(senderPubKey) else { return }
         guard !hasSentReadReceipt(safeMessageID) else { return }
         let nt = NostrTransport(keychain: keychain)
         nt.senderPeerID = meshService.myPeerID
-        nt.sendReadReceiptGeohash(safeMessageID, toRecipientHex: senderPubKey, from: id)
+        nt.sendReadReceiptGeohash(safeMessageID, toRecipientHex: canonicalSenderPubkey, from: id)
         recordSentReadReceipt(safeMessageID)
     }
         
@@ -5640,13 +5640,13 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     private func sendDeliveryAckViaNostrEmbedded(_ message: BitchatMessage, wasReadBefore: Bool, senderPubkey: String, key: Data?) {
         guard !wasReadBefore else { return }
         guard let safeMessageID = InputValidator.validateMessageID(message.id) else { return }
-        let canonicalSenderPubkey = senderPubkey.lowercased()
+        let canonicalSenderPubkey = Self.canonicalNostrPubkeyHex(senderPubkey)
         
         if let key {
             SecureLogger.debug("Sending DELIVERED ack for \(safeMessageID.prefix(8))… via router", category: .session)
             messageRouter.sendDeliveryAck(safeMessageID, to: PeerID(hexData: key))
-        } else if let id = try? NostrIdentityBridge.getCurrentNostrIdentity() {
-            guard Data(hexString: canonicalSenderPubkey)?.count == 32 else { return }
+        } else if let canonicalSenderPubkey,
+                  let id = try? NostrIdentityBridge.getCurrentNostrIdentity() {
             // Fallback: no Noise mapping yet — send directly to sender's Nostr pubkey
             let nt = NostrTransport(keychain: keychain)
             nt.senderPeerID = meshService.myPeerID
@@ -5657,7 +5657,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     @MainActor
     private func handleViewingThisChat(_ message: BitchatMessage, targetPeerID: String, key: Data?, senderPubkey: String) {
-        let canonicalSenderPubkey = senderPubkey.lowercased()
+        let canonicalSenderPubkey = Self.canonicalNostrPubkeyHex(senderPubkey)
         unreadPrivateMessages.remove(targetPeerID)
         if let key,
            let ephemeralPeerID = unifiedPeerService.peers.first(where: { $0.noisePublicKey == key })?.peerID.id {
@@ -5670,8 +5670,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 SecureLogger.debug("Viewing chat; sending READ ack for \(safeMessageID.prefix(8))… via router", category: .session)
                 messageRouter.sendReadReceipt(receipt, to: PeerID(hexData: key))
                 recordSentReadReceipt(safeMessageID)
-            } else if let id = try? NostrIdentityBridge.getCurrentNostrIdentity() {
-                guard Data(hexString: canonicalSenderPubkey)?.count == 32 else { return }
+            } else if let canonicalSenderPubkey,
+                      let id = try? NostrIdentityBridge.getCurrentNostrIdentity() {
                 let nt = NostrTransport(keychain: keychain)
                 nt.senderPeerID = meshService.myPeerID
                 nt.sendReadReceiptGeohash(safeMessageID, toRecipientHex: canonicalSenderPubkey, from: id)
@@ -5721,7 +5721,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     @MainActor
     private func handleNostrAcknowledgment(content: String, from senderPubkey: String) {
-        let canonicalSenderPubkey = senderPubkey.lowercased()
+        guard let canonicalSenderPubkey = Self.canonicalNostrPubkeyHex(senderPubkey) else { return }
         // Parse ACK format: "ACK:TYPE:MESSAGE_ID"
         let parts = content.split(separator: ":", maxSplits: 2)
         guard parts.count >= 3 else {
@@ -5734,7 +5734,6 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             SecureLogger.warning("⚠️ Unknown ACK type: \(ackType)", category: .session)
             return
         }
-        guard Data(hexString: canonicalSenderPubkey)?.count == 32 else { return }
         guard let messageId = InputValidator.validateMessageID(String(parts[2])) else { return }
         
         // Check if we've already processed this ACK
@@ -5853,8 +5852,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         timestamp: Date
     ) {
         guard let safeMessageID = InputValidator.validateMessageID(messageId) else { return }
-        let canonicalSenderPubkey = senderPubkey.lowercased()
-        guard Data(hexString: canonicalSenderPubkey)?.count == 32 else { return }
+        guard let canonicalSenderPubkey = Self.canonicalNostrPubkeyHex(senderPubkey) else { return }
         // Check if we already have this message in local storage
         for (_, messages) in privateChats {
             if messages.contains(where: { $0.id == safeMessageID }) {
