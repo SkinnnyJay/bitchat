@@ -183,6 +183,20 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
 
+    def test_does_not_match_combining_mark_prefixed_token(self) -> None:
+        content = """
+            let combined = pre\u0301#Preview
+            #Preview { Text("real preview") }
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
+
+    def test_does_not_match_connector_punctuation_prefixed_token(self) -> None:
+        content = """
+            let combined = pre‿#Preview
+            #Preview { Text("real preview") }
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
+
     def test_does_not_match_identifier_prefixed_suffix_variant(self) -> None:
         content = """
             #PreviewVariant { Text("not target token") }
@@ -1635,6 +1649,34 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             result = self.run_script("--root", temp_dir)
             self.assertEqual(result.returncode, 1)
             self.assertIn("UnicodePrefix.swift (lines: 2)", result.stdout)
+            self.assertNotIn("lines: 1, 2", result.stdout)
+
+    def test_reports_only_canonical_preview_when_combining_mark_prefixed_variant_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "CombiningPrefix.swift"
+            swift_file.write_text(
+                "let value = pre\u0301#Preview\n#Preview { Text(\"flagged\") }\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("CombiningPrefix.swift (lines: 2)", result.stdout)
+            self.assertNotIn("lines: 1, 2", result.stdout)
+
+    def test_reports_only_canonical_preview_when_connector_prefixed_variant_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "ConnectorPrefix.swift"
+            swift_file.write_text(
+                "let value = pre‿#Preview\n#Preview { Text(\"flagged\") }\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("ConnectorPrefix.swift (lines: 2)", result.stdout)
             self.assertNotIn("lines: 1, 2", result.stdout)
 
     def test_supports_custom_token_scans(self) -> None:
