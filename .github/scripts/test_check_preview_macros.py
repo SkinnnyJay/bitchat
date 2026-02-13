@@ -612,7 +612,9 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not read one or more Swift files", result.stdout)
             self.assertIn("Loop.swift", result.stdout)
             self.assertTrue(
-                "cannot resolve path" in result.stdout or "Too many levels of symbolic links" in result.stdout,
+                "cannot resolve path" in result.stdout
+                or "Too many levels of symbolic links" in result.stdout
+                or "symlinked Swift file not scanned" in result.stdout,
                 msg=result.stdout,
             )
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", result.stdout)
@@ -663,6 +665,29 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
                 self.assertIn("Could not read one or more Swift files", result.stdout)
                 self.assertIn("linked", result.stdout)
                 self.assertIn("symlinked directory not traversed", result.stdout)
+                self.assertIn(
+                    "Failure summary: 1 unreadable, 0 parse errors, 0 token matches.",
+                    result.stdout,
+                )
+
+    def test_fails_closed_when_root_contains_symlinked_swift_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            symlinked_swift = temp_path / "Linked.swift"
+            with tempfile.TemporaryDirectory() as target_dir:
+                target_file = pathlib.Path(target_dir) / "Real.swift"
+                target_file.write_text("struct Real {}\n", encoding="utf-8")
+                try:
+                    symlinked_swift.symlink_to(target_file)
+                except (NotImplementedError, OSError) as error:
+                    self.skipTest(f"Symlink file setup not supported in environment: {error}")
+
+                result = self.run_script("--root", temp_dir, "--allow-empty")
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(result.stderr, "")
+                self.assertIn("Could not read one or more Swift files", result.stdout)
+                self.assertIn("Linked.swift", result.stdout)
+                self.assertIn("symlinked Swift file not scanned", result.stdout)
                 self.assertIn(
                     "Failure summary: 1 unreadable, 0 parse errors, 0 token matches.",
                     result.stdout,
