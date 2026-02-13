@@ -411,6 +411,19 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("BomExample.swift (lines: 1)", result.stdout)
 
+    def test_reports_detected_file_with_uppercase_swift_extension(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "Uppercase.SWIFT"
+            swift_file.write_text(
+                "#Preview { Text(\"hi\") }\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Uppercase.SWIFT (lines: 1)", result.stdout)
+
     def test_does_not_flag_double_hash_prefixed_preview_token_in_script_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)

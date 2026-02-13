@@ -259,7 +259,7 @@ def main() -> int:
             subdirectories.sort()
             filenames.sort()
             for filename in filenames:
-                if not filename.endswith(".swift"):
+                if not filename.lower().endswith(".swift"):
                     continue
 
                 swift_file = Path(directory) / filename
