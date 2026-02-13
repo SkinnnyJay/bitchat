@@ -1364,9 +1364,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
 
     static func sanitizedFavoriteNotificationNostrPubkey(_ value: String?) -> String? {
-        guard let value else { return nil }
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+        FavoritesPersistenceService.sanitizedNostrPublicKey(value)
     }
 
     static func canonicalNostrPubkeyHex(_ value: String) -> String? {

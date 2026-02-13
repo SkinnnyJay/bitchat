@@ -140,12 +140,14 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
         XCTAssertEqual(ChatViewModel.sanitizedFavoriteNotificationSenderNickname("   "), "user")
     }
 
-    func testSanitizedFavoriteNotificationNostrPubkeyTrimsAndRejectsBlank() {
+    func testSanitizedFavoriteNotificationNostrPubkeyAcceptsValidNpubAndRejectsBlank() {
+        let npub = try? Bech32.encode(hrp: "npub", data: Data(repeating: 0x11, count: 32))
         XCTAssertEqual(
-            ChatViewModel.sanitizedFavoriteNotificationNostrPubkey("  npub123  "),
-            "npub123"
+            ChatViewModel.sanitizedFavoriteNotificationNostrPubkey("  \(npub ?? "")  "),
+            npub
         )
         XCTAssertNil(ChatViewModel.sanitizedFavoriteNotificationNostrPubkey("   "))
+        XCTAssertNil(ChatViewModel.sanitizedFavoriteNotificationNostrPubkey("npub123"))
     }
 
     func testCanonicalNostrPubkeyHexAcceptsAndLowercasesHexInput() {
