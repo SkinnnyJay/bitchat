@@ -786,6 +786,8 @@ def main() -> int:
                             break
                         continue
                     file_size_bytes = descriptor_stat.st_size
+                    file_mtime_ns = descriptor_stat.st_mtime_ns
+                    file_ctime_ns = descriptor_stat.st_ctime_ns
                     if file_size_bytes > MAX_SWIFT_FILE_BYTES:
                         if not record_unreadable(
                             swift_file,
@@ -814,6 +816,16 @@ def main() -> int:
                     if not record_unreadable(
                         swift_file,
                         "file size changed during read (possible race)",
+                    ):
+                        break
+                    continue
+                if (
+                    post_read_descriptor_stat.st_mtime_ns != file_mtime_ns
+                    or post_read_descriptor_stat.st_ctime_ns != file_ctime_ns
+                ):
+                    if not record_unreadable(
+                        swift_file,
+                        "file metadata changed during read (possible race)",
                     ):
                         break
                     continue

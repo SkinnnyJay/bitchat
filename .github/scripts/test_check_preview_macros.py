@@ -1622,6 +1622,39 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 1 Swift files before failure.", output)
 
+    def test_fails_closed_when_swift_file_metadata_changes_during_read(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "RaceMetadata.swift"
+            swift_file.write_text("struct RaceMetadata {}\n", encoding="utf-8")
+
+            real_fstat = check_preview_macros.os.fstat
+            fstat_call_count = 0
+
+            def fake_fstat(descriptor: int) -> os.stat_result:
+                nonlocal fstat_call_count
+                descriptor_stat = real_fstat(descriptor)
+                if fstat_call_count == 1:
+                    descriptor_values = list(descriptor_stat)
+                    descriptor_values[8] = descriptor_stat.st_mtime + 1.0
+                    descriptor_stat = os.stat_result(descriptor_values)
+                fstat_call_count += 1
+                return descriptor_stat
+
+            with mock.patch.object(check_preview_macros.os, "fstat", side_effect=fake_fstat):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not read one or more Swift files", output)
+            self.assertIn("RaceMetadata.swift", output)
+            self.assertIn("file metadata changed during read (possible race)", output)
+            self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
+            self.assertIn("Scanned 1 Swift files before failure.", output)
+
     def test_fails_closed_when_swift_file_path_cannot_be_resolved(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)
