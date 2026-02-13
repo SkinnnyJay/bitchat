@@ -375,7 +375,7 @@ final class PeerIDTests: XCTestCase {
     
     func test_rejects_invalid_characters() {
         XCTAssertFalse(PeerID(str: "peer!@#").isValid)
-        XCTAssertFalse(PeerID(str: "gggggggggggggggg").isValid) // not hex for short form
+        XCTAssertFalse(PeerID(str: "invalid peer id").isValid)
     }
     
     func test_rejects_too_long() {

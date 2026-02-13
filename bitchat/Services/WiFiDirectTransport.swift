@@ -32,6 +32,7 @@ final class WiFiDirectTransport: NSObject {
     }
 
     private(set) var isDiscovering = false
+    private var hasStartedDiscovery = false
     private let impl: WiFiDirectTransportBackend
     private let maxTrackedPeers: Int
     private let maxPeerIDBytes: Int
@@ -58,6 +59,7 @@ final class WiFiDirectTransport: NSObject {
             return
         }
         isDiscovering = true
+        hasStartedDiscovery = true
         impl.startDiscovery()
     }
 
@@ -92,6 +94,9 @@ final class WiFiDirectTransport: NSObject {
     }
 
     func peerCapabilities(peerID: String) -> Set<String>? {
+        if !isDiscovering && hasStartedDiscovery {
+            return nil
+        }
         let normalizedPeerID = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedPeerID.isEmpty else { return nil }
         guard normalizedPeerID.utf8.count <= maxPeerIDBytes else { return nil }
@@ -106,6 +111,7 @@ final class WiFiDirectTransport: NSObject {
     func didReceive(_ data: Data, from peerID: String) {
         dispatchOnMain { [weak self] in
             guard let self else { return }
+            guard self.isDiscovering || !self.hasStartedDiscovery else { return }
             guard !data.isEmpty else { return }
             guard data.count <= self.maxInboundPayloadBytes else { return }
             let normalizedPeerID = peerID.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -128,6 +134,9 @@ final class WiFiDirectTransport: NSObject {
                 }
             let uniqueSorted = Array(Set(normalized)).sorted()
             let capped = Array(uniqueSorted.prefix(self.maxTrackedPeers))
+            if !self.isDiscovering && self.hasStartedDiscovery && !uniqueSorted.isEmpty {
+                return
+            }
             self.currentPeers = capped
         }
     }

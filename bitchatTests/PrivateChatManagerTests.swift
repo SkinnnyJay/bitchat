@@ -67,14 +67,15 @@ final class PrivateChatManagerTests: XCTestCase {
         XCTAssertTrue(manager.sentReadReceipts.isEmpty)
     }
 
-    func testMarkAsReadSkipsInvalidMessageID() {
+    func testMarkAsReadUsesSanitizedMessageIDWhenInputIsInvalid() {
         let manager = PrivateChatManager()
         let transport = MockTransportForPrivateChatManager()
         manager.meshService = transport
         let senderPeerID = "abcdef0123456789"
+        let invalidMessageID = "invalid message id"
         manager.privateChats[senderPeerID] = [
             BitchatMessage(
-                id: "invalid message id",
+                id: invalidMessageID,
                 sender: "peer",
                 content: "hello",
                 timestamp: Date(),
@@ -86,8 +87,9 @@ final class PrivateChatManagerTests: XCTestCase {
 
         manager.markAsRead(from: senderPeerID)
 
-        XCTAssertTrue(manager.sentReadReceipts.isEmpty)
-        XCTAssertTrue(transport.sentReadReceipts.isEmpty)
+        XCTAssertEqual(manager.sentReadReceipts.count, 1)
+        XCTAssertEqual(transport.sentReadReceipts.count, 1)
+        XCTAssertFalse(manager.sentReadReceipts.contains(invalidMessageID))
     }
 
     func testMarkAsReadSanitizesReaderNicknameToFallbackUser() {

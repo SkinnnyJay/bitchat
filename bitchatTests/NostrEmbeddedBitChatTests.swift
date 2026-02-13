@@ -137,8 +137,8 @@ final class NostrEmbeddedBitChatTests: XCTestCase {
         XCTAssertNotNil(result)
         XCTAssertTrue(result?.hasPrefix("bitchat1:") == true)
         let decoded = decodeEmbeddedPacket(result)
-        XCTAssertEqual(decoded?.recipientID?.hexEncodedString(), PeerID(str: recipient).toShort().id)
-        XCTAssertEqual(decoded?.senderID.hexEncodedString(), PeerID(str: sender).toShort().id)
+        XCTAssertEqual(decoded?.recipientID?.hexEncodedString(), PeerID(str: recipient).toShort().bare)
+        XCTAssertEqual(decoded?.senderID.hexEncodedString(), PeerID(str: sender).toShort().bare)
     }
 
     func testEncodeAckForNostrNoRecipientAcceptsFullNoiseSenderPeerID() {

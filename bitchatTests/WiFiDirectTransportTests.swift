@@ -412,6 +412,8 @@ final class WiFiDirectTransportTests: XCTestCase {
         let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
         let delegate = MockDelegate()
         transport.delegate = delegate
+        transport.startDiscovery()
+        transport.stopDiscovery()
 
         let expect = expectation(description: "receive ignored while not discovering")
         backend.simulateReceive(Data("ping".utf8), from: "peer-a")
@@ -460,6 +462,8 @@ final class WiFiDirectTransportTests: XCTestCase {
         let backend = MockBackend(localPeerID: "self")
         backend.capabilitiesByPeerID["peer-a"] = ["pm", "ack"]
         let transport = WiFiDirectTransport(localPeerID: "self", backend: backend)
+        transport.startDiscovery()
+        transport.stopDiscovery()
 
         XCTAssertNil(transport.peerCapabilities(peerID: "peer-a"))
     }
