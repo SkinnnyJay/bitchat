@@ -26,6 +26,7 @@ MAX_VISITED_DIRECTORIES = 200000
 MAX_DIRECTORY_ENTRIES_PER_DIRECTORY = 200000
 MAX_TOTAL_DIRECTORY_ENTRIES = 2_000_000
 MAX_SEEN_SWIFT_PATH_KEYS = 300_000
+MAX_SEEN_SWIFT_FILE_IDENTITIES = 300_000
 MAX_TOTAL_PARSED_SWIFT_LINES = 20_000_000
 MAX_ROOT_BYTES = 4096
 MAX_ROOT_COUNT = 128
@@ -536,6 +537,7 @@ def main() -> int:
     directory_entries_limit_path: Path | None = None
     total_directory_entries_limit_reached = False
     seen_path_keys_limit_reached = False
+    seen_file_identities_limit_reached = False
     parsed_lines_limit_reached = False
     unreadable_limit_reached = False
     parse_error_limit_reached = False
@@ -615,6 +617,7 @@ def main() -> int:
             or directory_entries_limit_reached
             or total_directory_entries_limit_reached
             or seen_path_keys_limit_reached
+            or seen_file_identities_limit_reached
             or parsed_lines_limit_reached
             or unreadable_limit_reached
             or parse_error_limit_reached
@@ -628,6 +631,16 @@ def main() -> int:
             seen_path_keys_limit_reached = True
             return False
         seen_files.add(path)
+        return True
+
+    def try_add_seen_file_identity(identity: tuple[int, int]) -> bool:
+        nonlocal seen_file_identities_limit_reached
+        if identity in seen_file_identities:
+            return True
+        if len(seen_file_identities) >= MAX_SEEN_SWIFT_FILE_IDENTITIES:
+            seen_file_identities_limit_reached = True
+            return False
+        seen_file_identities.add(identity)
         return True
 
     for root in roots:
@@ -735,7 +748,8 @@ def main() -> int:
                     continue
                 if not try_increment_scanned_files():
                     break
-                seen_file_identities.add(file_identity)
+                if not try_add_seen_file_identity(file_identity):
+                    break
                 open_flags = os.O_RDONLY
                 open_requires_nonblocking_support = hasattr(os, "O_NONBLOCK")
                 if open_requires_nonblocking_support:
@@ -923,6 +937,12 @@ def main() -> int:
             "Scan aborted after reaching maximum tracked Swift path-key limit "
             f"({MAX_SEEN_SWIFT_PATH_KEYS})."
         )
+    if seen_file_identities_limit_reached:
+        has_failure = True
+        print(
+            "Scan aborted after reaching maximum tracked Swift file-identity limit "
+            f"({MAX_SEEN_SWIFT_FILE_IDENTITIES})."
+        )
     if parsed_lines_limit_reached:
         has_failure = True
         print(
@@ -959,6 +979,7 @@ def main() -> int:
         print(f"Visited {visited_directories} directories before failure.")
         print(f"Processed {processed_directory_entries} directory entries before failure.")
         print(f"Tracked {len(seen_files)} unique Swift path keys before failure.")
+        print(f"Tracked {len(seen_file_identities)} unique Swift file identities before failure.")
         print(f"Parsed {parsed_swift_lines} Swift lines before failure.")
         print(f"Read {scanned_swift_bytes} Swift bytes before failure.")
         return 1
