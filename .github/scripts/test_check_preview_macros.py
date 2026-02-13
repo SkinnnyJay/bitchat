@@ -250,6 +250,20 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("One or more scan roots are invalid", result.stdout)
             self.assertIn("is not a directory", result.stdout)
 
+    def test_fails_when_scan_root_has_symlink_loop(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            loop_root = temp_path / "loop"
+            try:
+                loop_root.symlink_to(loop_root)
+            except OSError as error:
+                self.skipTest(f"Symlink creation not supported in environment: {error}")
+
+            result = self.run_script("--root", str(loop_root))
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("One or more scan roots are invalid", result.stdout)
+            self.assertIn("cannot resolve path", result.stdout)
+
     def test_fails_when_scan_root_is_blank_after_trimming(self) -> None:
         result = self.run_script("--root", "   ")
         self.assertEqual(result.returncode, 1)

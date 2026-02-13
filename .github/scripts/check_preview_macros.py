@@ -207,6 +207,9 @@ def main() -> int:
         root = Path(trimmed_root).expanduser()
         try:
             root_key = root.resolve(strict=False)
+        except RuntimeError as error:
+            invalid_roots[str(root)] = f"cannot resolve path ({error})"
+            continue
         except OSError:
             root_key = root.absolute()
         if root_key in seen_roots:
