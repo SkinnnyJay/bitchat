@@ -133,6 +133,32 @@ def contains_disallowed_control_characters(value: str) -> bool:
     return any(unicodedata.category(character) in DISALLOWED_CONTROL_CATEGORIES for character in value)
 
 
+def is_swift_identifier_continuation_character(character: str) -> bool:
+    if character == "_" or character.isalnum():
+        return True
+    if character in {"\u200c", "\u200d"}:
+        return True
+    return unicodedata.category(character) in {"Mn", "Mc", "Me"}
+
+
+def has_token_boundaries(
+    segment: str,
+    start: int,
+    end: int,
+    *,
+    requires_right_boundary: bool,
+) -> bool:
+    if start > 0:
+        left_character = segment[start - 1]
+        if left_character == "#" or is_swift_identifier_continuation_character(left_character):
+            return False
+    if requires_right_boundary and end < len(segment):
+        right_character = segment[end]
+        if right_character == "#" or is_swift_identifier_continuation_character(right_character):
+            return False
+    return True
+
+
 def format_line_numbers_for_diagnostics(
     line_numbers: list[int],
     total_line_number_count: int | None = None,
@@ -258,8 +284,8 @@ def find_token_matches_with_state(
     if content.startswith("\ufeff"):
         content = content[1:]
 
-    right_boundary = r"(?![\w#])" if (token[-1].isalnum() or token[-1] == "_") else ""
-    pattern = re.compile(rf"(?<![\w#]){re.escape(token)}{right_boundary}")
+    pattern = re.compile(re.escape(token))
+    token_requires_right_boundary = token[-1].isalnum() or token[-1] == "_"
     matches: list[int] = []
     match_count = 0
     processed_line_count = 0
@@ -444,10 +470,18 @@ def find_token_matches_with_state(
             )
 
         code_segment = "".join(code_chars)
-        if pattern.search(code_segment):
+        for match in pattern.finditer(code_segment):
+            if not has_token_boundaries(
+                code_segment,
+                match.start(),
+                match.end(),
+                requires_right_boundary=token_requires_right_boundary,
+            ):
+                continue
             match_count += 1
             if max_tracked_line_numbers is None or len(matches) < max_tracked_line_numbers:
                 matches.append(line_number)
+            break
 
     if block_comment_starts:
         return (
