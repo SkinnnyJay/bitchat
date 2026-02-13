@@ -120,6 +120,15 @@ final class CommandProcessorTests: XCTestCase {
         XCTAssertEqual(canonical, String(repeating: "ab", count: 32))
     }
 
+    func testCanonicalNostrBlockKeyDecodesNpub() {
+        let hex = String(repeating: "11", count: 32)
+        let npub = try? Bech32.encode(hrp: "npub", data: Data(hexString: hex) ?? Data())
+
+        let canonical = CommandProcessor.canonicalNostrBlockKey(npub ?? "")
+
+        XCTAssertEqual(canonical, hex)
+    }
+
     func testCanonicalNostrBlockKeyRejectsInvalidValues() {
         XCTAssertNil(CommandProcessor.canonicalNostrBlockKey("abc"))
         XCTAssertNil(CommandProcessor.canonicalNostrBlockKey(String(repeating: "zz", count: 32)))
