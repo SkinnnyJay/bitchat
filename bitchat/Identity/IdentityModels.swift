@@ -115,7 +115,7 @@ struct CryptographicIdentity: Codable {
 /// Represents the social layer of identity - user-assigned names and trust relationships.
 /// This layer provides human-friendly identification and relationship management.
 /// All data in this layer is local-only and never transmitted over the network.
-struct SocialIdentity: Codable {
+struct SocialIdentity: Codable, Equatable {
     let fingerprint: String
     var localPetname: String?   // User's name for this peer
     var claimedNickname: String // What peer calls themselves

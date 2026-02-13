@@ -138,6 +138,51 @@ final class SecureIdentityStateManagerTests: XCTestCase {
         XCTAssertFalse(updated.isFavorite)
     }
 
+    func testShouldPersistIdentityMutationReturnsFalseWhenIdentityAndIndexUnchanged() {
+        let identity = SocialIdentity(
+            fingerprint: String(repeating: "ab", count: 32),
+            localPetname: nil,
+            claimedNickname: "alice",
+            trustLevel: .unknown,
+            isFavorite: false,
+            isBlocked: false,
+            notes: nil
+        )
+        let index = ["alice": Set([identity.fingerprint])]
+
+        XCTAssertFalse(
+            SecureIdentityStateManager.shouldPersistIdentityMutation(
+                existingIdentity: identity,
+                newIdentity: identity,
+                existingNicknameIndex: index,
+                newNicknameIndex: index
+            )
+        )
+    }
+
+    func testShouldPersistIdentityMutationReturnsTrueWhenNicknameIndexChanges() {
+        let identity = SocialIdentity(
+            fingerprint: String(repeating: "ab", count: 32),
+            localPetname: nil,
+            claimedNickname: "alice",
+            trustLevel: .unknown,
+            isFavorite: false,
+            isBlocked: false,
+            notes: nil
+        )
+        let oldIndex = ["alice": Set([identity.fingerprint])]
+        let newIndex = ["alice": Set([identity.fingerprint]), "bob": Set(["other"])]
+
+        XCTAssertTrue(
+            SecureIdentityStateManager.shouldPersistIdentityMutation(
+                existingIdentity: identity,
+                newIdentity: identity,
+                existingNicknameIndex: oldIndex,
+                newNicknameIndex: newIndex
+            )
+        )
+    }
+
     func testApplyingNostrBlockReportsChangesOnlyWhenSetMutates() {
         let key = String(repeating: "ab", count: 32)
 

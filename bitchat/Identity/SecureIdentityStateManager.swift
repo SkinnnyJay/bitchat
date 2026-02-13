@@ -301,6 +301,15 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
             notes: nil
         )
     }
+
+    static func shouldPersistIdentityMutation(
+        existingIdentity: SocialIdentity?,
+        newIdentity: SocialIdentity,
+        existingNicknameIndex: [String: Set<String>],
+        newNicknameIndex: [String: Set<String>]
+    ) -> Bool {
+        existingIdentity != newIdentity || existingNicknameIndex != newNicknameIndex
+    }
     
     init(_ keychain: KeychainManagerProtocol) {
         self.keychain = keychain
@@ -497,14 +506,21 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
                 isBlocked: identity.isBlocked,
                 notes: identity.notes
             )
-
-            self.cache.socialIdentities[canonicalFingerprint] = sanitizedIdentity
-            self.cache.nicknameIndex = Self.updatedNicknameIndex(
+            let updatedNicknameIndex = Self.updatedNicknameIndex(
                 self.cache.nicknameIndex,
                 fingerprint: canonicalFingerprint,
                 oldNickname: existingIdentity?.claimedNickname,
                 newNickname: sanitizedIdentity.claimedNickname
             )
+            guard Self.shouldPersistIdentityMutation(
+                existingIdentity: existingIdentity,
+                newIdentity: sanitizedIdentity,
+                existingNicknameIndex: self.cache.nicknameIndex,
+                newNicknameIndex: updatedNicknameIndex
+            ) else { return }
+
+            self.cache.socialIdentities[canonicalFingerprint] = sanitizedIdentity
+            self.cache.nicknameIndex = updatedNicknameIndex
             
             // Save to keychain
             self.saveIdentityCache()
@@ -531,13 +547,21 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
                 fingerprint: canonicalFingerprint,
                 isFavorite: isFavorite
             )
-            self.cache.socialIdentities[canonicalFingerprint] = identity
-            self.cache.nicknameIndex = Self.updatedNicknameIndex(
+            let updatedNicknameIndex = Self.updatedNicknameIndex(
                 self.cache.nicknameIndex,
                 fingerprint: canonicalFingerprint,
                 oldNickname: existingIdentity?.claimedNickname,
                 newNickname: identity.claimedNickname
             )
+            guard Self.shouldPersistIdentityMutation(
+                existingIdentity: existingIdentity,
+                newIdentity: identity,
+                existingNicknameIndex: self.cache.nicknameIndex,
+                newNicknameIndex: updatedNicknameIndex
+            ) else { return }
+
+            self.cache.socialIdentities[canonicalFingerprint] = identity
+            self.cache.nicknameIndex = updatedNicknameIndex
             self.saveIdentityCache()
         }
     }
@@ -569,13 +593,21 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
                 fingerprint: canonicalFingerprint,
                 isBlocked: isBlocked
             )
-            self.cache.socialIdentities[canonicalFingerprint] = identity
-            self.cache.nicknameIndex = Self.updatedNicknameIndex(
+            let updatedNicknameIndex = Self.updatedNicknameIndex(
                 self.cache.nicknameIndex,
                 fingerprint: canonicalFingerprint,
                 oldNickname: existingIdentity?.claimedNickname,
                 newNickname: identity.claimedNickname
             )
+            guard Self.shouldPersistIdentityMutation(
+                existingIdentity: existingIdentity,
+                newIdentity: identity,
+                existingNicknameIndex: self.cache.nicknameIndex,
+                newNicknameIndex: updatedNicknameIndex
+            ) else { return }
+
+            self.cache.socialIdentities[canonicalFingerprint] = identity
+            self.cache.nicknameIndex = updatedNicknameIndex
             self.saveIdentityCache()
         }
     }
