@@ -322,26 +322,26 @@ final class CommandProcessor {
         }
     }
 
-    static func resolveFavoriteNoisePublicKey(from peerID: String, fallbackNoiseKey: Data?) -> Data? {
+    nonisolated static func resolveFavoriteNoisePublicKey(from peerID: String, fallbackNoiseKey: Data?) -> Data? {
         if let decoded = ChatViewModel.decodeNoisePublicKey(from: peerID) {
             return decoded
         }
         return ChatViewModel.validatedNoisePublicKey(fallbackNoiseKey)
     }
 
-    static func favoriteNicknameForPersistence(_ nickname: String) -> String {
+    nonisolated static func favoriteNicknameForPersistence(_ nickname: String) -> String {
         FavoritesPersistenceService.sanitizedPeerNickname(nickname)
     }
 
-    static func sanitizedNicknameForIdentity(_ nickname: String) -> String {
+    nonisolated static func sanitizedNicknameForIdentity(_ nickname: String) -> String {
         SecureIdentityStateManager.sanitizedClaimedNickname(nickname)
     }
 
-    static func canonicalNostrBlockKey(_ value: String) -> String? {
+    nonisolated static func canonicalNostrBlockKey(_ value: String) -> String? {
         SecureIdentityStateManager.canonicalNostrPubkey(value)
     }
 
-    static func canonicalBlockedDisplayNameIndex(_ entries: [(id: String, displayName: String)]) -> [String: String] {
+    nonisolated static func canonicalBlockedDisplayNameIndex(_ entries: [(id: String, displayName: String)]) -> [String: String] {
         var index: [String: String] = [:]
         for entry in entries {
             guard let canonical = canonicalNostrBlockKey(entry.id) else { continue }

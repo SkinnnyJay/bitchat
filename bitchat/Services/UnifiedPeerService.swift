@@ -270,7 +270,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         }.first
     }
 
-    static func resolveCachedFingerprint(from cache: [String: String], peerID: String) -> String? {
+    nonisolated static func resolveCachedFingerprint(from cache: [String: String], peerID: String) -> String? {
         for key in lookupKeys(for: peerID) {
             if let fingerprint = cache[key],
                let canonicalFingerprint = canonicalFingerprint(fingerprint) {
@@ -288,7 +288,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return matches.first.flatMap { canonicalFingerprint($0.value) }
     }
 
-    static func resolveCachedFingerprint(from cache: [String: String], order: [String], peerID: String) -> String? {
+    nonisolated static func resolveCachedFingerprint(from cache: [String: String], order: [String], peerID: String) -> String? {
         var candidateFingerprintsByKey: [String: String] = [:]
 
         for key in lookupKeys(for: peerID) {
@@ -357,7 +357,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return lhs.peerID.id < rhs.peerID.id
     }
 
-    static func cacheFingerprint(
+    nonisolated static func cacheFingerprint(
         _ fingerprint: String,
         for peerID: String,
         in cache: inout [String: String]
@@ -372,7 +372,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         }
     }
 
-    static func cacheFingerprint(
+    nonisolated static func cacheFingerprint(
         _ fingerprint: String,
         for peerID: String,
         in cache: inout [String: String],
@@ -416,7 +416,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         }
     }
 
-    static func fingerprintCacheReferenceIDs(from peers: [BitchatPeer]) -> [String] {
+    nonisolated static func fingerprintCacheReferenceIDs(from peers: [BitchatPeer]) -> [String] {
         var referenceIDs: [String] = []
         func appendID(_ id: String) {
             let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -437,7 +437,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return referenceIDs
     }
 
-    static func pruneFingerprintCache(
+    nonisolated static func pruneFingerprintCache(
         _ cache: inout [String: String],
         order: inout [String],
         referenceIDs: [String],
@@ -476,7 +476,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         }
     }
 
-    static func deduplicatedOrderKeepingMostRecent(_ order: [String]) -> [String] {
+    nonisolated static func deduplicatedOrderKeepingMostRecent(_ order: [String]) -> [String] {
         var seen: Set<String> = []
         var dedupedReversed: [String] = []
         for key in order.reversed() where seen.insert(key).inserted {
@@ -485,7 +485,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return dedupedReversed.reversed()
     }
 
-    static func resolveFingerprintFromMesh(
+    nonisolated static func resolveFingerprintFromMesh(
         for peerID: String,
         using resolver: (PeerID) -> String?
     ) -> String? {
@@ -498,11 +498,11 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return nil
     }
 
-    static func canonicalFingerprint(_ fingerprint: String) -> String? {
+    nonisolated static func canonicalFingerprint(_ fingerprint: String) -> String? {
         FingerprintNormalizer.canonical(fingerprint)
     }
 
-    static func buildPeerIndex(from peers: [BitchatPeer]) -> [String: BitchatPeer] {
+    nonisolated static func buildPeerIndex(from peers: [BitchatPeer]) -> [String: BitchatPeer] {
         var index: [String: BitchatPeer] = [:]
         let sortedPeers = peers.sorted(by: shouldSortPeer)
         for peer in sortedPeers {
@@ -524,7 +524,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return index
     }
 
-    static func buildConnectedPeerLookupKeys(from connectedPeerIDs: Set<String>) -> Set<String> {
+    nonisolated static func buildConnectedPeerLookupKeys(from connectedPeerIDs: Set<String>) -> Set<String> {
         var collectedLookupKeys: Set<String> = []
         for connectedPeerID in connectedPeerIDs {
             for key in lookupKeys(for: connectedPeerID) {
@@ -538,7 +538,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return collectedLookupKeys
     }
 
-    static func isPeerOnline(
+    nonisolated static func isPeerOnline(
         _ peerID: String,
         connectedPeerIDs: Set<String>,
         connectedPeerLookupKeys: Set<String>
@@ -554,7 +554,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return connectedPeerLookupKeys.contains(normalized)
     }
 
-    static func meshDedupKey(for peerID: PeerID) -> String {
+    nonisolated static func meshDedupKey(for peerID: PeerID) -> String {
         let normalized = WiFiPeerIdentity.normalizedKey(peerID.id)
         if !normalized.isEmpty {
             return normalized
@@ -562,7 +562,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return peerID.id.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
-    static func deduplicateMeshPeers(_ peers: [BitchatPeer]) -> [BitchatPeer] {
+    nonisolated static func deduplicateMeshPeers(_ peers: [BitchatPeer]) -> [BitchatPeer] {
         var peersByDedupKey: [String: BitchatPeer] = [:]
         for peer in peers {
             let dedupKey = meshDedupKey(for: peer.peerID)
@@ -577,7 +577,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return Array(peersByDedupKey.values)
     }
 
-    static func shouldPreferMeshPeer(_ candidate: BitchatPeer, over existing: BitchatPeer) -> Bool {
+    nonisolated static func shouldPreferMeshPeer(_ candidate: BitchatPeer, over existing: BitchatPeer) -> Bool {
         if candidate.isConnected != existing.isConnected {
             return candidate.isConnected
         }
@@ -597,7 +597,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return candidate.peerID.id < existing.peerID.id
     }
 
-    static func shouldIncludeFavoriteAsOfflinePeer(
+    nonisolated static func shouldIncludeFavoriteAsOfflinePeer(
         favoriteNoiseKey: Data,
         favoriteNickname: String,
         existingPeers: [BitchatPeer],
@@ -628,11 +628,11 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return true
     }
 
-    static func sanitizedPeerNickname(_ nickname: String) -> String {
+    nonisolated static func sanitizedPeerNickname(_ nickname: String) -> String {
         InputValidator.validateNickname(nickname) ?? "user"
     }
 
-    static func resolvedNoisePublicKey(for snapshot: TransportPeerSnapshot) -> Data? {
+    nonisolated static func resolvedNoisePublicKey(for snapshot: TransportPeerSnapshot) -> Data? {
         if let noisePublicKey = snapshot.noisePublicKey, noisePublicKey.count == 32 {
             return noisePublicKey
         }
@@ -644,14 +644,14 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return nil
     }
 
-    static func shouldIncludeMeshSnapshot(_ snapshot: TransportPeerSnapshot, localPeerID: PeerID) -> Bool {
+    nonisolated static func shouldIncludeMeshSnapshot(_ snapshot: TransportPeerSnapshot, localPeerID: PeerID) -> Bool {
         if WiFiPeerIdentity.isEquivalent(snapshot.peerID.id, localPeerID.id) {
             return false
         }
         return snapshot.peerID.isValid
     }
 
-    static func resolveMeshNickname(for peerID: String, using resolver: (PeerID) -> String?) -> String? {
+    nonisolated static func resolveMeshNickname(for peerID: String, using resolver: (PeerID) -> String?) -> String? {
         for lookupKey in lookupKeys(for: peerID) {
             guard let nickname = resolver(PeerID(str: lookupKey)),
                   let sanitized = InputValidator.validateNickname(nickname) else { continue }
@@ -660,12 +660,12 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return nil
     }
 
-    static func fingerprintFromPeer(_ peer: BitchatPeer) -> String? {
+    nonisolated static func fingerprintFromPeer(_ peer: BitchatPeer) -> String? {
         guard peer.noisePublicKey.count == 32 else { return nil }
         return peer.noisePublicKey.sha256Fingerprint()
     }
 
-    static func resolvedFingerprintForPeer(_ peer: BitchatPeer) -> String? {
+    nonisolated static func resolvedFingerprintForPeer(_ peer: BitchatPeer) -> String? {
         if let fingerprint = fingerprintFromPeer(peer) {
             return fingerprint
         }
@@ -675,7 +675,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return nil
     }
 
-    static func favoriteNoisePublicKey(for peer: BitchatPeer) -> Data? {
+    nonisolated static func favoriteNoisePublicKey(for peer: BitchatPeer) -> Data? {
         if peer.noisePublicKey.count == 32 {
             return peer.noisePublicKey
         }
@@ -685,7 +685,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return nil
     }
 
-    static func favoriteNicknameForPersistence(_ nickname: String, fallbackDisplayName: String) -> String {
+    nonisolated static func favoriteNicknameForPersistence(_ nickname: String, fallbackDisplayName: String) -> String {
         if let sanitized = InputValidator.validateNickname(nickname) {
             return sanitized
         }
@@ -705,7 +705,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         Self.peerID(for: nickname, in: peers)
     }
 
-    static func peerID(for nickname: String, in peers: [BitchatPeer]) -> String? {
+    nonisolated static func peerID(for nickname: String, in peers: [BitchatPeer]) -> String? {
         let target = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !target.isEmpty else { return nil }
         let normalizedTarget = target.lowercased()
@@ -719,7 +719,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return bestPeerForNicknameMatch(candidates)?.peerID.id
     }
 
-    static func bestPeerForNicknameMatch(_ peers: [BitchatPeer]) -> BitchatPeer? {
+    nonisolated static func bestPeerForNicknameMatch(_ peers: [BitchatPeer]) -> BitchatPeer? {
         guard !peers.isEmpty else { return nil }
         return peers.max { lhs, rhs in
             if nicknameMatchPriority(lhs) != nicknameMatchPriority(rhs) {
