@@ -445,6 +445,17 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
         self.assertIn("One or more scan roots are invalid", result.stdout)
         self.assertIn("is empty after trimming", result.stdout)
 
+    def test_fails_when_scan_root_exceeds_max_utf8_bytes(self) -> None:
+        oversized_root = "a" * (check_preview_macros.MAX_ROOT_BYTES + 1)
+        result = self.run_script("--root", oversized_root)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("One or more scan roots are invalid", result.stdout)
+        self.assertIn("is too long", result.stdout)
+        self.assertIn(
+            f"{check_preview_macros.MAX_ROOT_BYTES} UTF-8 bytes",
+            result.stdout,
+        )
+
     def test_fails_when_scan_root_contains_control_character(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             result = self.run_script("--root", f"{temp_dir}\x01")

@@ -19,6 +19,7 @@ import unicodedata
 
 MAX_TOKEN_BYTES = 256
 MAX_SWIFT_FILE_BYTES = 5 * 1024 * 1024
+MAX_ROOT_BYTES = 4096
 DISALLOWED_CONTROL_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn"}
 
 
@@ -248,6 +249,12 @@ def main() -> int:
         trimmed_root = raw_root.strip()
         if not trimmed_root:
             invalid_roots[raw_root] = "is empty after trimming"
+            continue
+        if len(trimmed_root.encode("utf-8")) > MAX_ROOT_BYTES:
+            invalid_roots[raw_root] = (
+                "is too long; "
+                f"must be at most {MAX_ROOT_BYTES} UTF-8 bytes"
+            )
             continue
         if contains_disallowed_control_characters(trimmed_root):
             invalid_roots[raw_root] = "contains control characters"
