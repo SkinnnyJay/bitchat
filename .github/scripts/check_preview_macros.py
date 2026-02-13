@@ -194,6 +194,17 @@ def format_open_read_error(error: OSError) -> str:
     return f"cannot open/read file ({error})"
 
 
+def format_utf8_decode_error(error: UnicodeDecodeError) -> str:
+    reason = error.reason if isinstance(error.reason, str) and error.reason else "decode failure"
+    start = error.start if isinstance(error.start, int) and not isinstance(error.start, bool) else None
+    end = error.end if isinstance(error.end, int) and not isinstance(error.end, bool) else None
+    if start is None:
+        return f"cannot decode file as UTF-8 ({reason})"
+    if end is None or end <= start + 1:
+        return f"cannot decode file as UTF-8 ({reason} at byte {start})"
+    return f"cannot decode file as UTF-8 ({reason} at bytes {start}-{end - 1})"
+
+
 def path_from_error_filename(filename: object, fallback: Path) -> Path:
     if filename is None:
         return fallback
@@ -1164,7 +1175,7 @@ def main() -> int:
                 try:
                     content = raw_content.decode("utf-8")
                 except UnicodeDecodeError as error:
-                    if not record_unreadable(swift_file, str(error)):
+                    if not record_unreadable(swift_file, format_utf8_decode_error(error)):
                         break
                     continue
                 line_numbers, line_number_count, parse_error, parsed_line_count = find_token_matches_with_state(

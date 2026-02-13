@@ -681,6 +681,20 @@ class PreviewMacroUtilityTests(unittest.TestCase):
             check_preview_macros.format_open_read_error(error),
         )
 
+    def test_formats_utf8_decode_error_for_single_byte_position(self) -> None:
+        error = UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+        self.assertEqual(
+            check_preview_macros.format_utf8_decode_error(error),
+            "cannot decode file as UTF-8 (invalid start byte at byte 0)",
+        )
+
+    def test_formats_utf8_decode_error_for_byte_range(self) -> None:
+        error = UnicodeDecodeError("utf-8", b"\xe2(\xa1", 0, 3, "invalid continuation byte")
+        self.assertEqual(
+            check_preview_macros.format_utf8_decode_error(error),
+            "cannot decode file as UTF-8 (invalid continuation byte at bytes 0-2)",
+        )
+
     def test_iter_content_lines_handles_mixed_newline_sequences(self) -> None:
         content = "a\r\nb\rc\n\n"
         self.assertEqual(
@@ -1462,6 +1476,25 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(return_code, 1)
             self.assertIn("Could not read one or more Swift files:", output)
             self.assertIn("RRRRRRRR... +32 chars truncated", output)
+            self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
+
+    def test_fails_closed_when_swift_file_is_not_utf8_decodable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            non_utf8_swift = temp_path / "NonUtf8.swift"
+            non_utf8_swift.write_bytes(b"\xff")
+
+            return_code, output = self.run_main_with_args(
+                roots=[temp_dir],
+                token="#Preview",
+                allow_empty=True,
+            )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not read one or more Swift files:", output)
+            self.assertIn("NonUtf8.swift", output)
+            self.assertIn("cannot decode file as UTF-8", output)
+            self.assertIn("byte 0", output)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
 
     def test_preserves_parse_error_counts_when_internal_tracking_is_capped(self) -> None:
