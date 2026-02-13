@@ -21,6 +21,14 @@ MAX_TOKEN_BYTES = 256
 MAX_SWIFT_FILE_BYTES = 5 * 1024 * 1024
 
 
+def escape_diagnostic_text(text: str) -> str:
+    return text.encode("unicode_escape").decode("ascii")
+
+
+def format_path_for_diagnostics(path: Path | str) -> str:
+    return escape_diagnostic_text(str(path))
+
+
 def format_open_read_error(error: OSError) -> str:
     if error.errno == errno.ELOOP:
         return "symlinked Swift file not scanned"
@@ -275,7 +283,11 @@ def main() -> int:
     if invalid_roots:
         print("One or more scan roots are invalid:")
         for root in sorted(invalid_roots):
-            print(f" - {root} ({invalid_roots[root]})")
+            print(
+                " - "
+                f"{format_path_for_diagnostics(root)} "
+                f"({escape_diagnostic_text(invalid_roots[root])})"
+            )
         return 1
 
     matches: list[Path] = []
@@ -444,17 +456,25 @@ def main() -> int:
         has_failure = True
         print("Could not read one or more Swift files:")
         for swift_file in sorted(unreadable_files):
-            print(f" - {swift_file}: {unreadable_files[swift_file]}")
+            print(
+                " - "
+                f"{format_path_for_diagnostics(swift_file)}: "
+                f"{escape_diagnostic_text(unreadable_files[swift_file])}"
+            )
 
     if parse_error_files:
         has_failure = True
         print("Could not reliably parse one or more Swift files:")
         for swift_file in sorted(parse_error_files):
-            print(f" - {swift_file}: {parse_error_files[swift_file]}")
+            print(
+                " - "
+                f"{format_path_for_diagnostics(swift_file)}: "
+                f"{escape_diagnostic_text(parse_error_files[swift_file])}"
+            )
 
     if scanned_files == 0 and not args.allow_empty and not unreadable_files:
         has_failure = True
-        joined_roots = ", ".join(str(root) for root in roots)
+        joined_roots = ", ".join(format_path_for_diagnostics(root) for root in roots)
         print(
             "No Swift files were discovered in configured roots; "
             f"failing to avoid false green checks. Roots: [{joined_roots}]"
@@ -465,7 +485,7 @@ def main() -> int:
         print(f"Found unsupported token '{token}' in Swift sources:")
         for match in sorted(matches):
             line_list = ", ".join(str(line) for line in matches_with_lines.get(match, []))
-            print(f" - {match} (lines: {line_list})")
+            print(f" - {format_path_for_diagnostics(match)} (lines: {line_list})")
 
     if has_failure:
         print(
@@ -477,7 +497,7 @@ def main() -> int:
         print(f"Scanned {scanned_files} Swift files before failure.")
         return 1
 
-    joined_roots = ", ".join(str(root) for root in roots)
+    joined_roots = ", ".join(format_path_for_diagnostics(root) for root in roots)
     print(
         f"No unsupported token '{token}' detected in roots [{joined_roots}] "
         f"across {scanned_files} Swift files."

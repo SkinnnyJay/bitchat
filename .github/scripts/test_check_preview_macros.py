@@ -292,6 +292,12 @@ class PreviewMacroDetectionTests(unittest.TestCase):
 
 
 class PreviewMacroUtilityTests(unittest.TestCase):
+    def test_escapes_control_characters_for_diagnostics(self) -> None:
+        self.assertEqual(
+            check_preview_macros.escape_diagnostic_text("line1\nline2\t\x01"),
+            "line1\\nline2\\t\\x01",
+        )
+
     def test_formats_open_error_for_symlink_loop(self) -> None:
         error = OSError(errno.ELOOP, "too many levels of symbolic links")
         self.assertEqual(
@@ -440,6 +446,7 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("One or more scan roots are invalid", result.stdout)
             self.assertIn("contains control characters", result.stdout)
+            self.assertIn("\\x01", result.stdout)
 
     def test_fails_when_no_swift_files_found_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
