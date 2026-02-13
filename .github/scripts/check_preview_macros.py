@@ -282,6 +282,12 @@ def main() -> int:
             print(f" - {match} (lines: {line_list})")
 
     if has_failure:
+        print(
+            "Failure summary: "
+            f"{len(unreadable_files)} unreadable, "
+            f"{len(parse_error_files)} parse errors, "
+            f"{len(matches)} token matches."
+        )
         print(f"Scanned {scanned_files} Swift files before failure.")
         return 1
 

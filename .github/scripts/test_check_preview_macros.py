@@ -311,6 +311,7 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             result = self.run_script("--root", temp_dir)
             self.assertEqual(result.returncode, 1)
             self.assertIn("Example.swift (lines: 4)", result.stdout)
+            self.assertIn("Failure summary: 0 unreadable, 0 parse errors, 1 token matches.", result.stdout)
 
     def test_reports_detected_file_with_utf8_bom(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -424,6 +425,7 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Corrupt.swift", result.stdout)
             self.assertIn("Could not reliably parse one or more Swift files", result.stdout)
             self.assertIn("UnmatchedCloser.swift", result.stdout)
+            self.assertIn("Failure summary: 1 unreadable, 1 parse errors, 0 token matches.", result.stdout)
 
     def test_reports_parse_errors_and_token_matches_together(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -445,6 +447,7 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("UnmatchedCloser.swift", result.stdout)
             self.assertIn("Found unsupported token '#Preview' in Swift sources", result.stdout)
             self.assertIn("HasPreview.swift (lines: 1)", result.stdout)
+            self.assertIn("Failure summary: 0 unreadable, 1 parse errors, 1 token matches.", result.stdout)
 
     def test_fails_closed_on_unterminated_block_comment(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
