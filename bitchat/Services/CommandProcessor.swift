@@ -323,18 +323,15 @@ final class CommandProcessor {
         if let decoded = ChatViewModel.decodeNoisePublicKey(from: peerID) {
             return decoded
         }
-        if let fallbackNoiseKey, fallbackNoiseKey.count == 32 {
-            return fallbackNoiseKey
-        }
-        return nil
+        return ChatViewModel.validatedNoisePublicKey(fallbackNoiseKey)
     }
 
     static func favoriteNicknameForPersistence(_ nickname: String) -> String {
-        InputValidator.validateNickname(nickname) ?? "user"
+        FavoritesPersistenceService.sanitizedPeerNickname(nickname)
     }
 
     static func sanitizedNicknameForIdentity(_ nickname: String) -> String {
-        InputValidator.validateNickname(nickname) ?? "user"
+        SecureIdentityStateManager.sanitizedClaimedNickname(nickname)
     }
 
     static func canonicalNostrBlockKey(_ value: String) -> String? {

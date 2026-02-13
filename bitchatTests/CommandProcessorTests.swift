@@ -96,6 +96,15 @@ final class CommandProcessorTests: XCTestCase {
         XCTAssertNil(resolved)
     }
 
+    func testResolveFavoriteNoisePublicKeyRejectsNilFallbackWhenPeerIDIsShort() {
+        let resolved = CommandProcessor.resolveFavoriteNoisePublicKey(
+            from: "abcdef0123456789",
+            fallbackNoiseKey: nil
+        )
+
+        XCTAssertNil(resolved)
+    }
+
     func testFavoriteNicknameForPersistenceKeepsValidNickname() {
         XCTAssertEqual(CommandProcessor.favoriteNicknameForPersistence("alice"), "alice")
     }
