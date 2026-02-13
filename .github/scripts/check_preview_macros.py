@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import errno
+import math
 import os
 from pathlib import Path
 import re
@@ -78,7 +79,12 @@ def stat_timestamp_ns_or_none(stats: object, nanoseconds_attr: str, seconds_attr
         return nanoseconds_value
     seconds_value = getattr(stats, seconds_attr, None)
     if isinstance(seconds_value, (int, float)):
-        return int(seconds_value * 1_000_000_000)
+        if isinstance(seconds_value, float) and not math.isfinite(seconds_value):
+            return None
+        try:
+            return int(seconds_value * 1_000_000_000)
+        except (OverflowError, ValueError):
+            return None
     return None
 
 

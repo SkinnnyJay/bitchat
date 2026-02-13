@@ -383,6 +383,24 @@ class PreviewMacroUtilityTests(unittest.TestCase):
             1_250_000_000,
         )
 
+    def test_returns_none_for_non_finite_stat_seconds_values(self) -> None:
+        nan_stats = type("StatLike", (), {"st_mtime": float("nan")})()
+        inf_stats = type("StatLike", (), {"st_mtime": float("inf")})()
+        self.assertIsNone(
+            check_preview_macros.stat_timestamp_ns_or_none(
+                nan_stats,
+                "st_mtime_ns",
+                "st_mtime",
+            )
+        )
+        self.assertIsNone(
+            check_preview_macros.stat_timestamp_ns_or_none(
+                inf_stats,
+                "st_mtime_ns",
+                "st_mtime",
+            )
+        )
+
     def test_returns_none_when_stat_timestamp_fields_are_missing(self) -> None:
         stats = type("StatLike", (), {})()
         self.assertIsNone(
