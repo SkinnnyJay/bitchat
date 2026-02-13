@@ -460,6 +460,20 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Example.swift (lines: 4)", result.stdout)
             self.assertIn("Failure summary: 0 unreadable, 0 parse errors, 1 token matches.", result.stdout)
 
+    def test_reports_detected_file_with_absolute_path_for_relative_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "RelativeRootPreview.swift"
+            swift_file.write_text("#Preview { Text(\"flagged\") }\n", encoding="utf-8")
+
+            relative_root = os.path.relpath(temp_dir, pathlib.Path.cwd())
+            result = self.run_script("--root", relative_root)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                f"{swift_file.resolve()} (lines: 1)",
+                result.stdout,
+            )
+
     def test_reports_detected_file_with_utf8_bom(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)
@@ -1023,6 +1037,19 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not reliably parse one or more Swift files", result.stdout)
             self.assertIn("UnterminatedBlockComment.swift", result.stdout)
             self.assertIn("unterminated block comment", result.stdout)
+
+    def test_reports_parse_error_file_with_absolute_path_for_relative_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "RelativeRootParseError.swift"
+            swift_file.write_text("let value = 1\n*/\n", encoding="utf-8")
+
+            relative_root = os.path.relpath(temp_dir, pathlib.Path.cwd())
+            result = self.run_script("--root", relative_root)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Could not reliably parse one or more Swift files", result.stdout)
+            self.assertIn(str(swift_file.resolve()), result.stdout)
+            self.assertIn("unmatched block comment closer", result.stdout)
 
     def test_fails_closed_on_unterminated_multiline_string(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

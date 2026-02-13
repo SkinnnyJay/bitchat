@@ -419,12 +419,13 @@ def main() -> int:
                     record_unreadable(swift_file, str(error))
                     continue
                 line_numbers, parse_error = find_token_line_numbers_with_state(content, token)
+                reported_swift_file = report_path(swift_file)
                 if parse_error is not None:
-                    parse_error_files[swift_file] = parse_error
+                    parse_error_files[reported_swift_file] = parse_error
                     continue
                 if line_numbers:
-                    matches.append(swift_file)
-                    matches_with_lines[swift_file] = line_numbers
+                    matches.append(reported_swift_file)
+                    matches_with_lines[reported_swift_file] = line_numbers
 
         for error_path, error_message in traversal_errors.items():
             record_unreadable(error_path, error_message)
