@@ -201,7 +201,7 @@ def find_token_matches_with_state(
     if content.startswith("\ufeff"):
         content = content[1:]
 
-    right_boundary = r"(?!\w)" if (token[-1].isalnum() or token[-1] == "_") else ""
+    right_boundary = r"(?![\w#])" if (token[-1].isalnum() or token[-1] == "_") else ""
     pattern = re.compile(rf"(?<![\w#]){re.escape(token)}{right_boundary}")
     matches: list[int] = []
     match_count = 0

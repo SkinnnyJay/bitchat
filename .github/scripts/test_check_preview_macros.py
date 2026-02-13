@@ -120,6 +120,13 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
 
+    def test_does_not_match_hash_suffixed_token(self) -> None:
+        content = """
+            #Preview# { Text("not target token") }
+            #Preview { Text("real preview") }
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
+
     def test_does_not_match_unicode_identifier_prefixed_token(self) -> None:
         content = """
             let combined = α#Preview
@@ -1334,6 +1341,19 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             swift_file = temp_path / "DoubleHash.swift"
             swift_file.write_text(
                 "##Preview { Text(\"ignored\") }\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("No unsupported token '#Preview' detected", result.stdout)
+
+    def test_does_not_flag_hash_suffixed_preview_token_in_script_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "HashSuffix.swift"
+            swift_file.write_text(
+                "#Preview# { Text(\"ignored\") }\n",
                 encoding="utf-8",
             )
 
