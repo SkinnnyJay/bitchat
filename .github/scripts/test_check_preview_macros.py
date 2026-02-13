@@ -624,6 +624,30 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("blocked_root", result.stdout)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", result.stdout)
 
+    def test_unreadable_root_does_not_emit_no_swift_discovered_message(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            blocked_root = temp_path / "blocked_root"
+            blocked_root.mkdir(parents=True, exist_ok=True)
+
+            try:
+                os.chmod(blocked_root, 0)
+            except OSError as error:
+                self.skipTest(f"Could not adjust root permissions for traversal test: {error}")
+
+            if os.access(blocked_root, os.R_OK | os.X_OK):
+                os.chmod(blocked_root, 0o755)
+                self.skipTest("Permission restrictions are not enforced in this environment.")
+
+            try:
+                result = self.run_script("--root", str(blocked_root))
+            finally:
+                os.chmod(blocked_root, 0o755)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Could not read one or more Swift files", result.stdout)
+            self.assertNotIn("No Swift files were discovered in configured roots", result.stdout)
+
     def test_reports_unreadable_and_parse_errors_together(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)

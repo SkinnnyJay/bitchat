@@ -304,7 +304,7 @@ def main() -> int:
         for swift_file in sorted(parse_error_files):
             print(f" - {swift_file}: {parse_error_files[swift_file]}")
 
-    if scanned_files == 0 and not args.allow_empty:
+    if scanned_files == 0 and not args.allow_empty and not unreadable_files:
         has_failure = True
         joined_roots = ", ".join(str(root) for root in roots)
         print(
