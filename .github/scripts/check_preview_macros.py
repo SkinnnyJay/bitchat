@@ -239,16 +239,16 @@ def main() -> int:
                 matches.append(swift_file)
                 matches_with_lines[swift_file] = line_numbers
 
-    if unreadable_files:
-        print("Could not read one or more Swift files:")
-        for swift_file in sorted(unreadable_files):
-            print(f" - {swift_file}: {unreadable_files[swift_file]}")
-        return 1
-
-    if parse_error_files:
-        print("Could not reliably parse one or more Swift files:")
-        for swift_file in sorted(parse_error_files):
-            print(f" - {swift_file}: {parse_error_files[swift_file]}")
+    if unreadable_files or parse_error_files:
+        if unreadable_files:
+            print("Could not read one or more Swift files:")
+            for swift_file in sorted(unreadable_files):
+                print(f" - {swift_file}: {unreadable_files[swift_file]}")
+        if parse_error_files:
+            print("Could not reliably parse one or more Swift files:")
+            for swift_file in sorted(parse_error_files):
+                print(f" - {swift_file}: {parse_error_files[swift_file]}")
+        print(f"Scanned {scanned_files} Swift files before failure.")
         return 1
 
     if scanned_files == 0 and not args.allow_empty:

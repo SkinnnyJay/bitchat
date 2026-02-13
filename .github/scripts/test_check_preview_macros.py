@@ -369,6 +369,25 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("Could not read one or more Swift files", result.stdout)
             self.assertIn("Corrupt.swift", result.stdout)
+            self.assertIn("Scanned 1 Swift files before failure.", result.stdout)
+
+    def test_reports_unreadable_and_parse_errors_together(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            unreadable_file = temp_path / "Corrupt.swift"
+            unreadable_file.write_bytes(b"\xff\xfe\xfa")
+            parse_error_file = temp_path / "UnmatchedCloser.swift"
+            parse_error_file.write_text(
+                "let value = 1\n*/\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Could not read one or more Swift files", result.stdout)
+            self.assertIn("Corrupt.swift", result.stdout)
+            self.assertIn("Could not reliably parse one or more Swift files", result.stdout)
+            self.assertIn("UnmatchedCloser.swift", result.stdout)
 
     def test_fails_closed_on_unterminated_block_comment(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
