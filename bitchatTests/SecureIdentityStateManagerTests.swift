@@ -214,6 +214,33 @@ final class SecureIdentityStateManagerTests: XCTestCase {
         XCTAssertFalse(removed.updated.contains(key))
     }
 
+    func testApplyingVerificationMutationReportsChangesOnlyWhenSetMutates() {
+        let fingerprint = String(repeating: "ab", count: 32)
+
+        let added = SecureIdentityStateManager.applyingVerificationMutation(
+            [],
+            fingerprint: fingerprint,
+            verified: true
+        )
+        XCTAssertTrue(added.changed)
+        XCTAssertTrue(added.updated.contains(fingerprint))
+
+        let addedAgain = SecureIdentityStateManager.applyingVerificationMutation(
+            added.updated,
+            fingerprint: fingerprint,
+            verified: true
+        )
+        XCTAssertFalse(addedAgain.changed)
+
+        let removed = SecureIdentityStateManager.applyingVerificationMutation(
+            added.updated,
+            fingerprint: fingerprint,
+            verified: false
+        )
+        XCTAssertTrue(removed.changed)
+        XCTAssertFalse(removed.updated.contains(fingerprint))
+    }
+
     func testBuildNicknameIndexGroupsFingerprintsByClaimedNickname() {
         let socialIdentities: [String: SocialIdentity] = [
             "fp1": SocialIdentity(

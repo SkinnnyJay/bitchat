@@ -210,6 +210,20 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
         return (updated, removed)
     }
 
+    static func applyingVerificationMutation(
+        _ verifiedFingerprints: Set<String>,
+        fingerprint: String,
+        verified: Bool
+    ) -> (updated: Set<String>, changed: Bool) {
+        var updated = verifiedFingerprints
+        if verified {
+            let inserted = updated.insert(fingerprint).inserted
+            return (updated, inserted)
+        }
+        let removed = updated.remove(fingerprint) != nil
+        return (updated, removed)
+    }
+
     static func buildNicknameIndex(from socialIdentities: [String: SocialIdentity]) -> [String: Set<String>] {
         var index: [String: Set<String>] = [:]
         for (fingerprint, identity) in socialIdentities {
@@ -741,17 +755,25 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
         SecureLogger.info("Fingerprint \(verified ? "verified" : "unverified"): \(canonicalFingerprint)", category: .security)
         
         queue.async(flags: .barrier) {
-            if verified {
-                self.cache.verifiedFingerprints.insert(canonicalFingerprint)
-            } else {
-                self.cache.verifiedFingerprints.remove(canonicalFingerprint)
-            }
+            let verificationResult = Self.applyingVerificationMutation(
+                self.cache.verifiedFingerprints,
+                fingerprint: canonicalFingerprint,
+                verified: verified
+            )
             
             // Update trust level if social identity exists
+            var trustChanged = false
             if var identity = self.cache.socialIdentities[canonicalFingerprint] {
-                identity.trustLevel = verified ? .verified : .casual
-                self.cache.socialIdentities[canonicalFingerprint] = identity
+                let nextTrust: TrustLevel = verified ? .verified : .casual
+                if identity.trustLevel != nextTrust {
+                    identity.trustLevel = nextTrust
+                    self.cache.socialIdentities[canonicalFingerprint] = identity
+                    trustChanged = true
+                }
             }
+
+            guard verificationResult.changed || trustChanged else { return }
+            self.cache.verifiedFingerprints = verificationResult.updated
             
             self.saveIdentityCache()
         }
