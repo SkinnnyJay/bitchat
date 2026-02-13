@@ -12,14 +12,19 @@ import argparse
 from pathlib import Path
 import sys
 
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Fail if unsupported preview macro tokens are found in Swift files."
     )
     parser.add_argument(
         "--root",
-        default="bitchat",
-        help="Directory to recursively scan for Swift files (default: bitchat).",
+        action="append",
+        default=[],
+        help=(
+            "Directory to recursively scan for Swift files. "
+            "Can be provided multiple times."
+        ),
     )
     parser.add_argument(
         "--token",
@@ -31,16 +36,23 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    root = Path(args.root)
-    if not root.exists():
-        print(f"Scan root does not exist: {root}")
+
+    roots = [Path(raw) for raw in (args.root or ["bitchat", "bitchatShareExtension"])]
+    missing_roots = [root for root in roots if not root.exists()]
+    if missing_roots:
+        print("One or more scan roots do not exist:")
+        for root in missing_roots:
+            print(f" - {root}")
         return 1
 
     matches: list[Path] = []
+    scanned_files = 0
 
-    for swift_file in root.rglob("*.swift"):
-        if args.token in swift_file.read_text(encoding="utf-8", errors="ignore"):
-            matches.append(swift_file)
+    for root in roots:
+        for swift_file in root.rglob("*.swift"):
+            scanned_files += 1
+            if args.token in swift_file.read_text(encoding="utf-8", errors="ignore"):
+                matches.append(swift_file)
 
     if matches:
         print(f"Found unsupported token '{args.token}' in Swift sources:")
@@ -48,7 +60,11 @@ def main() -> int:
             print(f" - {match}")
         return 1
 
-    print(f"No unsupported token '{args.token}' detected in {root}.")
+    joined_roots = ", ".join(str(root) for root in roots)
+    print(
+        f"No unsupported token '{args.token}' detected in roots [{joined_roots}] "
+        f"across {scanned_files} Swift files."
+    )
     return 0
 
 

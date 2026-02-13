@@ -30,7 +30,7 @@ jobs:
         uses: swift-actions/setup-swift@v2
 
       - name: "Guard against #Preview macro regressions"
-        run: python3 .github/scripts/check_preview_macros.py
+        run: python3 .github/scripts/check_preview_macros.py --root bitchat --root bitchatShareExtension
 
       - name: Capture toolchain fingerprints
         id: toolchain
