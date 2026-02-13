@@ -99,6 +99,13 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [2])
 
+    def test_does_not_match_double_hash_prefixed_token(self) -> None:
+        content = """
+            ##Preview { Text("not target token") }
+            #Preview { Text("real preview") }
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
+
     def test_detects_preview_after_string_with_comment_markers(self) -> None:
         content = """
             let tricky = "/* not a comment marker in a string */"
