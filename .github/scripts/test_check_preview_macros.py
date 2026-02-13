@@ -430,6 +430,22 @@ class PreviewMacroUtilityTests(unittest.TestCase):
             )
         )
 
+    def test_reads_stat_integer_or_none_for_integer_values(self) -> None:
+        stats = type("StatLike", (), {"st_dev": 42})()
+        self.assertEqual(check_preview_macros.stat_integer_or_none(stats, "st_dev"), 42)
+
+    def test_returns_none_for_boolean_stat_integer_values(self) -> None:
+        stats = type("StatLike", (), {"st_dev": True})()
+        self.assertIsNone(check_preview_macros.stat_integer_or_none(stats, "st_dev"))
+
+    def test_reads_stat_identity_or_none_for_integer_fields(self) -> None:
+        stats = type("StatLike", (), {"st_dev": 7, "st_ino": 9})()
+        self.assertEqual(check_preview_macros.stat_identity_or_none(stats), (7, 9))
+
+    def test_returns_none_for_stat_identity_with_invalid_fields(self) -> None:
+        stats = type("StatLike", (), {"st_dev": True, "st_ino": 9})()
+        self.assertIsNone(check_preview_macros.stat_identity_or_none(stats))
+
     def test_formats_roots_for_diagnostics(self) -> None:
         roots = [pathlib.Path("/tmp/a"), pathlib.Path("/tmp/b"), pathlib.Path("/tmp/c")]
         self.assertEqual(
@@ -1729,6 +1745,72 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
                 output,
                 r"file identity changed during open/read \(possible race: \d+:\d+ -> \d+:\d+\)",
             )
+            self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
+            self.assertIn("Scanned 1 Swift files before failure.", output)
+
+    def test_fails_closed_when_descriptor_identity_fields_are_non_integer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "RaceDescriptorIdentity.swift"
+            swift_file.write_text("struct RaceDescriptorIdentity {}\n", encoding="utf-8")
+
+            real_fstat = check_preview_macros.os.fstat
+            fstat_call_count = 0
+
+            def fake_fstat(descriptor: int) -> os.stat_result:
+                nonlocal fstat_call_count
+                descriptor_stat = real_fstat(descriptor)
+                if fstat_call_count == 0:
+                    descriptor_values = list(descriptor_stat)
+                    descriptor_values[2] = True
+                    descriptor_stat = os.stat_result(descriptor_values)
+                fstat_call_count += 1
+                return descriptor_stat
+
+            with mock.patch.object(check_preview_macros.os, "fstat", side_effect=fake_fstat):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not read one or more Swift files", output)
+            self.assertIn("RaceDescriptorIdentity.swift", output)
+            self.assertIn("cannot read descriptor file identity metadata", output)
+            self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
+            self.assertIn("Scanned 1 Swift files before failure.", output)
+
+    def test_fails_closed_when_post_read_identity_fields_are_non_integer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "RacePostReadIdentity.swift"
+            swift_file.write_text("struct RacePostReadIdentity {}\n", encoding="utf-8")
+
+            real_fstat = check_preview_macros.os.fstat
+            fstat_call_count = 0
+
+            def fake_fstat(descriptor: int) -> os.stat_result:
+                nonlocal fstat_call_count
+                descriptor_stat = real_fstat(descriptor)
+                if fstat_call_count == 1:
+                    descriptor_values = list(descriptor_stat)
+                    descriptor_values[1] = True
+                    descriptor_stat = os.stat_result(descriptor_values)
+                fstat_call_count += 1
+                return descriptor_stat
+
+            with mock.patch.object(check_preview_macros.os, "fstat", side_effect=fake_fstat):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not read one or more Swift files", output)
+            self.assertIn("RacePostReadIdentity.swift", output)
+            self.assertIn("cannot read post-read file identity metadata", output)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 1 Swift files before failure.", output)
 

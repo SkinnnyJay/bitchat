@@ -90,6 +90,21 @@ def stat_timestamp_ns_or_none(stats: object, nanoseconds_attr: str, seconds_attr
     return None
 
 
+def stat_integer_or_none(stats: object, attr: str) -> int | None:
+    value = getattr(stats, attr, None)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    return None
+
+
+def stat_identity_or_none(stats: object) -> tuple[int, int] | None:
+    device = stat_integer_or_none(stats, "st_dev")
+    inode = stat_integer_or_none(stats, "st_ino")
+    if device is None or inode is None:
+        return None
+    return device, inode
+
+
 def contains_disallowed_control_characters(value: str) -> bool:
     return any(unicodedata.category(character) in DISALLOWED_CONTROL_CATEGORIES for character in value)
 
@@ -791,7 +806,16 @@ def main() -> int:
                     if not record_unreadable(swift_file, f"cannot inspect file metadata ({error})"):
                         break
                     continue
-                file_identity = (resolved_stat.st_dev, resolved_stat.st_ino)
+                file_identity = stat_identity_or_none(resolved_stat)
+                if file_identity is None:
+                    if not try_increment_scanned_files():
+                        break
+                    if not record_unreadable(
+                        swift_file,
+                        "cannot read file identity metadata (non-integer st_dev/st_ino)",
+                    ):
+                        break
+                    continue
                 if file_identity in seen_file_identities:
                     continue
                 if not try_increment_scanned_files():
@@ -825,7 +849,14 @@ def main() -> int:
                         if not record_unreadable(swift_file, "unsupported non-regular Swift path"):
                             break
                         continue
-                    descriptor_identity = (descriptor_stat.st_dev, descriptor_stat.st_ino)
+                    descriptor_identity = stat_identity_or_none(descriptor_stat)
+                    if descriptor_identity is None:
+                        if not record_unreadable(
+                            swift_file,
+                            "cannot read descriptor file identity metadata (non-integer st_dev/st_ino)",
+                        ):
+                            break
+                        continue
                     if descriptor_identity != file_identity:
                         if not record_unreadable(
                             swift_file,
@@ -883,13 +914,21 @@ def main() -> int:
                     ):
                         break
                     continue
-                if (post_read_descriptor_stat.st_dev, post_read_descriptor_stat.st_ino) != descriptor_identity:
+                post_read_identity = stat_identity_or_none(post_read_descriptor_stat)
+                if post_read_identity is None:
+                    if not record_unreadable(
+                        swift_file,
+                        "cannot read post-read file identity metadata (non-integer st_dev/st_ino)",
+                    ):
+                        break
+                    continue
+                if post_read_identity != descriptor_identity:
                     if not record_unreadable(
                         swift_file,
                         "file identity changed during read "
                         "(possible race: "
                         f"{descriptor_identity[0]}:{descriptor_identity[1]} -> "
-                        f"{post_read_descriptor_stat.st_dev}:{post_read_descriptor_stat.st_ino})",
+                        f"{post_read_identity[0]}:{post_read_identity[1]})",
                     ):
                         break
                     continue
