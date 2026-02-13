@@ -141,6 +141,20 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
 
+    def test_does_not_match_dollar_suffixed_token(self) -> None:
+        content = """
+            #Preview$ { Text("not target token") }
+            #Preview { Text("real preview") }
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
+
+    def test_does_not_match_dollar_prefixed_token(self) -> None:
+        content = """
+            let combinedNoSpace = $#Preview
+            #Preview { Text("real preview") }
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
+
     def test_does_not_match_combining_mark_suffixed_token(self) -> None:
         content = """
             #Preview\u0301 { Text("not target token") }
@@ -602,6 +616,7 @@ class PreviewMacroUtilityTests(unittest.TestCase):
     def test_detects_swift_identifier_continuation_characters(self) -> None:
         self.assertTrue(check_preview_macros.is_swift_identifier_continuation_character("a"))
         self.assertTrue(check_preview_macros.is_swift_identifier_continuation_character("_"))
+        self.assertTrue(check_preview_macros.is_swift_identifier_continuation_character("$"))
         self.assertTrue(check_preview_macros.is_swift_identifier_continuation_character("\u0301"))
         self.assertTrue(check_preview_macros.is_swift_identifier_continuation_character("\u200d"))
         self.assertTrue(check_preview_macros.is_swift_identifier_continuation_character("‿"))
@@ -622,6 +637,22 @@ class PreviewMacroUtilityTests(unittest.TestCase):
                 "#Preview\u200d",
                 0,
                 len("#Preview"),
+                requires_right_boundary=True,
+            )
+        )
+        self.assertFalse(
+            check_preview_macros.has_token_boundaries(
+                "#Preview$",
+                0,
+                len("#Preview"),
+                requires_right_boundary=True,
+            )
+        )
+        self.assertFalse(
+            check_preview_macros.has_token_boundaries(
+                "$#Preview",
+                1,
+                1 + len("#Preview"),
                 requires_right_boundary=True,
             )
         )
@@ -1625,6 +1656,32 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             swift_file = temp_path / "HashSuffix.swift"
             swift_file.write_text(
                 "#Preview# { Text(\"ignored\") }\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("No unsupported token '#Preview' detected", result.stdout)
+
+    def test_does_not_flag_dollar_suffixed_preview_token_in_script_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "DollarSuffix.swift"
+            swift_file.write_text(
+                "#Preview$ { Text(\"ignored\") }\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("No unsupported token '#Preview' detected", result.stdout)
+
+    def test_does_not_flag_dollar_prefixed_preview_token_in_script_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "DollarPrefix.swift"
+            swift_file.write_text(
+                "let combined = $#Preview\n",
                 encoding="utf-8",
             )
 

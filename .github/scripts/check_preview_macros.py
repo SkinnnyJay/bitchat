@@ -137,6 +137,8 @@ def contains_disallowed_control_characters(value: str) -> bool:
 def is_swift_identifier_continuation_character(character: str) -> bool:
     if character == "_" or character.isalnum():
         return True
+    if character == "$":
+        return True
     if character in {"\u200c", "\u200d"}:
         return True
     return unicodedata.category(character) in {"Mn", "Mc", "Me", "Pc"}
