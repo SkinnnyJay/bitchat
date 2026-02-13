@@ -669,6 +669,32 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Corrupt.swift", result.stdout)
             self.assertIn("Scanned 1 Swift files before failure.", result.stdout)
 
+    def test_fails_closed_when_swift_file_is_permission_denied(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            locked_file = temp_path / "Locked.swift"
+            locked_file.write_text("struct Locked {}\n", encoding="utf-8")
+
+            try:
+                os.chmod(locked_file, 0)
+            except OSError as error:
+                self.skipTest(f"Could not adjust file permissions for readability test: {error}")
+
+            if os.access(locked_file, os.R_OK):
+                os.chmod(locked_file, 0o644)
+                self.skipTest("File permission restrictions are not enforced in this environment.")
+
+            try:
+                result = self.run_script("--root", temp_dir)
+            finally:
+                os.chmod(locked_file, 0o644)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Could not read one or more Swift files", result.stdout)
+            self.assertIn("Locked.swift", result.stdout)
+            self.assertIn("permission denied", result.stdout)
+            self.assertIn("Scanned 1 Swift files before failure.", result.stdout)
+
     def test_fails_closed_when_swift_file_exceeds_max_supported_size(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)

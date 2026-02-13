@@ -9,6 +9,7 @@ This enforces PreviewProvider-only previews to avoid toolchain-specific
 from __future__ import annotations
 
 import argparse
+import errno
 import os
 from pathlib import Path
 import re
@@ -277,6 +278,15 @@ def main() -> int:
     def record_unreadable(path: Path, reason: str) -> None:
         unreadable_files[report_path(path)] = reason
 
+    def format_open_read_error(error: OSError) -> str:
+        if error.errno == errno.ELOOP:
+            return "symlinked Swift file not scanned"
+        if error.errno in {errno.EACCES, errno.EPERM}:
+            return f"cannot open/read file (permission denied: {error})"
+        if error.errno == errno.ENOENT:
+            return f"path disappeared during scan ({error})"
+        return f"cannot open/read file ({error})"
+
     for root in roots:
         traversal_errors: dict[Path, str] = {}
 
@@ -389,7 +399,7 @@ def main() -> int:
                         descriptor = -1
                         raw_content = file_handle.read(MAX_SWIFT_FILE_BYTES + 1)
                 except OSError as error:
-                    record_unreadable(swift_file, f"cannot open/read file ({error})")
+                    record_unreadable(swift_file, format_open_read_error(error))
                     continue
                 finally:
                     if descriptor >= 0:
