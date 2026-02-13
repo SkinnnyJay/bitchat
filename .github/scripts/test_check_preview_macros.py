@@ -409,6 +409,21 @@ class PreviewMacroDetectionTests(unittest.TestCase):
             "token candidate checks exceed maximum supported count (3) at line 1",
         )
 
+    def test_reports_parse_state_for_excessive_total_token_candidate_checks(self) -> None:
+        content = "#a#a#a\n#a#a#a\n"
+        with (
+            mock.patch.object(check_preview_macros, "MAX_TOKEN_CANDIDATE_CHECKS_PER_LINE", 10),
+            mock.patch.object(check_preview_macros, "MAX_TOTAL_TOKEN_CANDIDATE_CHECKS", 5),
+        ):
+            matches, parse_error = check_preview_macros.find_token_line_numbers_with_state(
+                content, "#a"
+            )
+        self.assertEqual(matches, [])
+        self.assertEqual(
+            parse_error,
+            "total token candidate checks exceed maximum supported count (5) at line 2",
+        )
+
     def test_randomized_inputs_never_raise_parser_exceptions(self) -> None:
         rng = random.Random(20260213)
         alphabet = string.ascii_letters + string.digits + string.punctuation + " \t\nαβ🙂"
@@ -3134,6 +3149,31 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("TooManyTokenCandidates.swift", output)
             self.assertIn(
                 "token candidate checks exceed maximum supported count (3) at line 1",
+                output,
+            )
+            self.assertIn("Failure summary: 0 unreadable, 1 parse errors, 0 token matches.", output)
+
+    def test_fails_closed_on_excessive_total_token_candidate_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "TooManyTotalTokenCandidates.swift"
+            swift_file.write_text("#a#a#a\n#a#a#a\n", encoding="utf-8")
+
+            with (
+                mock.patch.object(check_preview_macros, "MAX_TOKEN_CANDIDATE_CHECKS_PER_LINE", 10),
+                mock.patch.object(check_preview_macros, "MAX_TOTAL_TOKEN_CANDIDATE_CHECKS", 5),
+            ):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#a",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not reliably parse one or more Swift files", output)
+            self.assertIn("TooManyTotalTokenCandidates.swift", output)
+            self.assertIn(
+                "total token candidate checks exceed maximum supported count (5) at line 2",
                 output,
             )
             self.assertIn("Failure summary: 0 unreadable, 1 parse errors, 0 token matches.", output)

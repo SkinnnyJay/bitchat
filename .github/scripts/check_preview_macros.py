@@ -44,6 +44,7 @@ MAX_REPORTED_TOKEN_MATCH_FILES = 200
 MAX_SWIFT_FILE_LINES = 1_000_000
 MAX_SWIFT_LINE_CHARS = 200_000
 MAX_TOKEN_CANDIDATE_CHECKS_PER_LINE = 50_000
+MAX_TOTAL_TOKEN_CANDIDATE_CHECKS = 5_000_000
 MAX_REPORTED_LINE_NUMBERS_PER_FILE = 50
 MAX_TRACKED_LINE_NUMBERS_PER_FILE = 200
 MAX_BLOCK_COMMENT_NESTING = 4096
@@ -288,6 +289,7 @@ def find_token_matches_with_state(
     matches: list[int] = []
     match_count = 0
     processed_line_count = 0
+    total_token_candidate_checks = 0
     block_comment_starts: list[int] = []
     active_string_hashes: int | None = None
     active_string_is_multiline = False
@@ -476,12 +478,21 @@ def find_token_matches_with_state(
             if match_start < 0:
                 break
             token_candidate_checks += 1
+            total_token_candidate_checks += 1
             if token_candidate_checks > MAX_TOKEN_CANDIDATE_CHECKS_PER_LINE:
                 return (
                     matches,
                     match_count,
                     "token candidate checks exceed maximum supported count "
                     f"({MAX_TOKEN_CANDIDATE_CHECKS_PER_LINE}) at line {line_number}",
+                    processed_line_count,
+                )
+            if total_token_candidate_checks > MAX_TOTAL_TOKEN_CANDIDATE_CHECKS:
+                return (
+                    matches,
+                    match_count,
+                    "total token candidate checks exceed maximum supported count "
+                    f"({MAX_TOTAL_TOKEN_CANDIDATE_CHECKS}) at line {line_number}",
                     processed_line_count,
                 )
             match_end = match_start + len(token)
