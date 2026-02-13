@@ -35,6 +35,7 @@ MAX_REPORTED_TOKEN_MATCH_FILES = 200
 MAX_REPORTED_LINE_NUMBERS_PER_FILE = 50
 MAX_TRACKED_LINE_NUMBERS_PER_FILE = 200
 MAX_BLOCK_COMMENT_NESTING = 4096
+MAX_RAW_STRING_DELIMITER_HASHES = 256
 MAX_REPORTED_ROOTS_IN_SUMMARY = 20
 MAX_DIAGNOSTIC_TEXT_CHARS = 512
 DISALLOWED_CONTROL_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn"}
@@ -152,6 +153,7 @@ def find_token_matches_with_state(
     block_comment_starts: list[int] = []
     active_string_hashes: int | None = None
     active_string_is_multiline = False
+    active_string_close_token: str | None = None
     active_string_start_line: int | None = None
 
     def parse_string_start(line: str, cursor: int) -> tuple[int, bool] | None:
@@ -200,26 +202,30 @@ def find_token_matches_with_state(
 
             if active_string_hashes is not None:
                 if active_string_is_multiline:
-                    multiline_close = '"""' + ("#" * active_string_hashes)
-                    if line.startswith(multiline_close, cursor):
+                    if active_string_close_token is not None and line.startswith(
+                        active_string_close_token, cursor
+                    ):
                         if is_string_closer_escaped(line, cursor, active_string_hashes):
                             cursor += 1
                             continue
-                        cursor += len(multiline_close)
+                        cursor += len(active_string_close_token)
                         active_string_hashes = None
                         active_string_is_multiline = False
+                        active_string_close_token = None
                         active_string_start_line = None
                         continue
                     cursor += 1
                     continue
 
-                singleline_close = '"' + ("#" * active_string_hashes)
-                if line.startswith(singleline_close, cursor):
+                if active_string_close_token is not None and line.startswith(
+                    active_string_close_token, cursor
+                ):
                     if is_string_closer_escaped(line, cursor, active_string_hashes):
                         cursor += 1
                         continue
-                    cursor += len(singleline_close)
+                    cursor += len(active_string_close_token)
                     active_string_hashes = None
+                    active_string_close_token = None
                     active_string_start_line = None
                     continue
                 if active_string_hashes == 0 and line[cursor] == "\\" and cursor + 1 < len(line):
@@ -263,11 +269,26 @@ def find_token_matches_with_state(
                 cursor += 2
                 continue
 
+            if line[cursor] == "#" and cursor > 0 and line[cursor - 1] == "#":
+                code_chars.append(line[cursor])
+                cursor += 1
+                continue
+
             string_start = parse_string_start(line, cursor)
             if string_start is not None:
                 consumed, is_multiline = string_start
                 active_string_hashes = consumed - (3 if is_multiline else 1)
+                if active_string_hashes > MAX_RAW_STRING_DELIMITER_HASHES:
+                    return (
+                        matches,
+                        match_count,
+                        "raw string delimiter exceeds maximum supported hash count "
+                        f"({MAX_RAW_STRING_DELIMITER_HASHES}) at line {line_number}",
+                    )
                 active_string_is_multiline = is_multiline
+                active_string_close_token = (
+                    ('"""' if is_multiline else '"') + ("#" * active_string_hashes)
+                )
                 active_string_start_line = line_number
                 cursor += consumed
                 continue
