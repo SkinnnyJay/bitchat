@@ -5929,7 +5929,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // For now, create a temporary peer ID based on Nostr pubkey
         // This allows the message to be displayed even without Noise key mapping
-        let tempPeerID = "nostr_" + canonicalSenderPubkey.prefix(TransportConfig.nostrConvKeyPrefixLength)
+        guard let tempPeerID = Self.nostrConversationPeerID(
+            actualSenderNoiseKey: nil,
+            senderPubkey: canonicalSenderPubkey
+        ) else { return }
         
         // Check if we're viewing this unknown sender's chat
         let isViewingThisChat = selectedPrivateChatPeer == tempPeerID
