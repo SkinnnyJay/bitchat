@@ -93,6 +93,12 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [2])
 
+    def test_detects_preview_after_attribute_clause_on_same_line(self) -> None:
+        content = """
+            @available(iOS 17, *) #Preview { Text("real preview") }
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [2])
+
     def test_detects_preview_after_string_with_comment_markers(self) -> None:
         content = """
             let tricky = "/* not a comment marker in a string */"
