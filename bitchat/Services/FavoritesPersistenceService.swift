@@ -6,7 +6,7 @@ import Combine
 @MainActor
 final class FavoritesPersistenceService: ObservableObject {
     
-    struct FavoriteRelationship: Codable {
+    struct FavoriteRelationship: Codable, Equatable {
         let peerNoisePublicKey: Data
         let peerNostrPublicKey: String?
         let peerNickname: String
@@ -77,6 +77,13 @@ final class FavoritesPersistenceService: ObservableObject {
             favoritedAt: relationship.favoritedAt,
             lastUpdated: relationship.lastUpdated
         )
+    }
+
+    static func shouldPersistCleanedRelationships(
+        decoded: [FavoriteRelationship],
+        cleaned: [FavoriteRelationship]
+    ) -> Bool {
+        decoded != cleaned
     }
     
     private init() {
@@ -337,7 +344,11 @@ final class FavoritesPersistenceService: ObservableObject {
             }
             
             // If we cleaned up duplicates, save the cleaned list
-            if cleanedRelationships.count < decodedRelationships.count {
+            let shouldPersistCleaned = Self.shouldPersistCleanedRelationships(
+                decoded: decodedRelationships,
+                cleaned: cleanedRelationships
+            )
+            if shouldPersistCleaned {
                 // Cleaned up duplicates
                 
                 // Clear and rebuild favorites dictionary

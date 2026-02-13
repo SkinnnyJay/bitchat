@@ -85,6 +85,59 @@ final class FavoritesPersistenceServiceTests: XCTestCase {
         XCTAssertNil(sanitized?.peerNostrPublicKey)
     }
 
+    func testShouldPersistCleanedRelationshipsDetectsSanitizedValueChanges() {
+        let decoded = [
+            FavoritesPersistenceService.FavoriteRelationship(
+                peerNoisePublicKey: Data(repeating: 0x11, count: 32),
+                peerNostrPublicKey: "   ",
+                peerNickname: "alice",
+                isFavorite: true,
+                theyFavoritedUs: false,
+                favoritedAt: Date(timeIntervalSince1970: 1),
+                lastUpdated: Date(timeIntervalSince1970: 2)
+            )
+        ]
+        let cleaned = [
+            FavoritesPersistenceService.FavoriteRelationship(
+                peerNoisePublicKey: Data(repeating: 0x11, count: 32),
+                peerNostrPublicKey: nil,
+                peerNickname: "alice",
+                isFavorite: true,
+                theyFavoritedUs: false,
+                favoritedAt: Date(timeIntervalSince1970: 1),
+                lastUpdated: Date(timeIntervalSince1970: 2)
+            )
+        ]
+
+        XCTAssertTrue(
+            FavoritesPersistenceService.shouldPersistCleanedRelationships(
+                decoded: decoded,
+                cleaned: cleaned
+            )
+        )
+    }
+
+    func testShouldPersistCleanedRelationshipsReturnsFalseWhenUnchanged() {
+        let relationships = [
+            FavoritesPersistenceService.FavoriteRelationship(
+                peerNoisePublicKey: Data(repeating: 0x11, count: 32),
+                peerNostrPublicKey: nil,
+                peerNickname: "alice",
+                isFavorite: true,
+                theyFavoritedUs: false,
+                favoritedAt: Date(timeIntervalSince1970: 1),
+                lastUpdated: Date(timeIntervalSince1970: 2)
+            )
+        ]
+
+        XCTAssertFalse(
+            FavoritesPersistenceService.shouldPersistCleanedRelationships(
+                decoded: relationships,
+                cleaned: relationships
+            )
+        )
+    }
+
     @MainActor
     func testGetFavoriteStatusForPeerIDAcceptsFullNoisePeerID() {
         let fullNoiseHex = String(repeating: "ab", count: 32)
