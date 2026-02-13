@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import os
 import pathlib
+import random
+import string
 import subprocess
 import sys
 import tempfile
@@ -253,6 +255,26 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         )
         self.assertEqual(matches, [])
         self.assertEqual(parse_error, "unmatched block comment closer at line 3")
+
+    def test_randomized_inputs_never_raise_parser_exceptions(self) -> None:
+        rng = random.Random(20260213)
+        alphabet = string.ascii_letters + string.digits + string.punctuation + " \t\nαβ🙂"
+
+        for _ in range(2000):
+            length = rng.randint(0, 500)
+            content = "".join(rng.choice(alphabet) for _ in range(length))
+            try:
+                matches, parse_error = check_preview_macros.find_token_line_numbers_with_state(
+                    content, "#Preview"
+                )
+            except Exception as error:  # pragma: no cover - explicit crash guard assertion
+                self.fail(f"Parser raised {type(error).__name__} for randomized input: {error}")
+
+            self.assertEqual(matches, sorted(set(matches)))
+            for line_number in matches:
+                self.assertGreaterEqual(line_number, 1)
+            if parse_error is not None:
+                self.assertIsInstance(parse_error, str)
 
 
 class PreviewMacroScriptBehaviorTests(unittest.TestCase):
