@@ -439,7 +439,10 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(result.stderr, "")
             self.assertIn("Could not read one or more Swift files", result.stdout)
             self.assertIn("Loop.swift", result.stdout)
-            self.assertIn("cannot resolve path", result.stdout)
+            self.assertTrue(
+                "cannot resolve path" in result.stdout or "Too many levels of symbolic links" in result.stdout,
+                msg=result.stdout,
+            )
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", result.stdout)
 
     def test_reports_unreadable_and_parse_errors_together(self) -> None:
