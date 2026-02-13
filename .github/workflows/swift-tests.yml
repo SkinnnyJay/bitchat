@@ -19,7 +19,7 @@ concurrency:
 jobs:
   test:
     name: Run Swift Tests
-    runs-on: macos-latest
+    runs-on: macos-14
     timeout-minutes: 20
 
     steps:
