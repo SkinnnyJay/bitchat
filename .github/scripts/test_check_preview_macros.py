@@ -63,6 +63,12 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [2])
 
+    def test_detects_custom_token_with_trailing_non_word_character(self) -> None:
+        content = """
+            let value = 1; #MyPreview(ExampleView())
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#MyPreview("), [2])
+
     def test_ignores_nested_block_comment_preview_token(self) -> None:
         content = """
             /*
@@ -111,6 +117,13 @@ class PreviewMacroDetectionTests(unittest.TestCase):
     def test_does_not_match_unicode_identifier_prefixed_token(self) -> None:
         content = """
             let combined = α#Preview
+            #Preview { Text("real preview") }
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
+
+    def test_does_not_match_identifier_prefixed_suffix_variant(self) -> None:
+        content = """
+            #PreviewVariant { Text("not target token") }
             #Preview { Text("real preview") }
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
@@ -447,6 +460,27 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("Found unsupported token '#MyPreview'", result.stdout)
             self.assertIn("OtherPreview.swift (lines: 4)", result.stdout)
+
+    def test_supports_custom_token_ending_with_non_word_character(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "OtherPreviewCall.swift"
+            swift_file.write_text(
+                textwrap.dedent(
+                    """
+                    struct OtherPreviewCall: View {
+                        var body: some View { Text("ok") }
+                    }
+                    #MyPreview(OtherPreviewCall())
+                    """
+                ).strip() + "\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir, "--token", "#MyPreview(")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Found unsupported token '#MyPreview('", result.stdout)
+            self.assertIn("OtherPreviewCall.swift (lines: 4)", result.stdout)
 
     def test_trims_custom_token_value_before_scanning(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
