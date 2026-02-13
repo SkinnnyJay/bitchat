@@ -87,4 +87,54 @@ final class SecureIdentityStateManagerTests: XCTestCase {
         XCTAssertTrue(removed.changed)
         XCTAssertFalse(removed.updated.contains(key))
     }
+
+    func testBuildNicknameIndexGroupsFingerprintsByClaimedNickname() {
+        let socialIdentities: [String: SocialIdentity] = [
+            "fp1": SocialIdentity(
+                fingerprint: "fp1",
+                localPetname: nil,
+                claimedNickname: "alice",
+                trustLevel: .unknown,
+                isFavorite: false,
+                isBlocked: false,
+                notes: nil
+            ),
+            "fp2": SocialIdentity(
+                fingerprint: "fp2",
+                localPetname: nil,
+                claimedNickname: "alice",
+                trustLevel: .unknown,
+                isFavorite: false,
+                isBlocked: false,
+                notes: nil
+            )
+        ]
+
+        let index = SecureIdentityStateManager.buildNicknameIndex(from: socialIdentities)
+
+        XCTAssertEqual(index["alice"], Set(["fp1", "fp2"]))
+    }
+
+    func testSanitizedIdentityCacheNormalizesSocialNicknamesAndBlockedNostrKeys() {
+        let rawNostrKey = String(repeating: "AB", count: 32)
+        var cache = IdentityCache()
+        cache.socialIdentities = [
+            "fp1": SocialIdentity(
+                fingerprint: "fp1",
+                localPetname: nil,
+                claimedNickname: "   ",
+                trustLevel: .unknown,
+                isFavorite: false,
+                isBlocked: false,
+                notes: nil
+            )
+        ]
+        cache.blockedNostrPubkeys = [rawNostrKey, "bad-key"]
+
+        let sanitized = SecureIdentityStateManager.sanitizedIdentityCache(cache)
+
+        XCTAssertEqual(sanitized.socialIdentities["fp1"]?.claimedNickname, "user")
+        XCTAssertEqual(sanitized.nicknameIndex["user"], Set(["fp1"]))
+        XCTAssertEqual(sanitized.blockedNostrPubkeys, [String(repeating: "ab", count: 32)])
+    }
 }

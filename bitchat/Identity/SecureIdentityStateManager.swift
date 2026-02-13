@@ -201,6 +201,43 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
         let removed = updated.remove(key) != nil
         return (updated, removed)
     }
+
+    static func buildNicknameIndex(from socialIdentities: [String: SocialIdentity]) -> [String: Set<String>] {
+        var index: [String: Set<String>] = [:]
+        for (fingerprint, identity) in socialIdentities {
+            index = updatedNicknameIndex(
+                index,
+                fingerprint: fingerprint,
+                oldNickname: nil,
+                newNickname: identity.claimedNickname
+            )
+        }
+        return index
+    }
+
+    static func sanitizedIdentityCache(_ cache: IdentityCache) -> IdentityCache {
+        var sanitized = cache
+        var sanitizedSocialIdentities: [String: SocialIdentity] = [:]
+
+        for (fingerprint, identity) in cache.socialIdentities {
+            sanitizedSocialIdentities[fingerprint] = SocialIdentity(
+                fingerprint: identity.fingerprint,
+                localPetname: identity.localPetname,
+                claimedNickname: sanitizedClaimedNickname(identity.claimedNickname),
+                trustLevel: identity.trustLevel,
+                isFavorite: identity.isFavorite,
+                isBlocked: identity.isBlocked,
+                notes: identity.notes
+            )
+        }
+
+        sanitized.socialIdentities = sanitizedSocialIdentities
+        sanitized.nicknameIndex = buildNicknameIndex(from: sanitizedSocialIdentities)
+        sanitized.blockedNostrPubkeys = Set(
+            cache.blockedNostrPubkeys.compactMap(canonicalNostrPubkey)
+        )
+        return sanitized
+    }
     
     init(_ keychain: KeychainManagerProtocol) {
         self.keychain = keychain
@@ -243,7 +280,8 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
         do {
             let sealedBox = try AES.GCM.SealedBox(combined: encryptedData)
             let decryptedData = try AES.GCM.open(sealedBox, using: encryptionKey)
-            cache = try JSONDecoder().decode(IdentityCache.self, from: decryptedData)
+            let decoded = try JSONDecoder().decode(IdentityCache.self, from: decryptedData)
+            cache = Self.sanitizedIdentityCache(decoded)
         } catch {
             // Log error but continue with empty cache
             SecureLogger.error(error, context: "Failed to load identity cache", category: .security)
