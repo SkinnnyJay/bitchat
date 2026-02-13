@@ -172,6 +172,12 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
         return data.hexEncodedString()
     }
 
+    static func canonicalFingerprint(_ value: String) -> String? {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard normalized.count == 64, Data(hexString: normalized)?.count == 32 else { return nil }
+        return normalized
+    }
+
     static func updatedNicknameIndex(
         _ index: [String: Set<String>],
         fingerprint: String,
@@ -224,8 +230,9 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
         var sanitizedSocialIdentities: [String: SocialIdentity] = [:]
 
         for (fingerprint, identity) in cache.socialIdentities {
-            sanitizedSocialIdentities[fingerprint] = SocialIdentity(
-                fingerprint: fingerprint,
+            guard let canonicalFingerprint = canonicalFingerprint(fingerprint) else { continue }
+            sanitizedSocialIdentities[canonicalFingerprint] = SocialIdentity(
+                fingerprint: canonicalFingerprint,
                 localPetname: identity.localPetname,
                 claimedNickname: sanitizedClaimedNickname(identity.claimedNickname),
                 trustLevel: identity.trustLevel,
@@ -240,6 +247,19 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
         sanitized.blockedNostrPubkeys = Set(
             cache.blockedNostrPubkeys.compactMap(canonicalNostrPubkey)
         )
+        sanitized.verifiedFingerprints = Set(
+            cache.verifiedFingerprints.compactMap(canonicalFingerprint)
+        )
+        var normalizedInteractions: [String: Date] = [:]
+        for (fingerprint, interactionDate) in cache.lastInteractions {
+            guard let canonicalFingerprint = canonicalFingerprint(fingerprint) else { continue }
+            if let existing = normalizedInteractions[canonicalFingerprint] {
+                normalizedInteractions[canonicalFingerprint] = max(existing, interactionDate)
+            } else {
+                normalizedInteractions[canonicalFingerprint] = interactionDate
+            }
+        }
+        sanitized.lastInteractions = normalizedInteractions
         return sanitized
     }
 
@@ -375,8 +395,9 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     // MARK: - Social Identity Management
     
     func getSocialIdentity(for fingerprint: String) -> SocialIdentity? {
+        guard let canonicalFingerprint = Self.canonicalFingerprint(fingerprint) else { return nil }
         queue.sync {
-            return cache.socialIdentities[fingerprint]
+            return cache.socialIdentities[canonicalFingerprint]
         }
     }
 
@@ -389,19 +410,20 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     ///   - signingPublicKey: Optional Ed25519 signing public key for authenticating public messages
     ///   - claimedNickname: Optional latest claimed nickname to persist into social identity
     func upsertCryptographicIdentity(fingerprint: String, noisePublicKey: Data, signingPublicKey: Data?, claimedNickname: String? = nil) {
+        guard let canonicalFingerprint = Self.canonicalFingerprint(fingerprint) else { return }
         queue.async(flags: .barrier) {
             let now = Date()
-            if var existing = self.cryptographicIdentities[fingerprint] {
+            if var existing = self.cryptographicIdentities[canonicalFingerprint] {
                 // Update keys if changed
                 if existing.publicKey != noisePublicKey {
                     existing = CryptographicIdentity(
-                        fingerprint: fingerprint,
+                        fingerprint: canonicalFingerprint,
                         publicKey: noisePublicKey,
                         signingPublicKey: signingPublicKey ?? existing.signingPublicKey,
                         firstSeen: existing.firstSeen,
                         lastHandshake: now
                     )
-                    self.cryptographicIdentities[fingerprint] = existing
+                    self.cryptographicIdentities[canonicalFingerprint] = existing
                 } else {
                     // Update signing key and lastHandshake
                     existing.signingPublicKey = signingPublicKey ?? existing.signingPublicKey
@@ -412,27 +434,27 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
                         firstSeen: existing.firstSeen,
                         lastHandshake: now
                     )
-                    self.cryptographicIdentities[fingerprint] = updated
+                    self.cryptographicIdentities[canonicalFingerprint] = updated
                 }
                 // Persist updated state (already assigned in branches above)
             } else {
                 // New entry
                 let entry = CryptographicIdentity(
-                    fingerprint: fingerprint,
+                    fingerprint: canonicalFingerprint,
                     publicKey: noisePublicKey,
                     signingPublicKey: signingPublicKey,
                     firstSeen: now,
                     lastHandshake: now
                 )
-                self.cryptographicIdentities[fingerprint] = entry
+                self.cryptographicIdentities[canonicalFingerprint] = entry
             }
 
             // Optionally persist claimed nickname into social identity
             if let claimed = claimedNickname {
                 let sanitizedClaimed = Self.sanitizedClaimedNickname(claimed)
-                let previousClaimedNickname = self.cache.socialIdentities[fingerprint]?.claimedNickname
-                var identity = self.cache.socialIdentities[fingerprint] ?? SocialIdentity(
-                    fingerprint: fingerprint,
+                let previousClaimedNickname = self.cache.socialIdentities[canonicalFingerprint]?.claimedNickname
+                var identity = self.cache.socialIdentities[canonicalFingerprint] ?? SocialIdentity(
+                    fingerprint: canonicalFingerprint,
                     localPetname: nil,
                     claimedNickname: sanitizedClaimed,
                     trustLevel: .unknown,
@@ -443,13 +465,13 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
                 // Update claimed nickname if changed
                 if identity.claimedNickname != sanitizedClaimed {
                     identity.claimedNickname = sanitizedClaimed
-                    self.cache.socialIdentities[fingerprint] = identity
-                } else if self.cache.socialIdentities[fingerprint] == nil {
-                    self.cache.socialIdentities[fingerprint] = identity
+                    self.cache.socialIdentities[canonicalFingerprint] = identity
+                } else if self.cache.socialIdentities[canonicalFingerprint] == nil {
+                    self.cache.socialIdentities[canonicalFingerprint] = identity
                 }
                 self.cache.nicknameIndex = Self.updatedNicknameIndex(
                     self.cache.nicknameIndex,
-                    fingerprint: fingerprint,
+                    fingerprint: canonicalFingerprint,
                     oldNickname: previousClaimedNickname,
                     newNickname: identity.claimedNickname
                 )
@@ -469,10 +491,11 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     }
     
     func updateSocialIdentity(_ identity: SocialIdentity) {
+        guard let canonicalFingerprint = Self.canonicalFingerprint(identity.fingerprint) else { return }
         queue.async(flags: .barrier) {
-            let existingIdentity = self.cache.socialIdentities[identity.fingerprint]
+            let existingIdentity = self.cache.socialIdentities[canonicalFingerprint]
             let sanitizedIdentity = SocialIdentity(
-                fingerprint: identity.fingerprint,
+                fingerprint: canonicalFingerprint,
                 localPetname: identity.localPetname,
                 claimedNickname: Self.sanitizedClaimedNickname(identity.claimedNickname),
                 trustLevel: identity.trustLevel,
@@ -481,10 +504,10 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
                 notes: identity.notes
             )
 
-            self.cache.socialIdentities[identity.fingerprint] = sanitizedIdentity
+            self.cache.socialIdentities[canonicalFingerprint] = sanitizedIdentity
             self.cache.nicknameIndex = Self.updatedNicknameIndex(
                 self.cache.nicknameIndex,
-                fingerprint: identity.fingerprint,
+                fingerprint: canonicalFingerprint,
                 oldNickname: existingIdentity?.claimedNickname,
                 newNickname: sanitizedIdentity.claimedNickname
             )
@@ -506,17 +529,18 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     }
     
     func setFavorite(_ fingerprint: String, isFavorite: Bool) {
+        guard let canonicalFingerprint = Self.canonicalFingerprint(fingerprint) else { return }
         queue.async(flags: .barrier) {
-            let existingIdentity = self.cache.socialIdentities[fingerprint]
+            let existingIdentity = self.cache.socialIdentities[canonicalFingerprint]
             let identity = Self.applyingFavoriteMutation(
                 existingIdentity: existingIdentity,
-                fingerprint: fingerprint,
+                fingerprint: canonicalFingerprint,
                 isFavorite: isFavorite
             )
-            self.cache.socialIdentities[fingerprint] = identity
+            self.cache.socialIdentities[canonicalFingerprint] = identity
             self.cache.nicknameIndex = Self.updatedNicknameIndex(
                 self.cache.nicknameIndex,
-                fingerprint: fingerprint,
+                fingerprint: canonicalFingerprint,
                 oldNickname: existingIdentity?.claimedNickname,
                 newNickname: identity.claimedNickname
             )
@@ -525,33 +549,36 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     }
     
     func isFavorite(fingerprint: String) -> Bool {
+        guard let canonicalFingerprint = Self.canonicalFingerprint(fingerprint) else { return false }
         queue.sync {
-            return cache.socialIdentities[fingerprint]?.isFavorite ?? false
+            return cache.socialIdentities[canonicalFingerprint]?.isFavorite ?? false
         }
     }
     
     // MARK: - Blocked Users Management
     
     func isBlocked(fingerprint: String) -> Bool {
+        guard let canonicalFingerprint = Self.canonicalFingerprint(fingerprint) else { return false }
         queue.sync {
-            return cache.socialIdentities[fingerprint]?.isBlocked ?? false
+            return cache.socialIdentities[canonicalFingerprint]?.isBlocked ?? false
         }
     }
     
     func setBlocked(_ fingerprint: String, isBlocked: Bool) {
-        SecureLogger.info("User \(isBlocked ? "blocked" : "unblocked"): \(fingerprint)", category: .security)
+        guard let canonicalFingerprint = Self.canonicalFingerprint(fingerprint) else { return }
+        SecureLogger.info("User \(isBlocked ? "blocked" : "unblocked"): \(canonicalFingerprint)", category: .security)
         
         queue.async(flags: .barrier) {
-            let existingIdentity = self.cache.socialIdentities[fingerprint]
+            let existingIdentity = self.cache.socialIdentities[canonicalFingerprint]
             let identity = Self.applyingBlockedMutation(
                 existingIdentity: existingIdentity,
-                fingerprint: fingerprint,
+                fingerprint: canonicalFingerprint,
                 isBlocked: isBlocked
             )
-            self.cache.socialIdentities[fingerprint] = identity
+            self.cache.socialIdentities[canonicalFingerprint] = identity
             self.cache.nicknameIndex = Self.updatedNicknameIndex(
                 self.cache.nicknameIndex,
-                fingerprint: fingerprint,
+                fingerprint: canonicalFingerprint,
                 oldNickname: existingIdentity?.claimedNickname,
                 newNickname: identity.claimedNickname
             )
@@ -604,8 +631,10 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
             
             // If handshake completed, update last interaction
             if case .completed(let fingerprint) = state {
-                self.cache.lastInteractions[fingerprint] = Date()
-                self.saveIdentityCache()
+                if let canonicalFingerprint = Self.canonicalFingerprint(fingerprint) {
+                    self.cache.lastInteractions[canonicalFingerprint] = Date()
+                    self.saveIdentityCache()
+                }
             }
         }
     }
@@ -635,19 +664,20 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     // MARK: - Verification
     
     func setVerified(fingerprint: String, verified: Bool) {
-        SecureLogger.info("Fingerprint \(verified ? "verified" : "unverified"): \(fingerprint)", category: .security)
+        guard let canonicalFingerprint = Self.canonicalFingerprint(fingerprint) else { return }
+        SecureLogger.info("Fingerprint \(verified ? "verified" : "unverified"): \(canonicalFingerprint)", category: .security)
         
         queue.async(flags: .barrier) {
             if verified {
-                self.cache.verifiedFingerprints.insert(fingerprint)
+                self.cache.verifiedFingerprints.insert(canonicalFingerprint)
             } else {
-                self.cache.verifiedFingerprints.remove(fingerprint)
+                self.cache.verifiedFingerprints.remove(canonicalFingerprint)
             }
             
             // Update trust level if social identity exists
-            if var identity = self.cache.socialIdentities[fingerprint] {
+            if var identity = self.cache.socialIdentities[canonicalFingerprint] {
                 identity.trustLevel = verified ? .verified : .casual
-                self.cache.socialIdentities[fingerprint] = identity
+                self.cache.socialIdentities[canonicalFingerprint] = identity
             }
             
             self.saveIdentityCache()
@@ -655,8 +685,9 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     }
     
     func isVerified(fingerprint: String) -> Bool {
+        guard let canonicalFingerprint = Self.canonicalFingerprint(fingerprint) else { return false }
         queue.sync {
-            return cache.verifiedFingerprints.contains(fingerprint)
+            return cache.verifiedFingerprints.contains(canonicalFingerprint)
         }
     }
     
