@@ -352,8 +352,22 @@ def main() -> int:
                 seen_file_identities.add(file_identity)
                 scanned_files += 1
                 open_flags = os.O_RDONLY
-                if hasattr(os, "O_NONBLOCK"):
+                open_requires_nonblocking_support = hasattr(os, "O_NONBLOCK")
+                if open_requires_nonblocking_support:
                     open_flags |= os.O_NONBLOCK
+                if hasattr(os, "O_CLOEXEC"):
+                    open_flags |= os.O_CLOEXEC
+                if hasattr(os, "O_NOFOLLOW"):
+                    open_flags |= os.O_NOFOLLOW
+                if not open_requires_nonblocking_support:
+                    try:
+                        pre_open_stat = swift_file.lstat()
+                    except OSError as error:
+                        record_unreadable(swift_file, f"cannot inspect file metadata ({error})")
+                        continue
+                    if not stat.S_ISREG(pre_open_stat.st_mode):
+                        record_unreadable(swift_file, "unsupported non-regular Swift path")
+                        continue
                 descriptor = -1
                 try:
                     descriptor = os.open(swift_file, open_flags)
@@ -375,7 +389,7 @@ def main() -> int:
                         descriptor = -1
                         raw_content = file_handle.read(MAX_SWIFT_FILE_BYTES + 1)
                 except OSError as error:
-                    record_unreadable(swift_file, str(error))
+                    record_unreadable(swift_file, f"cannot open/read file ({error})")
                     continue
                 finally:
                     if descriptor >= 0:
