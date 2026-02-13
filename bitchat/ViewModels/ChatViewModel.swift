@@ -1223,8 +1223,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 return true
             }
             // Also check for geohash (Nostr) DM conv key if this peer has a known Nostr pubkey
-            if let nostrHex = peer.nostrPublicKey {
-                let convKey = "nostr_" + String(nostrHex.prefix(TransportConfig.nostrConvKeyPrefixLength))
+            if let nostrHex = peer.nostrPublicKey,
+               let convKey = Self.geohashConversationKey(for: nostrHex) {
                 if unreadPrivateMessages.contains(convKey) {
                     return true
                 }
@@ -1672,8 +1672,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
             // Track ourselves as active participant
             recordGeoParticipant(pubkeyHex: identity.publicKeyHex)
-            let shortKey = "nostr:" + identity.publicKeyHex.prefix(TransportConfig.nostrShortKeyDisplayLength)
-            nostrKeyMapping[shortKey] = identity.publicKeyHex
+            if let shortKey = Self.geohashShortMappingKey(for: identity.publicKeyHex) {
+                nostrKeyMapping[shortKey] = identity.publicKeyHex.lowercased()
+            }
             SecureLogger.debug("GeoTeleport: sent geo message pub=\(identity.publicKeyHex.prefix(8))… teleported=\(LocationChannelManager.shared.teleported)", category: .session)
             
             // If we tagged this as teleported, also mark our pubkey in teleportedGeo for UI
@@ -2077,10 +2078,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
         if let gh = currentGeohash,
            let myIdentity = try? NostrIdentityBridge.deriveIdentity(forGeohash: gh) {
-            let myLower = myIdentity.publicKeyHex.lowercased()
-            let shortLen = TransportConfig.nostrShortKeyDisplayLength
-            let shortKey = "nostr:" + myLower.prefix(shortLen)
-            if lowerPeer == shortKey { return true }
+            if let shortKey = Self.geohashShortMappingKey(for: myIdentity.publicKeyHex),
+               lowerPeer == shortKey {
+                return true
+            }
             let suffix = myIdentity.publicKeyHex.suffix(4)
             let expected = (nickname + "#" + suffix).lowercased()
             if let display = displayName?.lowercased(), display == expected { return true }
@@ -2168,8 +2169,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Remove geohash DM conversation if exists
-        let convKey = "nostr_" + String(hex.prefix(TransportConfig.nostrConvKeyPrefixLength))
-        if privateChats[convKey] != nil {
+        if let convKey = Self.geohashConversationKey(for: hex),
+           privateChats[convKey] != nil {
             privateChats.removeValue(forKey: convKey)
             unreadPrivateMessages.remove(convKey)
         }
@@ -2604,8 +2605,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     // MARK: - Geohash DMs initiation
     @MainActor
     func startGeohashDM(withPubkeyHex hex: String) {
-        let convKey = "nostr_" + String(hex.prefix(TransportConfig.nostrConvKeyPrefixLength))
-        nostrKeyMapping[convKey] = hex
+        guard let canonicalHex = Self.canonicalNostrPubkeyHex(hex),
+              let convKey = Self.geohashConversationKey(for: canonicalHex) else { return }
+        nostrKeyMapping[convKey] = canonicalHex
         selectedPrivateChatPeer = convKey
     }
 
@@ -3444,8 +3446,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             // If a disambiguation suffix is present (e.g., "name#abcd"), try exact displayName match first
             if nickname.contains("#") {
                 if let person = visibleGeohashPeople().first(where: { $0.displayName == nickname }) {
-                    let convKey = "nostr_" + String(person.id.prefix(TransportConfig.nostrConvKeyPrefixLength))
-                    nostrKeyMapping[convKey] = person.id
+                    guard let canonicalPersonID = Self.canonicalNostrPubkeyHex(person.id),
+                          let convKey = Self.geohashConversationKey(for: canonicalPersonID) else { return nil }
+                    nostrKeyMapping[convKey] = canonicalPersonID
                     return convKey
                 }
             }
@@ -3455,7 +3458,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             }().lowercased()
             // Try exact match against cached geoNicknames (pubkey -> nickname)
             if let pub = geoNicknames.first(where: { (_, nick) in nick.lowercased() == base })?.key {
-                let convKey = "nostr_" + String(pub.prefix(TransportConfig.nostrConvKeyPrefixLength))
+                guard let convKey = Self.geohashConversationKey(for: pub) else { return nil }
                 nostrKeyMapping[convKey] = pub
                 return convKey
             }

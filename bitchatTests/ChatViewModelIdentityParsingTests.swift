@@ -227,8 +227,26 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
         XCTAssertEqual(key, "nostr_" + String(hex.prefix(TransportConfig.nostrConvKeyPrefixLength)))
     }
 
+    func testGeohashConversationKeyAcceptsNpubInput() {
+        let hex = String(repeating: "11", count: 32)
+        let npub = try? Bech32.encode(hrp: "npub", data: Data(hexString: hex) ?? Data())
+
+        let key = ChatViewModel.geohashConversationKey(for: npub?.uppercased() ?? "")
+
+        XCTAssertEqual(key, "nostr_" + String(hex.prefix(TransportConfig.nostrConvKeyPrefixLength)))
+    }
+
     func testGeohashShortMappingKeyRejectsInvalidInput() {
         XCTAssertNil(ChatViewModel.geohashShortMappingKey(for: "invalid"))
+    }
+
+    func testGeohashShortMappingKeyAcceptsNpubInput() {
+        let hex = String(repeating: "22", count: 32)
+        let npub = try? Bech32.encode(hrp: "npub", data: Data(hexString: hex) ?? Data())
+
+        let key = ChatViewModel.geohashShortMappingKey(for: npub?.uppercased() ?? "")
+
+        XCTAssertEqual(key, "nostr:" + String(hex.prefix(TransportConfig.nostrShortKeyDisplayLength)))
     }
 
     func testNostrDisplaySuffixUsesCanonicalizedNostrKeyWhenAvailable() {
