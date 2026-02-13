@@ -672,6 +672,22 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             )
             self.assertIn("Scanned 1 Swift files before failure.", result.stdout)
 
+    def test_fails_closed_when_swift_path_is_non_regular_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            fifo_path = temp_path / "Stream.swift"
+            try:
+                os.mkfifo(fifo_path)
+            except (AttributeError, NotImplementedError, OSError) as error:
+                self.skipTest(f"FIFO setup not supported in environment: {error}")
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Could not read one or more Swift files", result.stdout)
+            self.assertIn("Stream.swift", result.stdout)
+            self.assertIn("unsupported non-regular Swift path", result.stdout)
+            self.assertIn("Scanned 1 Swift files before failure.", result.stdout)
+
     def test_fails_closed_when_swift_file_path_cannot_be_resolved(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)

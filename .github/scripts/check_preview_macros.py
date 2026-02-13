@@ -341,6 +341,14 @@ def main() -> int:
                 seen_files.add(resolved_file)
                 scanned_files += 1
                 try:
+                    path_stat = swift_file.stat()
+                except OSError as error:
+                    record_unreadable(swift_file, f"cannot inspect file size ({error})")
+                    continue
+                if not stat.S_ISREG(path_stat.st_mode):
+                    record_unreadable(swift_file, "unsupported non-regular Swift path")
+                    continue
+                try:
                     with swift_file.open("rb") as file_handle:
                         file_size_bytes = os.fstat(file_handle.fileno()).st_size
                         if file_size_bytes > MAX_SWIFT_FILE_BYTES:
