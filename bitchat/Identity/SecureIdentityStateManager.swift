@@ -187,6 +187,20 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
         updated[newNickname]?.insert(fingerprint)
         return updated
     }
+
+    static func applyingNostrBlock(
+        _ blockedKeys: Set<String>,
+        key: String,
+        isBlocked: Bool
+    ) -> (updated: Set<String>, changed: Bool) {
+        var updated = blockedKeys
+        if isBlocked {
+            let inserted = updated.insert(key).inserted
+            return (updated, inserted)
+        }
+        let removed = updated.remove(key) != nil
+        return (updated, removed)
+    }
     
     init(_ keychain: KeychainManagerProtocol) {
         self.keychain = keychain
@@ -481,11 +495,13 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     func setNostrBlocked(_ pubkeyHexLowercased: String, isBlocked: Bool) {
         guard let key = Self.canonicalNostrPubkey(pubkeyHexLowercased) else { return }
         queue.async(flags: .barrier) {
-            if isBlocked {
-                self.cache.blockedNostrPubkeys.insert(key)
-            } else {
-                self.cache.blockedNostrPubkeys.remove(key)
-            }
+            let result = Self.applyingNostrBlock(
+                self.cache.blockedNostrPubkeys,
+                key: key,
+                isBlocked: isBlocked
+            )
+            guard result.changed else { return }
+            self.cache.blockedNostrPubkeys = result.updated
             self.saveIdentityCache()
         }
     }

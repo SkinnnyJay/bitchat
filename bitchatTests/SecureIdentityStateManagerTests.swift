@@ -72,4 +72,19 @@ final class SecureIdentityStateManagerTests: XCTestCase {
         XCTAssertNil(SecureIdentityStateManager.canonicalNostrPubkey("abc"))
         XCTAssertNil(SecureIdentityStateManager.canonicalNostrPubkey(String(repeating: "zz", count: 32)))
     }
+
+    func testApplyingNostrBlockReportsChangesOnlyWhenSetMutates() {
+        let key = String(repeating: "ab", count: 32)
+
+        let added = SecureIdentityStateManager.applyingNostrBlock([], key: key, isBlocked: true)
+        XCTAssertTrue(added.changed)
+        XCTAssertTrue(added.updated.contains(key))
+
+        let addedAgain = SecureIdentityStateManager.applyingNostrBlock(added.updated, key: key, isBlocked: true)
+        XCTAssertFalse(addedAgain.changed)
+
+        let removed = SecureIdentityStateManager.applyingNostrBlock(added.updated, key: key, isBlocked: false)
+        XCTAssertTrue(removed.changed)
+        XCTAssertFalse(removed.updated.contains(key))
+    }
 }
