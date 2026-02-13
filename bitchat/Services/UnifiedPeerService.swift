@@ -238,11 +238,11 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     
     // MARK: - Public Methods
 
-    static func lookupKeys(for peerID: String) -> [String] {
+    nonisolated static func lookupKeys(for peerID: String) -> [String] {
         WiFiPeerIdentity.lookupKeys(for: peerID)
     }
 
-    static func resolvePeer(from peerIndex: [String: BitchatPeer], peerID: String) -> BitchatPeer? {
+    nonisolated static func resolvePeer(from peerIndex: [String: BitchatPeer], peerID: String) -> BitchatPeer? {
         let lookupKeys = lookupKeys(for: peerID)
         guard !lookupKeys.isEmpty else { return nil }
 
@@ -331,7 +331,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         return candidateFingerprintsByKey[preferredKey]
     }
 
-    static func shouldSortPeer(_ lhs: BitchatPeer, _ rhs: BitchatPeer) -> Bool {
+    nonisolated static func shouldSortPeer(_ lhs: BitchatPeer, _ rhs: BitchatPeer) -> Bool {
         // Connectivity rank: connected > reachable > others
         func rank(_ peer: BitchatPeer) -> Int {
             peer.isConnected ? 2 : (peer.isReachable ? 1 : 0)

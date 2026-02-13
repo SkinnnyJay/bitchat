@@ -35,11 +35,11 @@ final class FavoritesPersistenceService: ObservableObject {
     
     static let shared = FavoritesPersistenceService()
 
-    static func isValidFavoriteNoisePublicKey(_ peerNoisePublicKey: Data) -> Bool {
+    nonisolated static func isValidFavoriteNoisePublicKey(_ peerNoisePublicKey: Data) -> Bool {
         peerNoisePublicKey.count == 32
     }
 
-    static func sanitizedNostrPublicKey(_ peerNostrPublicKey: String?) -> String? {
+    nonisolated static func sanitizedNostrPublicKey(_ peerNostrPublicKey: String?) -> String? {
         guard let peerNostrPublicKey else { return nil }
         let trimmed = peerNostrPublicKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -49,7 +49,7 @@ final class FavoritesPersistenceService: ObservableObject {
         return NostrKeyNormalizer.canonicalHex(trimmed)
     }
 
-    static func sanitizedPeerNickname(_ peerNickname: String?) -> String {
+    nonisolated static func sanitizedPeerNickname(_ peerNickname: String?) -> String {
         if let peerNickname,
            let sanitizedNickname = InputValidator.validateNickname(peerNickname) {
             return sanitizedNickname
@@ -57,7 +57,7 @@ final class FavoritesPersistenceService: ObservableObject {
         return "user"
     }
 
-    static func sanitizedFavoriteRelationship(_ relationship: FavoriteRelationship) -> FavoriteRelationship? {
+    nonisolated static func sanitizedFavoriteRelationship(_ relationship: FavoriteRelationship) -> FavoriteRelationship? {
         guard isValidFavoriteNoisePublicKey(relationship.peerNoisePublicKey) else {
             return nil
         }
@@ -72,14 +72,14 @@ final class FavoritesPersistenceService: ObservableObject {
         )
     }
 
-    static func shouldPersistCleanedRelationships(
+    nonisolated static func shouldPersistCleanedRelationships(
         decoded: [FavoriteRelationship],
         cleaned: [FavoriteRelationship]
     ) -> Bool {
         decoded != cleaned
     }
 
-    static func shouldPreferFavoriteRelationship(
+    nonisolated static func shouldPreferFavoriteRelationship(
         _ candidate: FavoriteRelationship,
         over existing: FavoriteRelationship
     ) -> Bool {

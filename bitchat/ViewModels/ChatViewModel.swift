@@ -3071,7 +3071,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             return direct
         }
         if let match = unifiedPeerService.peers.first(where: {
-            WiFiPeerIdentity.isEquivalent($0.peerID, senderPeerID)
+            WiFiPeerIdentity.isEquivalent($0.peerID.id, senderPeerID)
         }) {
             return match.nickname
         }
@@ -4681,7 +4681,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         guard !normalizedTarget.isEmpty else { return nil }
         return peerNicknames.first { candidate, nickname in
             guard InputValidator.validateNickname(nickname) != nil else { return false }
-            WiFiPeerIdentity.normalizedKey(candidate.id) == normalizedTarget
+            return WiFiPeerIdentity.normalizedKey(candidate.id) == normalizedTarget
         }.flatMap { InputValidator.validateNickname($0.value) }
     }
     
@@ -5536,7 +5536,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             }
 
             // Validate recipient
-            if !Self.isRecipientForLocalPeer(packet.recipientID, localPeerID: meshService.myPeerID) {
+            if !Self.isRecipientForLocalPeer(packet.recipientID, localPeerID: meshService.myPeerID.id) {
                 return
             }
 

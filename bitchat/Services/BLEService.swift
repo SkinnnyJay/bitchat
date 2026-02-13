@@ -1971,7 +1971,7 @@ extension BLEService {
                     deduped.append(item)
                 }
             }
-            let bounded = Array(deduped.prefix(TransportConfig.outboxPerPeerCap))
+            let bounded = Array(deduped.prefix(TransportConfig.messageRouterOutboxPerPeerCap))
             return bounded
         }
         
