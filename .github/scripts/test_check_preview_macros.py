@@ -274,6 +274,18 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         self.assertEqual(matches, [])
         self.assertEqual(parse_error, "unmatched block comment closer at line 3")
 
+    def test_reports_parse_state_for_excessive_block_comment_nesting(self) -> None:
+        content = "/* /* /* */ */ */\n#Preview { Text(\"real preview\") }\n"
+        with mock.patch.object(check_preview_macros, "MAX_BLOCK_COMMENT_NESTING", 2):
+            matches, parse_error = check_preview_macros.find_token_line_numbers_with_state(
+                content, "#Preview"
+            )
+        self.assertEqual(matches, [])
+        self.assertEqual(
+            parse_error,
+            "block comment nesting exceeds maximum supported depth (2) at line 1",
+        )
+
     def test_randomized_inputs_never_raise_parser_exceptions(self) -> None:
         rng = random.Random(20260213)
         alphabet = string.ascii_letters + string.digits + string.punctuation + " \t\nαβ🙂"
@@ -1686,6 +1698,31 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not reliably parse one or more Swift files", result.stdout)
             self.assertIn("UnmatchedBlockCloser.swift", result.stdout)
             self.assertIn("unmatched block comment closer", result.stdout)
+
+    def test_fails_closed_on_excessive_block_comment_nesting(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "NestedBlockCommentDepth.swift"
+            swift_file.write_text(
+                "/* /* /* */ */ */\n#Preview { Text(\"not reliably parseable\") }\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(check_preview_macros, "MAX_BLOCK_COMMENT_NESTING", 2):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not reliably parse one or more Swift files", output)
+            self.assertIn("NestedBlockCommentDepth.swift", output)
+            self.assertIn(
+                "block comment nesting exceeds maximum supported depth (2) at line 1",
+                output,
+            )
+            self.assertIn("Failure summary: 0 unreadable, 1 parse errors, 0 token matches.", output)
 
 
 if __name__ == "__main__":

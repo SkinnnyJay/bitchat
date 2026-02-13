@@ -34,6 +34,7 @@ MAX_TRACKED_TOKEN_MATCH_FILES = 200
 MAX_REPORTED_TOKEN_MATCH_FILES = 200
 MAX_REPORTED_LINE_NUMBERS_PER_FILE = 50
 MAX_TRACKED_LINE_NUMBERS_PER_FILE = 200
+MAX_BLOCK_COMMENT_NESTING = 4096
 MAX_REPORTED_ROOTS_IN_SUMMARY = 20
 MAX_DIAGNOSTIC_TEXT_CHARS = 512
 DISALLOWED_CONTROL_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn"}
@@ -229,6 +230,13 @@ def find_token_matches_with_state(
 
             if block_comment_starts:
                 if next_pair == "/*":
+                    if len(block_comment_starts) >= MAX_BLOCK_COMMENT_NESTING:
+                        return (
+                            matches,
+                            match_count,
+                            "block comment nesting exceeds maximum supported depth "
+                            f"({MAX_BLOCK_COMMENT_NESTING}) at line {line_number}",
+                        )
                     block_comment_starts.append(line_number)
                     cursor += 2
                     continue
@@ -244,6 +252,13 @@ def find_token_matches_with_state(
             if next_pair == "*/":
                 return matches, match_count, f"unmatched block comment closer at line {line_number}"
             if next_pair == "/*":
+                if len(block_comment_starts) >= MAX_BLOCK_COMMENT_NESTING:
+                    return (
+                        matches,
+                        match_count,
+                        "block comment nesting exceeds maximum supported depth "
+                        f"({MAX_BLOCK_COMMENT_NESTING}) at line {line_number}",
+                    )
                 block_comment_starts.append(line_number)
                 cursor += 2
                 continue
