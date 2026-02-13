@@ -259,6 +259,13 @@ def format_resolve_path_error(error: OSError) -> str:
     return f"cannot resolve path ({error})"
 
 
+def format_resolve_runtime_error(error: RuntimeError) -> str:
+    message = str(error).strip()
+    if not message:
+        return "cannot resolve path (runtime failure)"
+    return f"cannot resolve path (runtime failure: {message})"
+
+
 def format_file_inspection_error(error: OSError) -> str:
     if error.errno == errno.ELOOP:
         return f"cannot inspect file (symlink loop: {error})"
@@ -714,7 +721,7 @@ def main() -> int:
         try:
             root_key = root.resolve(strict=False)
         except RuntimeError as error:
-            invalid_roots[str(root)] = f"cannot resolve path ({error})"
+            invalid_roots[str(root)] = format_resolve_runtime_error(error)
             continue
         except OSError:
             root_key = Path(os.path.abspath(root))
@@ -977,19 +984,24 @@ def main() -> int:
                     continue
                 try:
                     resolved_file = swift_file.resolve()
-                except (RuntimeError, OSError) as error:
+                except RuntimeError as error:
                     if unresolved_key in seen_files:
                         continue
                     if not try_add_seen_file_key(unresolved_key):
                         break
                     if not try_increment_scanned_files():
                         break
-                    resolve_error = (
-                        format_resolve_path_error(error)
-                        if isinstance(error, OSError)
-                        else f"cannot resolve path ({error})"
-                    )
-                    if not record_unreadable(swift_file, resolve_error):
+                    if not record_unreadable(swift_file, format_resolve_runtime_error(error)):
+                        break
+                    continue
+                except OSError as error:
+                    if unresolved_key in seen_files:
+                        continue
+                    if not try_add_seen_file_key(unresolved_key):
+                        break
+                    if not try_increment_scanned_files():
+                        break
+                    if not record_unreadable(swift_file, format_resolve_path_error(error)):
                         break
                     continue
                 if resolved_file in seen_files:

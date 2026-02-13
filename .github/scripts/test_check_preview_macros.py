@@ -768,6 +768,13 @@ class PreviewMacroUtilityTests(unittest.TestCase):
             check_preview_macros.format_resolve_path_error(error),
         )
 
+    def test_formats_resolve_runtime_error_with_context(self) -> None:
+        error = RuntimeError("simulated resolution recursion")
+        self.assertEqual(
+            check_preview_macros.format_resolve_runtime_error(error),
+            "cannot resolve path (runtime failure: simulated resolution recursion)",
+        )
+
     def test_formats_file_inspection_error_for_permission_denied(self) -> None:
         error = OSError(errno.EACCES, "permission denied")
         self.assertIn(
@@ -2980,6 +2987,35 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("ResolveLoop.swift", output)
             self.assertIn("cannot resolve path (symlink loop:", output)
+            self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
+
+    def test_formats_runtime_file_resolve_errors_with_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            problematic_file = temp_path / "ResolveRuntime.swift"
+            problematic_file.write_text("struct ResolveRuntime {}\n", encoding="utf-8")
+
+            original_resolve = pathlib.Path.resolve
+
+            def raising_resolve(path: pathlib.Path, strict: bool = False) -> pathlib.Path:
+                if path == problematic_file:
+                    raise RuntimeError("simulated resolution recursion")
+                return original_resolve(path, strict=strict)
+
+            with mock.patch.object(pathlib.Path, "resolve", new=raising_resolve):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not read one or more Swift files", output)
+            self.assertIn("ResolveRuntime.swift", output)
+            self.assertIn(
+                "cannot resolve path (runtime failure: simulated resolution recursion)",
+                output,
+            )
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
 
     def test_prunes_uninspectable_subdirectory_before_traversal(self) -> None:
