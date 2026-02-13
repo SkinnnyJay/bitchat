@@ -240,11 +240,12 @@ final class CommandProcessor {
             return .success(message: "blocked \(nickname). you will no longer receive messages from them")
         }
         // Mesh lookup failed; try geohash (Nostr) participant by display name
-        if let pub = chatViewModel?.nostrPubkeyForDisplayName(nickname) {
-            if identityManager.isNostrBlocked(pubkeyHexLowercased: pub) {
+        if let pub = chatViewModel?.nostrPubkeyForDisplayName(nickname),
+           let canonicalPub = Self.canonicalNostrBlockKey(pub) {
+            if identityManager.isNostrBlocked(pubkeyHexLowercased: canonicalPub) {
                 return .success(message: "\(nickname) is already blocked")
             }
-            identityManager.setNostrBlocked(pub, isBlocked: true)
+            identityManager.setNostrBlocked(canonicalPub, isBlocked: true)
             return .success(message: "blocked \(nickname) in geohash chats")
         }
         
@@ -268,11 +269,12 @@ final class CommandProcessor {
             return .success(message: "unblocked \(nickname)")
         }
         // Try geohash unblock
-        if let pub = chatViewModel?.nostrPubkeyForDisplayName(nickname) {
-            if !identityManager.isNostrBlocked(pubkeyHexLowercased: pub) {
+        if let pub = chatViewModel?.nostrPubkeyForDisplayName(nickname),
+           let canonicalPub = Self.canonicalNostrBlockKey(pub) {
+            if !identityManager.isNostrBlocked(pubkeyHexLowercased: canonicalPub) {
                 return .success(message: "\(nickname) is not blocked")
             }
-            identityManager.setNostrBlocked(pub, isBlocked: false)
+            identityManager.setNostrBlocked(canonicalPub, isBlocked: false)
             return .success(message: "unblocked \(nickname) in geohash chats")
         }
         return .error(message: "cannot unblock \(nickname): not found")
@@ -333,6 +335,10 @@ final class CommandProcessor {
 
     static func sanitizedNicknameForIdentity(_ nickname: String) -> String {
         InputValidator.validateNickname(nickname) ?? "user"
+    }
+
+    static func canonicalNostrBlockKey(_ value: String) -> String? {
+        SecureIdentityStateManager.canonicalNostrPubkey(value)
     }
     
     private func handleHelp() -> CommandResult {

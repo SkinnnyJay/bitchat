@@ -111,4 +111,17 @@ final class CommandProcessorTests: XCTestCase {
     func testSanitizedNicknameForIdentityFallsBackToUserForInvalidInput() {
         XCTAssertEqual(CommandProcessor.sanitizedNicknameForIdentity("   "), "user")
     }
+
+    func testCanonicalNostrBlockKeyAcceptsHexAndLowercases() {
+        let uppercaseHex = String(repeating: "AB", count: 32)
+
+        let canonical = CommandProcessor.canonicalNostrBlockKey(uppercaseHex)
+
+        XCTAssertEqual(canonical, String(repeating: "ab", count: 32))
+    }
+
+    func testCanonicalNostrBlockKeyRejectsInvalidValues() {
+        XCTAssertNil(CommandProcessor.canonicalNostrBlockKey("abc"))
+        XCTAssertNil(CommandProcessor.canonicalNostrBlockKey(String(repeating: "zz", count: 32)))
+    }
 }
