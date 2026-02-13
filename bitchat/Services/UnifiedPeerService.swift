@@ -732,7 +732,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         }
     }
 
-    private static func nicknameMatchPriority(_ peer: BitchatPeer) -> Int {
+    nonisolated private static func nicknameMatchPriority(_ peer: BitchatPeer) -> Int {
         if peer.isConnected { return 3 }
         if peer.isReachable { return 2 }
         if peer.isMutualFavorite { return 1 }
