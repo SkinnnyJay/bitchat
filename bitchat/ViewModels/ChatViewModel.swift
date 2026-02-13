@@ -2092,7 +2092,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         let lowerPeer = peerID.lowercased()
         guard lowerPeer.hasPrefix("nostr") else { return false }
 
-        if let mapped = nostrKeyMapping[peerID]?.lowercased(),
+        if let mapped = Self.resolvedBlockedNostrPubkey(
+            senderPeerID: peerID,
+            nostrKeyMapping: nostrKeyMapping
+        ),
            let gh = currentGeohash,
            let myIdentity = try? NostrIdentityBridge.deriveIdentity(forGeohash: gh) {
             if mapped == myIdentity.publicKeyHex.lowercased() { return true }
@@ -2170,7 +2173,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             if var arr = geoTimelines[gh] {
                 arr.removeAll { msg in
                     if let spid = msg.senderPeerID?.id, spid.hasPrefix("nostr") {
-                        if let full = nostrKeyMapping[spid]?.lowercased() { return full == hex }
+                        if let full = Self.resolvedBlockedNostrPubkey(
+                            senderPeerID: spid,
+                            nostrKeyMapping: nostrKeyMapping
+                        ) { return full == hex }
                     }
                     return false
                 }
@@ -2181,7 +2187,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             case .location:
                 messages.removeAll { msg in
                     if let spid = msg.senderPeerID?.id , spid.hasPrefix("nostr") {
-                        if let full = nostrKeyMapping[spid]?.lowercased() { return full == hex }
+                        if let full = Self.resolvedBlockedNostrPubkey(
+                            senderPeerID: spid,
+                            nostrKeyMapping: nostrKeyMapping
+                        ) { return full == hex }
                     }
                     return false
                 }
@@ -2574,7 +2583,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         objectWillChange.send()
 
         // Resolve recipient hex from mapping
-        guard let recipientHex = nostrKeyMapping[peerID] else {
+        guard let recipientHex = nostrKeyMapping[peerID]
+            .flatMap(Self.canonicalNostrPubkeyHex) else {
             if let msgIdx = privateChats[peerID]?.firstIndex(where: { $0.id == messageID }) {
                 privateChats[peerID]?[msgIdx].deliveryStatus = .failed(
                     reason: String(localized: "content.delivery.reason.unknown_recipient", comment: "Failure reason when the recipient is unknown")
@@ -2942,9 +2952,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Store the Nostr pubkey if provided (for messages from unknown senders)
         if let nostrPubkey = notification.userInfo?["nostrPubkey"] as? String,
+           let canonicalNostrPubkey = Self.canonicalNostrPubkeyHex(nostrPubkey),
            let senderPeerID = message.senderPeerID?.id {
             // Store mapping for read receipts
-            nostrKeyMapping[senderPeerID] = nostrPubkey
+            nostrKeyMapping[senderPeerID] = canonicalNostrPubkey
         }
         
         // Process the Nostr message through the same flow as Bluetooth messages
@@ -3352,7 +3363,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Handle GeoDM (nostr_*) read receipts directly via per-geohash identity
         if peerID.hasPrefix("nostr_"),
-           let recipientHex = nostrKeyMapping[peerID],
+           let recipientHex = nostrKeyMapping[peerID]
+                .flatMap(Self.canonicalNostrPubkeyHex),
            case .location(let ch) = LocationChannelManager.shared.selectedChannel,
            let id = try? NostrIdentityBridge.deriveIdentity(forGeohash: ch.geohash) {
             let messages = privateChats[peerID] ?? []
