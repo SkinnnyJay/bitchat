@@ -142,6 +142,54 @@ final class FavoritesPersistenceServiceTests: XCTestCase {
         )
     }
 
+    func testShouldPreferFavoriteRelationshipPrefersMutualState() {
+        let baseDate = Date(timeIntervalSince1970: 10)
+        let existing = FavoritesPersistenceService.FavoriteRelationship(
+            peerNoisePublicKey: Data(repeating: 0x11, count: 32),
+            peerNostrPublicKey: nil,
+            peerNickname: "alice",
+            isFavorite: true,
+            theyFavoritedUs: false,
+            favoritedAt: baseDate,
+            lastUpdated: baseDate
+        )
+        let candidate = FavoritesPersistenceService.FavoriteRelationship(
+            peerNoisePublicKey: Data(repeating: 0x11, count: 32),
+            peerNostrPublicKey: nil,
+            peerNickname: "alice",
+            isFavorite: true,
+            theyFavoritedUs: true,
+            favoritedAt: baseDate,
+            lastUpdated: baseDate
+        )
+
+        XCTAssertTrue(FavoritesPersistenceService.shouldPreferFavoriteRelationship(candidate, over: existing))
+    }
+
+    func testShouldPreferFavoriteRelationshipPrefersEntryWithNostrKeyWhenStateEqual() {
+        let baseDate = Date(timeIntervalSince1970: 10)
+        let existing = FavoritesPersistenceService.FavoriteRelationship(
+            peerNoisePublicKey: Data(repeating: 0x11, count: 32),
+            peerNostrPublicKey: nil,
+            peerNickname: "alice",
+            isFavorite: true,
+            theyFavoritedUs: false,
+            favoritedAt: baseDate,
+            lastUpdated: baseDate
+        )
+        let candidate = FavoritesPersistenceService.FavoriteRelationship(
+            peerNoisePublicKey: Data(repeating: 0x11, count: 32),
+            peerNostrPublicKey: String(repeating: "ab", count: 32),
+            peerNickname: "alice",
+            isFavorite: true,
+            theyFavoritedUs: false,
+            favoritedAt: baseDate,
+            lastUpdated: baseDate
+        )
+
+        XCTAssertTrue(FavoritesPersistenceService.shouldPreferFavoriteRelationship(candidate, over: existing))
+    }
+
     @MainActor
     func testGetFavoriteStatusForPeerIDAcceptsFullNoisePeerID() {
         let fullNoiseHex = String(repeating: "ab", count: 32)

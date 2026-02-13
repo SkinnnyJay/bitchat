@@ -86,6 +86,30 @@ final class FavoritesPersistenceService: ObservableObject {
     ) -> Bool {
         decoded != cleaned
     }
+
+    static func shouldPreferFavoriteRelationship(
+        _ candidate: FavoriteRelationship,
+        over existing: FavoriteRelationship
+    ) -> Bool {
+        if candidate.isMutual != existing.isMutual {
+            return candidate.isMutual
+        }
+        if candidate.isFavorite != existing.isFavorite {
+            return candidate.isFavorite
+        }
+        if candidate.theyFavoritedUs != existing.theyFavoritedUs {
+            return candidate.theyFavoritedUs
+        }
+        let candidateHasNostrKey = candidate.peerNostrPublicKey != nil
+        let existingHasNostrKey = existing.peerNostrPublicKey != nil
+        if candidateHasNostrKey != existingHasNostrKey {
+            return candidateHasNostrKey
+        }
+        if candidate.lastUpdated != existing.lastUpdated {
+            return candidate.lastUpdated > existing.lastUpdated
+        }
+        return candidate.peerNickname < existing.peerNickname
+    }
     
     private init() {
         loadFavorites()
@@ -331,8 +355,7 @@ final class FavoritesPersistenceService: ObservableObject {
                     SecureLogger.warning("⚠️ Duplicate favorite found for public key \(relationship.peerNoisePublicKey.hexEncodedString()) - nicknames: '\(existing.peerNickname)' vs '\(relationship.peerNickname)'", category: .session)
                     
                     // Keep the most recent or most complete relationship
-                    if relationship.lastUpdated > existing.lastUpdated ||
-                       (relationship.peerNostrPublicKey != nil && existing.peerNostrPublicKey == nil) {
+                    if Self.shouldPreferFavoriteRelationship(relationship, over: existing) {
                         // Replace with newer/more complete entry
                         seenPublicKeys[relationship.peerNoisePublicKey] = relationship
                         cleanedRelationships.removeAll { $0.peerNoisePublicKey == relationship.peerNoisePublicKey }
