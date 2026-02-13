@@ -2208,23 +2208,24 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     private func subscribeNostrEvent(_ event: NostrEvent, gh: String) {
         guard event.kind == NostrProtocol.EventKind.ephemeralEvent.rawValue else { return }
+        guard let canonicalPubkey = Self.canonicalNostrPubkeyHex(event.pubkey) else { return }
         
         // Compute current participant count (5-minute window) BEFORE updating with this event
         let cutoff = Date().addingTimeInterval(-TransportConfig.uiRecentCutoffFiveMinutesSeconds)
         let existingCount = geoParticipants[gh]?.values.filter { $0 >= cutoff }.count ?? 0
         
         // Update participants for this specific geohash
-        recordGeoParticipant(pubkeyHex: event.pubkey, geohash: gh)
+        recordGeoParticipant(pubkeyHex: canonicalPubkey, geohash: gh)
         
         // Notify only on rising-edge: previously zero people, now someone sends a chat
         let content = event.content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !content.isEmpty else { return }
         
         // Respect geohash blocks
-        if identityManager.isNostrBlocked(pubkeyHexLowercased: event.pubkey.lowercased()) { return }
+        if identityManager.isNostrBlocked(pubkeyHexLowercased: canonicalPubkey) { return }
         
         // Skip self identity for this geohash
-        if let my = try? NostrIdentityBridge.deriveIdentity(forGeohash: gh), my.publicKeyHex.lowercased() == event.pubkey.lowercased() { return }
+        if let my = try? NostrIdentityBridge.deriveIdentity(forGeohash: gh), my.publicKeyHex.lowercased() == canonicalPubkey { return }
         
         // Only trigger when there were zero participants in this geohash recently
         guard existingCount == 0 else { return }
@@ -2242,10 +2243,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         if case .location(let ch) = activeChannel, ch.geohash == gh { return }
         #endif
         
-        cooldownPerGeohash(gh, content: content, event: event)
+        cooldownPerGeohash(gh, content: content, event: event, senderPubkey: canonicalPubkey)
     }
     
-    private func cooldownPerGeohash(_ gh: String, content: String, event: NostrEvent) {
+    private func cooldownPerGeohash(_ gh: String, content: String, event: NostrEvent, senderPubkey: String) {
         let now = Date()
         let last = lastGeoNotificationAt[gh] ?? .distantPast
         if now.timeIntervalSince(last) < TransportConfig.uiGeoNotifyCooldownSeconds { return }
@@ -2262,8 +2263,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             lastGeoNotificationAt[gh] = now
             // Pre-populate the target geohash timeline so the triggering message appears when user opens it
             var arr = geoTimelines[gh] ?? []
-            let senderSuffix = String(event.pubkey.suffix(4))
-            let nick = geoNicknames[event.pubkey.lowercased()]
+            let senderSuffix = String(senderPubkey.suffix(4))
+            let nick = geoNicknames[senderPubkey]
             let senderName = (nick?.isEmpty == false ? nick! : "anon") + "#" + senderSuffix
             
             // Clamp future timestamps
@@ -2276,7 +2277,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 content: content,
                 timestamp: ts,
                 isRelay: false,
-                senderPeerID: PeerID(nostr: event.pubkey),
+                senderPeerID: PeerID(nostr: senderPubkey),
                 mentions: mentions.isEmpty ? nil : mentions
             )
             if !arr.contains(where: { $0.id == msg.id }) {
