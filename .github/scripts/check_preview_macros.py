@@ -25,6 +25,7 @@ MAX_TOTAL_SCANNED_SWIFT_BYTES = 512 * 1024 * 1024
 MAX_VISITED_DIRECTORIES = 200000
 MAX_DIRECTORY_ENTRIES_PER_DIRECTORY = 200000
 MAX_TOTAL_DIRECTORY_ENTRIES = 2_000_000
+MAX_TOTAL_PARSED_SWIFT_LINES = 20_000_000
 MAX_ROOT_BYTES = 4096
 MAX_ROOT_COUNT = 128
 MAX_REPORTED_INVALID_ROOTS = 200
@@ -190,7 +191,7 @@ def find_token_matches_with_state(
     token: str,
     *,
     max_tracked_line_numbers: int | None = None,
-) -> tuple[list[int], int, str | None]:
+) -> tuple[list[int], int, str | None, int]:
     """
     Return tracked 1-based line numbers, total match count, and parse state error.
     """
@@ -201,6 +202,7 @@ def find_token_matches_with_state(
     pattern = re.compile(rf"(?<![\w#]){re.escape(token)}{right_boundary}")
     matches: list[int] = []
     match_count = 0
+    processed_line_count = 0
     block_comment_starts: list[int] = []
     active_string_hashes: int | None = None
     active_string_is_multiline = False
@@ -245,12 +247,14 @@ def find_token_matches_with_state(
         return line[index - len(escape_prefix) : index] == escape_prefix
 
     for line_number, line in iter_content_lines(content):
+        processed_line_count = line_number
         if line_number > MAX_SWIFT_FILE_LINES:
             return (
                 matches,
                 match_count,
                 "Swift file exceeds maximum supported line count "
                 f"({MAX_SWIFT_FILE_LINES})",
+                processed_line_count,
             )
         if len(line) > MAX_SWIFT_LINE_CHARS:
             return (
@@ -258,6 +262,7 @@ def find_token_matches_with_state(
                 match_count,
                 "Swift line exceeds maximum supported character count "
                 f"({MAX_SWIFT_LINE_CHARS}) at line {line_number}",
+                processed_line_count,
             )
         cursor = 0
         code_chars: list[str] = []
@@ -307,6 +312,7 @@ def find_token_matches_with_state(
                             match_count,
                             "block comment nesting exceeds maximum supported depth "
                             f"({MAX_BLOCK_COMMENT_NESTING}) at line {line_number}",
+                            processed_line_count,
                         )
                     block_comment_starts.append(line_number)
                     cursor += 2
@@ -321,7 +327,12 @@ def find_token_matches_with_state(
             if next_pair == "//":
                 break
             if next_pair == "*/":
-                return matches, match_count, f"unmatched block comment closer at line {line_number}"
+                return (
+                    matches,
+                    match_count,
+                    f"unmatched block comment closer at line {line_number}",
+                    processed_line_count,
+                )
             if next_pair == "/*":
                 if len(block_comment_starts) >= MAX_BLOCK_COMMENT_NESTING:
                     return (
@@ -329,6 +340,7 @@ def find_token_matches_with_state(
                         match_count,
                         "block comment nesting exceeds maximum supported depth "
                         f"({MAX_BLOCK_COMMENT_NESTING}) at line {line_number}",
+                        processed_line_count,
                     )
                 block_comment_starts.append(line_number)
                 cursor += 2
@@ -349,6 +361,7 @@ def find_token_matches_with_state(
                         match_count,
                         "raw string delimiter exceeds maximum supported hash count "
                         f"({MAX_RAW_STRING_DELIMITER_HASHES}) at line {line_number}",
+                        processed_line_count,
                     )
                 active_string_is_multiline = is_multiline
                 active_string_close_token = (
@@ -367,6 +380,7 @@ def find_token_matches_with_state(
                 matches,
                 match_count,
                 f"unterminated single-line string literal (opened at line {start_line})",
+                processed_line_count,
             )
 
         code_segment = "".join(code_chars)
@@ -380,6 +394,7 @@ def find_token_matches_with_state(
             matches,
             match_count,
             f"unterminated block comment (opened at line {block_comment_starts[0]})",
+            processed_line_count,
         )
     if active_string_hashes is not None and active_string_is_multiline:
         start_line = active_string_start_line or 1
@@ -387,13 +402,14 @@ def find_token_matches_with_state(
             matches,
             match_count,
             f"unterminated multiline string literal (opened at line {start_line})",
+            processed_line_count,
         )
 
-    return matches, match_count, None
+    return matches, match_count, None, processed_line_count
 
 
 def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[int], str | None]:
-    matches, _, parse_error = find_token_matches_with_state(content, token)
+    matches, _, parse_error, _ = find_token_matches_with_state(content, token)
     return matches, parse_error
 
 
@@ -518,11 +534,13 @@ def main() -> int:
     directory_entries_limit_reached = False
     directory_entries_limit_path: Path | None = None
     total_directory_entries_limit_reached = False
+    parsed_lines_limit_reached = False
     unreadable_limit_reached = False
     parse_error_limit_reached = False
     scanned_swift_bytes = 0
     visited_directories = 0
     processed_directory_entries = 0
+    parsed_swift_lines = 0
 
     def report_path(path: Path) -> Path:
         try:
@@ -594,6 +612,7 @@ def main() -> int:
             or directory_limit_reached
             or directory_entries_limit_reached
             or total_directory_entries_limit_reached
+            or parsed_lines_limit_reached
             or unreadable_limit_reached
             or parse_error_limit_reached
         )
@@ -769,11 +788,15 @@ def main() -> int:
                     if not record_unreadable(swift_file, str(error)):
                         break
                     continue
-                line_numbers, line_number_count, parse_error = find_token_matches_with_state(
+                line_numbers, line_number_count, parse_error, parsed_line_count = find_token_matches_with_state(
                     content,
                     token,
                     max_tracked_line_numbers=MAX_TRACKED_LINE_NUMBERS_PER_FILE,
                 )
+                parsed_swift_lines += parsed_line_count
+                if parsed_swift_lines > MAX_TOTAL_PARSED_SWIFT_LINES:
+                    parsed_lines_limit_reached = True
+                    break
                 reported_swift_file = report_path(swift_file)
                 if parse_error is not None:
                     if not record_parse_error(reported_swift_file, parse_error):
@@ -877,6 +900,12 @@ def main() -> int:
             "Scan aborted after reaching maximum total directory-entry limit "
             f"({MAX_TOTAL_DIRECTORY_ENTRIES})."
         )
+    if parsed_lines_limit_reached:
+        has_failure = True
+        print(
+            "Scan aborted after reaching maximum total parsed Swift line limit "
+            f"({MAX_TOTAL_PARSED_SWIFT_LINES})."
+        )
     if scanned_bytes_limit_reached:
         has_failure = True
         print(
@@ -906,6 +935,7 @@ def main() -> int:
         print(f"Scanned {scanned_files} Swift files before failure.")
         print(f"Visited {visited_directories} directories before failure.")
         print(f"Processed {processed_directory_entries} directory entries before failure.")
+        print(f"Parsed {parsed_swift_lines} Swift lines before failure.")
         print(f"Read {scanned_swift_bytes} Swift bytes before failure.")
         return 1
 

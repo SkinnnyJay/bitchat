@@ -684,6 +684,27 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Scanned 1 Swift files before failure.", output)
             self.assertIn("Read 0 Swift bytes before failure.", output)
 
+    def test_fails_closed_when_total_parsed_line_limit_is_reached(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            (temp_path / "A.swift").write_text("line1\nline2\n", encoding="utf-8")
+
+            with mock.patch.object(check_preview_macros, "MAX_TOTAL_PARSED_SWIFT_LINES", 1):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn(
+                "Scan aborted after reaching maximum total parsed Swift line limit (1).",
+                output,
+            )
+            self.assertIn("Failure summary: 0 unreadable, 0 parse errors, 0 token matches.", output)
+            self.assertIn("Scanned 1 Swift files before failure.", output)
+            self.assertIn("Parsed 2 Swift lines before failure.", output)
+
     def test_fails_closed_when_directory_visit_limit_is_reached(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)
@@ -1134,7 +1155,7 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
                 mock.patch.object(
                     check_preview_macros,
                     "find_token_matches_with_state",
-                    return_value=([], 0, long_reason),
+                    return_value=([], 0, long_reason, 1),
                 ),
             ):
                 return_code, output = self.run_main_with_args(
