@@ -9,6 +9,7 @@ This enforces PreviewProvider-only previews to avoid toolchain-specific
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import re
 import sys
@@ -236,33 +237,54 @@ def main() -> int:
     parse_error_files: dict[Path, str] = {}
 
     for root in roots:
-        for swift_file in sorted(root.rglob("*.swift")):
-            try:
-                resolved_file = swift_file.resolve()
-            except (RuntimeError, OSError) as error:
-                unresolved_key = swift_file.absolute()
-                if unresolved_key in seen_files:
+        traversal_errors: dict[Path, str] = {}
+
+        def record_walk_error(error: OSError) -> None:
+            error_path = Path(error.filename) if error.filename is not None else root
+            traversal_errors[error_path] = str(error)
+
+        for directory, subdirectories, filenames in os.walk(
+            root,
+            topdown=True,
+            onerror=record_walk_error,
+            followlinks=False,
+        ):
+            subdirectories.sort()
+            filenames.sort()
+            for filename in filenames:
+                if not filename.endswith(".swift"):
                     continue
-                seen_files.add(unresolved_key)
+
+                swift_file = Path(directory) / filename
+                try:
+                    resolved_file = swift_file.resolve()
+                except (RuntimeError, OSError) as error:
+                    unresolved_key = swift_file.absolute()
+                    if unresolved_key in seen_files:
+                        continue
+                    seen_files.add(unresolved_key)
+                    scanned_files += 1
+                    unreadable_files[swift_file] = f"cannot resolve path ({error})"
+                    continue
+                if resolved_file in seen_files:
+                    continue
+                seen_files.add(resolved_file)
                 scanned_files += 1
-                unreadable_files[swift_file] = f"cannot resolve path ({error})"
-                continue
-            if resolved_file in seen_files:
-                continue
-            seen_files.add(resolved_file)
-            scanned_files += 1
-            try:
-                content = swift_file.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError) as error:
-                unreadable_files[swift_file] = str(error)
-                continue
-            line_numbers, parse_error = find_token_line_numbers_with_state(content, token)
-            if parse_error is not None:
-                parse_error_files[swift_file] = parse_error
-                continue
-            if line_numbers:
-                matches.append(swift_file)
-                matches_with_lines[swift_file] = line_numbers
+                try:
+                    content = swift_file.read_text(encoding="utf-8")
+                except (OSError, UnicodeDecodeError) as error:
+                    unreadable_files[swift_file] = str(error)
+                    continue
+                line_numbers, parse_error = find_token_line_numbers_with_state(content, token)
+                if parse_error is not None:
+                    parse_error_files[swift_file] = parse_error
+                    continue
+                if line_numbers:
+                    matches.append(swift_file)
+                    matches_with_lines[swift_file] = line_numbers
+
+        for error_path, error_message in traversal_errors.items():
+            unreadable_files[error_path] = error_message
 
     has_failure = False
 

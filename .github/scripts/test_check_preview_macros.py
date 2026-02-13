@@ -5,6 +5,7 @@ Unit tests for preview guard token detection behavior.
 
 from __future__ import annotations
 
+import os
 import pathlib
 import subprocess
 import sys
@@ -443,6 +444,34 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
                 "cannot resolve path" in result.stdout or "Too many levels of symbolic links" in result.stdout,
                 msg=result.stdout,
             )
+            self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", result.stdout)
+
+    def test_fails_closed_when_directory_traversal_hits_permission_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            blocked_dir = temp_path / "blocked"
+            blocked_dir.mkdir(parents=True, exist_ok=True)
+            hidden_swift = blocked_dir / "Hidden.swift"
+            hidden_swift.write_text("struct Hidden {}\n", encoding="utf-8")
+
+            try:
+                os.chmod(blocked_dir, 0)
+            except OSError as error:
+                self.skipTest(f"Could not adjust directory permissions for traversal test: {error}")
+
+            if os.access(blocked_dir, os.R_OK | os.X_OK):
+                os.chmod(blocked_dir, 0o755)
+                self.skipTest("Permission restrictions are not enforced in this environment.")
+
+            try:
+                result = self.run_script("--root", temp_dir, "--allow-empty")
+            finally:
+                os.chmod(blocked_dir, 0o755)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.stderr, "")
+            self.assertIn("Could not read one or more Swift files", result.stdout)
+            self.assertIn("blocked", result.stdout)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", result.stdout)
 
     def test_reports_unreadable_and_parse_errors_together(self) -> None:
