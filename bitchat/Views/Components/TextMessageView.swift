@@ -66,32 +66,32 @@ struct TextMessageView: View {
     }
 }
 
-@available(macOS 14, iOS 17, *)
-#Preview {
-    @Previewable @State var ids: Set<String> = []
-    let keychain = PreviewKeychainManager()
-    
-    Group {
-        List {
-            TextMessageView(message: .preview, expandedMessageIDs: $ids)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(EmptyView())
+struct TextMessageView_Previews: PreviewProvider {
+    static var previews: some View {
+        let keychain = PreviewKeychainManager()
+
+        return Group {
+            List {
+                TextMessageView(message: .preview, expandedMessageIDs: .constant([]))
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(EmptyView())
+            }
+            .environment(\.colorScheme, .light)
+
+            List {
+                TextMessageView(message: .preview, expandedMessageIDs: .constant([]))
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(EmptyView())
+            }
+            .environment(\.colorScheme, .dark)
         }
-        .environment(\.colorScheme, .light)
-        
-        List {
-            TextMessageView(message: .preview, expandedMessageIDs: $ids)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(EmptyView())
-        }
-        .environment(\.colorScheme, .dark)
-    }
-    .environmentObject(
-        ChatViewModel(
-            keychain: keychain,
-            identityManager: SecureIdentityStateManager(keychain)
+        .environmentObject(
+            ChatViewModel(
+                keychain: keychain,
+                identityManager: SecureIdentityStateManager(keychain)
+            )
         )
-    )
+    }
 }

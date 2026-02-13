@@ -79,29 +79,33 @@ struct PaymentChipView: View {
     }
 }
 
-#Preview {
-    let cashuLink = "https://example.com/cashu"
-    let lightningLink = "https://example.com/lightning"
-    
-    List {
-        HStack {
-            PaymentChipView(paymentType: .cashu(cashuLink))
-            PaymentChipView(paymentType: .lightning(lightningLink))
-        }
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets())
-        .listRowBackground(EmptyView())
-    }
-    .environment(\.colorScheme, .light)
+struct PaymentChipView_Previews: PreviewProvider {
+    static var previews: some View {
+        let cashuLink = "https://example.com/cashu"
+        let lightningLink = "https://example.com/lightning"
 
-    List {
-        HStack {
-            PaymentChipView(paymentType: .cashu(cashuLink))
-            PaymentChipView(paymentType: .lightning(lightningLink))
+        Group {
+            List {
+                HStack {
+                    PaymentChipView(paymentType: .cashu(cashuLink))
+                    PaymentChipView(paymentType: .lightning(lightningLink))
+                }
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(EmptyView())
+            }
+            .environment(\.colorScheme, .light)
+
+            List {
+                HStack {
+                    PaymentChipView(paymentType: .cashu(cashuLink))
+                    PaymentChipView(paymentType: .lightning(lightningLink))
+                }
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(EmptyView())
+            }
+            .environment(\.colorScheme, .dark)
         }
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets())
-        .listRowBackground(EmptyView())
     }
-    .environment(\.colorScheme, .dark)
 }
