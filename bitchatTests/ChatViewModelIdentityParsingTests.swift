@@ -330,4 +330,40 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
             )
         )
     }
+
+    func testIsRecipientForLocalPeerAcceptsNilRecipientForBroadcastCompatibility() {
+        XCTAssertTrue(
+            ChatViewModel.isRecipientForLocalPeer(
+                nil,
+                localPeerID: "abcdef0123456789"
+            )
+        )
+    }
+
+    func testIsRecipientForLocalPeerMatchesEquivalentRecipientID() {
+        let localPeerID = "mesh:abcdef0123456789"
+        let recipientIDData = Data(hexString: "abcdef0123456789")
+
+        XCTAssertTrue(
+            ChatViewModel.isRecipientForLocalPeer(
+                recipientIDData,
+                localPeerID: localPeerID
+            )
+        )
+    }
+
+    func testIsRecipientForLocalPeerRejectsInvalidRecipientLengthOrMismatch() {
+        XCTAssertFalse(
+            ChatViewModel.isRecipientForLocalPeer(
+                Data(repeating: 0x11, count: 4),
+                localPeerID: "abcdef0123456789"
+            )
+        )
+        XCTAssertFalse(
+            ChatViewModel.isRecipientForLocalPeer(
+                Data(hexString: "0011223344556677"),
+                localPeerID: "abcdef0123456789"
+            )
+        )
+    }
 }

@@ -1407,6 +1407,13 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         return storedCanonicalHex == senderCanonicalHex
     }
 
+    static func isRecipientForLocalPeer(_ recipientIDData: Data?, localPeerID: String) -> Bool {
+        guard let recipientIDData else { return true }
+        guard recipientIDData.count == 8 else { return false }
+        let recipientPeerID = PeerID(hexData: recipientIDData)
+        return WiFiPeerIdentity.isEquivalent(recipientPeerID.id, localPeerID)
+    }
+
     static func favoriteNotificationState(from content: String) -> Bool? {
         let normalized = content.trimmingCharacters(in: .whitespacesAndNewlines)
         if normalized.hasPrefix("[FAVORITED]") || normalized.hasPrefix("FAVORITED") {
@@ -5488,7 +5495,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             }
 
             // Validate recipient
-            if let rid = packet.recipientID, rid.hexEncodedString() != meshService.myPeerID {
+            if !Self.isRecipientForLocalPeer(packet.recipientID, localPeerID: meshService.myPeerID) {
                 return
             }
 
