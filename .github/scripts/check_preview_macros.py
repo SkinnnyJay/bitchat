@@ -239,6 +239,9 @@ def main() -> int:
         if not trimmed_root:
             invalid_roots[raw_root] = "is empty after trimming"
             continue
+        if any(ord(character) < 32 or ord(character) == 127 for character in trimmed_root):
+            invalid_roots[raw_root] = "contains control characters"
+            continue
 
         root = Path(trimmed_root).expanduser()
         try:
