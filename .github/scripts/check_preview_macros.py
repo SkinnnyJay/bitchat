@@ -574,7 +574,11 @@ def main() -> int:
                     if subdirectory_path.is_symlink():
                         symlinked_subdirectories.append(subdirectory_path)
                 except OSError as error:
-                    traversal_errors[subdirectory_path] = f"cannot inspect directory ({error})"
+                    if not record_unreadable(subdirectory_path, f"cannot inspect directory ({error})"):
+                        break
+
+            if should_abort_scan():
+                break
 
             for symlinked_subdirectory in sorted(symlinked_subdirectories):
                 if not record_unreadable(
