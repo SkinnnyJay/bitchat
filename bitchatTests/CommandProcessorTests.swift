@@ -144,4 +144,23 @@ final class CommandProcessorTests: XCTestCase {
         XCTAssertNil(CommandProcessor.canonicalNostrBlockKey("abc"))
         XCTAssertNil(CommandProcessor.canonicalNostrBlockKey(String(repeating: "zz", count: 32)))
     }
+
+    func testCanonicalBlockedDisplayNameIndexCanonicalizesKeys() {
+        let hex = String(repeating: "ab", count: 32)
+        let npub = try? Bech32.encode(hrp: "npub", data: Data(hexString: hex) ?? Data())
+
+        let index = CommandProcessor.canonicalBlockedDisplayNameIndex([
+            (id: npub?.uppercased() ?? "", displayName: "alice")
+        ])
+
+        XCTAssertEqual(index[hex], "alice")
+    }
+
+    func testCanonicalBlockedDisplayNameIndexSkipsInvalidEntries() {
+        let index = CommandProcessor.canonicalBlockedDisplayNameIndex([
+            (id: "npub123", displayName: "bad")
+        ])
+
+        XCTAssertTrue(index.isEmpty)
+    }
 }

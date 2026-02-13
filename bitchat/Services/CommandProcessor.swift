@@ -195,9 +195,12 @@ final class CommandProcessor {
             var geoNames: [String] = []
             if let vm = chatViewModel {
                 let visible = vm.visibleGeohashPeople()
-                let visibleIndex = Dictionary(uniqueKeysWithValues: visible.map { ($0.id.lowercased(), $0.displayName) })
+                let visibleIndex = Self.canonicalBlockedDisplayNameIndex(
+                    visible.map { ($0.id, $0.displayName) }
+                )
                 for pk in geoBlocked {
-                    if let name = visibleIndex[pk.lowercased()] {
+                    if let canonicalPub = Self.canonicalNostrBlockKey(pk),
+                       let name = visibleIndex[canonicalPub] {
                         geoNames.append(name)
                     } else {
                         let suffix = String(pk.suffix(4))
@@ -336,6 +339,15 @@ final class CommandProcessor {
 
     static func canonicalNostrBlockKey(_ value: String) -> String? {
         SecureIdentityStateManager.canonicalNostrPubkey(value)
+    }
+
+    static func canonicalBlockedDisplayNameIndex(_ entries: [(id: String, displayName: String)]) -> [String: String] {
+        var index: [String: String] = [:]
+        for entry in entries {
+            guard let canonical = canonicalNostrBlockKey(entry.id) else { continue }
+            index[canonical] = entry.displayName
+        }
+        return index
     }
     
     private func handleHelp() -> CommandResult {
