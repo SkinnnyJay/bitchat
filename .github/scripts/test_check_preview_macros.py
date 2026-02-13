@@ -94,6 +94,31 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
 
+    def test_detects_preview_after_multiline_string_with_escaped_triple_quote(self) -> None:
+        escaped_triple_quote = "\\" + "\"\"\""
+        content = "\n".join(
+            [
+                "",
+                '            let tricky = """',
+                f"            literal marker {escaped_triple_quote}",
+                "            still string content",
+                '            """',
+                '            #Preview { Text("real preview") }',
+                "        ",
+            ]
+        )
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [6])
+
+    def test_detects_preview_after_raw_multiline_string_with_comment_markers(self) -> None:
+        content = '''
+            let raw = #"""
+            /* not a comment marker */
+            // still string content
+            """#
+            #Preview { Text("real preview") }
+        '''
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [6])
+
     def test_reports_multiple_line_numbers(self) -> None:
         content = """
             #Preview { Text("one") }

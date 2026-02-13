@@ -81,6 +81,9 @@ def find_token_line_numbers(content: str, token: str) -> list[int]:
                 if active_string_is_multiline:
                     multiline_close = '"""' + ("#" * active_string_hashes)
                     if line.startswith(multiline_close, cursor):
+                        if active_string_hashes == 0 and cursor > 0 and line[cursor - 1] == "\\":
+                            cursor += 1
+                            continue
                         cursor += len(multiline_close)
                         active_string_hashes = None
                         active_string_is_multiline = False
