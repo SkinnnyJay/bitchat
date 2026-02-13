@@ -52,7 +52,7 @@ def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[i
     if content.startswith("\ufeff"):
         content = content[1:]
 
-    pattern = re.compile(rf"(?<![A-Za-z0-9_#]){re.escape(token)}\b")
+    pattern = re.compile(rf"(?<![\w#]){re.escape(token)}\b")
     matches: list[int] = []
     block_comment_starts: list[int] = []
     active_string_hashes: int | None = None
