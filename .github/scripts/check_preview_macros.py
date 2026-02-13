@@ -15,6 +15,8 @@ import re
 import stat
 import sys
 
+MAX_TOKEN_BYTES = 256
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -204,6 +206,12 @@ def main() -> int:
         return 1
     if any(ord(character) < 32 or ord(character) == 127 for character in token):
         print("Configured token must not contain control characters.")
+        return 1
+    if len(token.encode("utf-8")) > MAX_TOKEN_BYTES:
+        print(
+            "Configured token is too long; "
+            f"must be at most {MAX_TOKEN_BYTES} UTF-8 bytes."
+        )
         return 1
 
     raw_roots = args.root or ["bitchat", "bitchatShareExtension"]

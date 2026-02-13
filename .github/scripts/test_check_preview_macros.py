@@ -616,6 +616,17 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_fails_when_token_exceeds_max_utf8_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            oversized_token = "#" + ("a" * check_preview_macros.MAX_TOKEN_BYTES)
+            result = self.run_script("--root", temp_dir, "--token", oversized_token)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Configured token is too long", result.stdout)
+            self.assertIn(
+                f"{check_preview_macros.MAX_TOKEN_BYTES} UTF-8 bytes",
+                result.stdout,
+            )
+
     def test_deduplicates_overlapping_roots(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)
