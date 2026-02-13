@@ -37,6 +37,7 @@ MAX_STORED_ERROR_REASON_CHARS = 2048
 MAX_TRACKED_TOKEN_MATCH_FILES = 200
 MAX_REPORTED_TOKEN_MATCH_FILES = 200
 MAX_SWIFT_FILE_LINES = 1_000_000
+MAX_SWIFT_LINE_CHARS = 200_000
 MAX_REPORTED_LINE_NUMBERS_PER_FILE = 50
 MAX_TRACKED_LINE_NUMBERS_PER_FILE = 200
 MAX_BLOCK_COMMENT_NESTING = 4096
@@ -242,6 +243,13 @@ def find_token_matches_with_state(
                 match_count,
                 "Swift file exceeds maximum supported line count "
                 f"({MAX_SWIFT_FILE_LINES})",
+            )
+        if len(line) > MAX_SWIFT_LINE_CHARS:
+            return (
+                matches,
+                match_count,
+                "Swift line exceeds maximum supported character count "
+                f"({MAX_SWIFT_LINE_CHARS}) at line {line_number}",
             )
         cursor = 0
         code_chars: list[str] = []

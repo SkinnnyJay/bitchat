@@ -310,6 +310,18 @@ class PreviewMacroDetectionTests(unittest.TestCase):
             "Swift file exceeds maximum supported line count (2)",
         )
 
+    def test_reports_parse_state_for_excessive_line_length(self) -> None:
+        content = "abcd\n#Preview { Text(\"real preview\") }\n"
+        with mock.patch.object(check_preview_macros, "MAX_SWIFT_LINE_CHARS", 3):
+            matches, parse_error = check_preview_macros.find_token_line_numbers_with_state(
+                content, "#Preview"
+            )
+        self.assertEqual(matches, [])
+        self.assertEqual(
+            parse_error,
+            "Swift line exceeds maximum supported character count (3) at line 1",
+        )
+
     def test_randomized_inputs_never_raise_parser_exceptions(self) -> None:
         rng = random.Random(20260213)
         alphabet = string.ascii_letters + string.digits + string.punctuation + " \t\nαβ🙂"
@@ -1937,6 +1949,28 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not reliably parse one or more Swift files", output)
             self.assertIn("TooManyLines.swift", output)
             self.assertIn("Swift file exceeds maximum supported line count (2)", output)
+            self.assertIn("Failure summary: 0 unreadable, 1 parse errors, 0 token matches.", output)
+
+    def test_fails_closed_on_excessive_file_line_length(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "TooLongLine.swift"
+            swift_file.write_text("abcd\n", encoding="utf-8")
+
+            with mock.patch.object(check_preview_macros, "MAX_SWIFT_LINE_CHARS", 3):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not reliably parse one or more Swift files", output)
+            self.assertIn("TooLongLine.swift", output)
+            self.assertIn(
+                "Swift line exceeds maximum supported character count (3) at line 1",
+                output,
+            )
             self.assertIn("Failure summary: 0 unreadable, 1 parse errors, 0 token matches.", output)
 
 
