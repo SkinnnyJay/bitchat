@@ -50,42 +50,40 @@ def find_token_line_numbers(content: str, token: str) -> list[int]:
     """
     pattern = re.compile(rf"^\s*{re.escape(token)}\b")
     matches: list[int] = []
-    in_block_comment = False
+    block_comment_depth = 0
 
     for line_number, line in enumerate(content.splitlines(), start=1):
         cursor = 0
-        line_has_match = False
+        code_chars: list[str] = []
 
         while cursor < len(line):
-            if in_block_comment:
-                block_end = line.find("*/", cursor)
-                if block_end == -1:
-                    cursor = len(line)
+            next_pair = line[cursor : cursor + 2]
+
+            if block_comment_depth > 0:
+                if next_pair == "/*":
+                    block_comment_depth += 1
+                    cursor += 2
                     continue
-                cursor = block_end + 2
-                in_block_comment = False
+                if next_pair == "*/":
+                    block_comment_depth -= 1
+                    cursor += 2
+                    continue
+                cursor += 1
                 continue
 
-            block_start = line.find("/*", cursor)
-            code_segment = line[cursor:] if block_start == -1 else line[cursor:block_start]
-            inline_comment = code_segment.find("//")
-            if inline_comment != -1:
-                code_segment = code_segment[:inline_comment]
-                block_start = -1
-
-            if pattern.search(code_segment):
-                matches.append(line_number)
-                line_has_match = True
+            if next_pair == "//":
                 break
+            if next_pair == "/*":
+                block_comment_depth += 1
+                cursor += 2
+                continue
 
-            if block_start == -1:
-                cursor = len(line)
-            else:
-                cursor = block_start + 2
-                in_block_comment = True
+            code_chars.append(line[cursor])
+            cursor += 1
 
-        if line_has_match:
-            continue
+        code_segment = "".join(code_chars)
+        if pattern.search(code_segment):
+            matches.append(line_number)
 
     return matches
 
