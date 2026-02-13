@@ -201,6 +201,9 @@ def main() -> int:
     if any(character.isspace() for character in token):
         print("Configured token must not contain whitespace characters.")
         return 1
+    if any(ord(character) < 32 or ord(character) == 127 for character in token):
+        print("Configured token must not contain control characters.")
+        return 1
 
     raw_roots = args.root or ["bitchat", "bitchatShareExtension"]
     roots: list[Path] = []

@@ -545,6 +545,15 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_fails_when_token_contains_control_character(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = self.run_script("--root", temp_dir, "--token", "#My\x01Preview")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "Configured token must not contain control characters.",
+                result.stdout,
+            )
+
     def test_deduplicates_overlapping_roots(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)
