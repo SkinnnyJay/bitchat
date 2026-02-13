@@ -70,6 +70,14 @@ def find_token_line_numbers(content: str, token: str) -> list[int]:
         quote_width = 3 if is_multiline else 1
         return hashes + quote_width, is_multiline
 
+    def backslash_run_length_before(line: str, index: int) -> int:
+        run_length = 0
+        cursor = index - 1
+        while cursor >= 0 and line[cursor] == "\\":
+            run_length += 1
+            cursor -= 1
+        return run_length
+
     for line_number, line in enumerate(content.splitlines(), start=1):
         cursor = 0
         code_chars: list[str] = []
@@ -81,7 +89,10 @@ def find_token_line_numbers(content: str, token: str) -> list[int]:
                 if active_string_is_multiline:
                     multiline_close = '"""' + ("#" * active_string_hashes)
                     if line.startswith(multiline_close, cursor):
-                        if active_string_hashes == 0 and cursor > 0 and line[cursor - 1] == "\\":
+                        if (
+                            active_string_hashes == 0
+                            and backslash_run_length_before(line, cursor) % 2 == 1
+                        ):
                             cursor += 1
                             continue
                         cursor += len(multiline_close)

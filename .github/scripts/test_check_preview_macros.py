@@ -109,6 +109,34 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         )
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [6])
 
+    def test_detects_preview_after_multiline_string_closes_on_even_backslashes(self) -> None:
+        even_backslashes_then_triple_quote = "\\\\" + "\"\"\""
+        content = "\n".join(
+            [
+                "",
+                '            let tricky = """',
+                f"            {even_backslashes_then_triple_quote}",
+                '            #Preview { Text("real preview") }',
+                "        ",
+            ]
+        )
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [4])
+
+    def test_detects_preview_after_multiline_string_with_three_backslashes_before_triple(self) -> None:
+        odd_backslashes_then_triple_quote = "\\\\\\" + "\"\"\""
+        content = "\n".join(
+            [
+                "",
+                '            let tricky = """',
+                f"            marker {odd_backslashes_then_triple_quote}",
+                "            still inside string",
+                '            """',
+                '            #Preview { Text("real preview") }',
+                "        ",
+            ]
+        )
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [6])
+
     def test_detects_preview_after_raw_multiline_string_with_comment_markers(self) -> None:
         content = '''
             let raw = #"""
