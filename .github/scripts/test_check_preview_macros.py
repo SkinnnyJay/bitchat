@@ -754,6 +754,34 @@ class PreviewMacroUtilityTests(unittest.TestCase):
             check_preview_macros.format_directory_inspection_error(error),
         )
 
+    def test_formats_path_access_error_for_permission_denied(self) -> None:
+        error = OSError(errno.EACCES, "permission denied")
+        self.assertIn(
+            "cannot access path (permission denied:",
+            check_preview_macros.format_path_access_error(error),
+        )
+
+    def test_formats_resolve_path_error_for_symlink_loop(self) -> None:
+        error = OSError(errno.ELOOP, "too many levels of symbolic links")
+        self.assertIn(
+            "cannot resolve path (symlink loop:",
+            check_preview_macros.format_resolve_path_error(error),
+        )
+
+    def test_formats_file_inspection_error_for_permission_denied(self) -> None:
+        error = OSError(errno.EACCES, "permission denied")
+        self.assertIn(
+            "cannot inspect file (permission denied:",
+            check_preview_macros.format_file_inspection_error(error),
+        )
+
+    def test_formats_file_metadata_error_for_disappeared_path(self) -> None:
+        error = OSError(errno.ENOENT, "no such file or directory")
+        self.assertIn(
+            "cannot inspect file metadata (path disappeared during scan:",
+            check_preview_macros.format_file_metadata_error(error),
+        )
+
     def test_formats_utf8_decode_error_for_single_byte_position(self) -> None:
         error = UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
         self.assertEqual(
@@ -2896,6 +2924,62 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("problematic", output)
             self.assertIn("cannot inspect directory", output)
+            self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
+
+    def test_formats_permission_denied_file_inspection_errors_with_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            problematic_file = temp_path / "Problematic.swift"
+            problematic_file.write_text("struct Problematic {}\n", encoding="utf-8")
+
+            original_is_symlink = pathlib.Path.is_symlink
+
+            def raising_is_symlink(path: pathlib.Path) -> bool:
+                if path == problematic_file:
+                    raise OSError(errno.EACCES, "permission denied", str(problematic_file))
+                return original_is_symlink(path)
+
+            with mock.patch.object(pathlib.Path, "is_symlink", new=raising_is_symlink):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not read one or more Swift files", output)
+            self.assertIn("Problematic.swift", output)
+            self.assertIn("cannot inspect file (permission denied:", output)
+            self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
+
+    def test_formats_symlink_loop_file_resolve_errors_with_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            problematic_file = temp_path / "ResolveLoop.swift"
+            problematic_file.write_text("struct ResolveLoop {}\n", encoding="utf-8")
+
+            original_resolve = pathlib.Path.resolve
+
+            def raising_resolve(path: pathlib.Path, strict: bool = False) -> pathlib.Path:
+                if path == problematic_file:
+                    raise OSError(
+                        errno.ELOOP,
+                        "too many levels of symbolic links",
+                        str(problematic_file),
+                    )
+                return original_resolve(path, strict=strict)
+
+            with mock.patch.object(pathlib.Path, "resolve", new=raising_resolve):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not read one or more Swift files", output)
+            self.assertIn("ResolveLoop.swift", output)
+            self.assertIn("cannot resolve path (symlink loop:", output)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
 
     def test_prunes_uninspectable_subdirectory_before_traversal(self) -> None:

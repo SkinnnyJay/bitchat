@@ -235,6 +235,54 @@ def format_directory_inspection_error(error: OSError) -> str:
     return f"cannot inspect directory ({error})"
 
 
+def format_path_access_error(error: OSError) -> str:
+    if error.errno == errno.ELOOP:
+        return f"cannot access path (symlink loop: {error})"
+    if error.errno in {errno.ENOTDIR, errno.EISDIR}:
+        return f"cannot access path (non-directory path: {error})"
+    if error.errno in {errno.EACCES, errno.EPERM}:
+        return f"cannot access path (permission denied: {error})"
+    if error.errno == errno.ENOENT:
+        return f"cannot access path (path disappeared during scan: {error})"
+    return f"cannot access path ({error})"
+
+
+def format_resolve_path_error(error: OSError) -> str:
+    if error.errno == errno.ELOOP:
+        return f"cannot resolve path (symlink loop: {error})"
+    if error.errno in {errno.ENOTDIR, errno.EISDIR}:
+        return f"cannot resolve path (non-directory path component: {error})"
+    if error.errno in {errno.EACCES, errno.EPERM}:
+        return f"cannot resolve path (permission denied: {error})"
+    if error.errno == errno.ENOENT:
+        return f"cannot resolve path (path disappeared during scan: {error})"
+    return f"cannot resolve path ({error})"
+
+
+def format_file_inspection_error(error: OSError) -> str:
+    if error.errno == errno.ELOOP:
+        return f"cannot inspect file (symlink loop: {error})"
+    if error.errno in {errno.ENOTDIR, errno.EISDIR}:
+        return f"cannot inspect file (non-regular path: {error})"
+    if error.errno in {errno.EACCES, errno.EPERM}:
+        return f"cannot inspect file (permission denied: {error})"
+    if error.errno == errno.ENOENT:
+        return f"cannot inspect file (path disappeared during scan: {error})"
+    return f"cannot inspect file ({error})"
+
+
+def format_file_metadata_error(error: OSError) -> str:
+    if error.errno == errno.ELOOP:
+        return f"cannot inspect file metadata (symlink loop: {error})"
+    if error.errno in {errno.ENOTDIR, errno.EISDIR}:
+        return f"cannot inspect file metadata (non-regular path: {error})"
+    if error.errno in {errno.EACCES, errno.EPERM}:
+        return f"cannot inspect file metadata (permission denied: {error})"
+    if error.errno == errno.ENOENT:
+        return f"cannot inspect file metadata (path disappeared during scan: {error})"
+    return f"cannot inspect file metadata ({error})"
+
+
 def path_from_error_filename(filename: object, fallback: Path) -> Path:
     if filename is None:
         return fallback
@@ -642,7 +690,7 @@ def main() -> int:
             invalid_roots[str(root)] = "does not exist"
             continue
         except OSError as error:
-            invalid_roots[str(root)] = f"cannot access path ({error})"
+            invalid_roots[str(root)] = format_path_access_error(error)
             continue
 
         root_mode = stat_nonnegative_integer_or_none(root_lstat, "st_mode")
@@ -924,7 +972,7 @@ def main() -> int:
                         break
                     if not try_increment_scanned_files():
                         break
-                    if not record_unreadable(swift_file, f"cannot inspect file ({error})"):
+                    if not record_unreadable(swift_file, format_file_inspection_error(error)):
                         break
                     continue
                 try:
@@ -936,7 +984,12 @@ def main() -> int:
                         break
                     if not try_increment_scanned_files():
                         break
-                    if not record_unreadable(swift_file, f"cannot resolve path ({error})"):
+                    resolve_error = (
+                        format_resolve_path_error(error)
+                        if isinstance(error, OSError)
+                        else f"cannot resolve path ({error})"
+                    )
+                    if not record_unreadable(swift_file, resolve_error):
                         break
                     continue
                 if resolved_file in seen_files:
@@ -948,7 +1001,7 @@ def main() -> int:
                 except OSError as error:
                     if not try_increment_scanned_files():
                         break
-                    if not record_unreadable(swift_file, f"cannot inspect file metadata ({error})"):
+                    if not record_unreadable(swift_file, format_file_metadata_error(error)):
                         break
                     continue
                 file_identity = stat_identity_or_none(resolved_stat)
@@ -979,7 +1032,7 @@ def main() -> int:
                     try:
                         pre_open_stat = swift_file.lstat()
                     except OSError as error:
-                        if not record_unreadable(swift_file, f"cannot inspect file metadata ({error})"):
+                        if not record_unreadable(swift_file, format_file_metadata_error(error)):
                             break
                         continue
                     pre_open_is_regular = stat_is_regular_file_or_none(pre_open_stat)
