@@ -157,6 +157,30 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     
     // Encryption key
     private let encryptionKey: SymmetricKey
+
+    static func sanitizedClaimedNickname(_ value: String?) -> String {
+        InputValidator.validateNickname(value ?? "") ?? "user"
+    }
+
+    static func updatedNicknameIndex(
+        _ index: [String: Set<String>],
+        fingerprint: String,
+        oldNickname: String?,
+        newNickname: String
+    ) -> [String: Set<String>] {
+        var updated = index
+        if let oldNickname, oldNickname != newNickname {
+            updated[oldNickname]?.remove(fingerprint)
+            if updated[oldNickname]?.isEmpty == true {
+                updated.removeValue(forKey: oldNickname)
+            }
+        }
+        if updated[newNickname] == nil {
+            updated[newNickname] = Set<String>()
+        }
+        updated[newNickname]?.insert(fingerprint)
+        return updated
+    }
     
     init(_ keychain: KeychainManagerProtocol) {
         self.keychain = keychain
@@ -298,18 +322,19 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
 
             // Optionally persist claimed nickname into social identity
             if let claimed = claimedNickname {
+                let sanitizedClaimed = Self.sanitizedClaimedNickname(claimed)
                 var identity = self.cache.socialIdentities[fingerprint] ?? SocialIdentity(
                     fingerprint: fingerprint,
                     localPetname: nil,
-                    claimedNickname: claimed,
+                    claimedNickname: sanitizedClaimed,
                     trustLevel: .unknown,
                     isFavorite: false,
                     isBlocked: false,
                     notes: nil
                 )
                 // Update claimed nickname if changed
-                if identity.claimedNickname != claimed {
-                    identity.claimedNickname = claimed
+                if identity.claimedNickname != sanitizedClaimed {
+                    identity.claimedNickname = sanitizedClaimed
                     self.cache.socialIdentities[fingerprint] = identity
                 } else if self.cache.socialIdentities[fingerprint] == nil {
                     self.cache.socialIdentities[fingerprint] = identity
@@ -331,24 +356,24 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     
     func updateSocialIdentity(_ identity: SocialIdentity) {
         queue.async(flags: .barrier) {
-            self.cache.socialIdentities[identity.fingerprint] = identity
-            
-            // Update nickname index
-            if let existingIdentity = self.cache.socialIdentities[identity.fingerprint] {
-                // Remove old nickname from index if changed
-                if existingIdentity.claimedNickname != identity.claimedNickname {
-                    self.cache.nicknameIndex[existingIdentity.claimedNickname]?.remove(identity.fingerprint)
-                    if self.cache.nicknameIndex[existingIdentity.claimedNickname]?.isEmpty == true {
-                        self.cache.nicknameIndex.removeValue(forKey: existingIdentity.claimedNickname)
-                    }
-                }
-            }
-            
-            // Add new nickname to index
-            if self.cache.nicknameIndex[identity.claimedNickname] == nil {
-                self.cache.nicknameIndex[identity.claimedNickname] = Set<String>()
-            }
-            self.cache.nicknameIndex[identity.claimedNickname]?.insert(identity.fingerprint)
+            let existingIdentity = self.cache.socialIdentities[identity.fingerprint]
+            let sanitizedIdentity = SocialIdentity(
+                fingerprint: identity.fingerprint,
+                localPetname: identity.localPetname,
+                claimedNickname: Self.sanitizedClaimedNickname(identity.claimedNickname),
+                trustLevel: identity.trustLevel,
+                isFavorite: identity.isFavorite,
+                isBlocked: identity.isBlocked,
+                notes: identity.notes
+            )
+
+            self.cache.socialIdentities[identity.fingerprint] = sanitizedIdentity
+            self.cache.nicknameIndex = Self.updatedNicknameIndex(
+                self.cache.nicknameIndex,
+                fingerprint: identity.fingerprint,
+                oldNickname: existingIdentity?.claimedNickname,
+                newNickname: sanitizedIdentity.claimedNickname
+            )
             
             // Save to keychain
             self.saveIdentityCache()
