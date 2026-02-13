@@ -148,6 +148,38 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Found unsupported token '#MyPreview'", result.stdout)
             self.assertIn("OtherPreview.swift (lines: 4)", result.stdout)
 
+    def test_trims_custom_token_value_before_scanning(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "TrimmedToken.swift"
+            swift_file.write_text(
+                textwrap.dedent(
+                    """
+                    struct TrimmedToken: View {
+                        var body: some View { Text("ok") }
+                    }
+                    #MyPreview {
+                        TrimmedToken()
+                    }
+                    """
+                ).strip() + "\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir, "--token", "  #MyPreview  ")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Found unsupported token '#MyPreview'", result.stdout)
+            self.assertIn("TrimmedToken.swift (lines: 4)", result.stdout)
+
+    def test_fails_when_token_is_blank_after_trimming(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = self.run_script("--root", temp_dir, "--token", "   ")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "Configured token is empty after trimming; provide a non-empty token.",
+                result.stdout,
+            )
+
     def test_deduplicates_overlapping_roots(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)

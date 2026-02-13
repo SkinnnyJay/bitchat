@@ -92,6 +92,10 @@ def find_token_line_numbers(content: str, token: str) -> list[int]:
 
 def main() -> int:
     args = parse_args()
+    token = args.token.strip()
+    if not token:
+        print("Configured token is empty after trimming; provide a non-empty token.")
+        return 1
 
     roots = [Path(raw) for raw in (args.root or ["bitchat", "bitchatShareExtension"])]
     invalid_roots: dict[Path, str] = {}
@@ -114,7 +118,7 @@ def main() -> int:
     unreadable_files: dict[Path, str] = {}
 
     for root in roots:
-        for swift_file in root.rglob("*.swift"):
+        for swift_file in sorted(root.rglob("*.swift")):
             resolved_file = swift_file.resolve()
             if resolved_file in seen_files:
                 continue
@@ -125,7 +129,7 @@ def main() -> int:
             except (OSError, UnicodeDecodeError) as error:
                 unreadable_files[swift_file] = str(error)
                 continue
-            line_numbers = find_token_line_numbers(content, args.token)
+            line_numbers = find_token_line_numbers(content, token)
             if line_numbers:
                 matches.append(swift_file)
                 matches_with_lines[swift_file] = line_numbers
@@ -145,7 +149,7 @@ def main() -> int:
         return 1
 
     if matches:
-        print(f"Found unsupported token '{args.token}' in Swift sources:")
+        print(f"Found unsupported token '{token}' in Swift sources:")
         for match in sorted(matches):
             line_list = ", ".join(str(line) for line in matches_with_lines.get(match, []))
             print(f" - {match} (lines: {line_list})")
@@ -153,7 +157,7 @@ def main() -> int:
 
     joined_roots = ", ".join(str(root) for root in roots)
     print(
-        f"No unsupported token '{args.token}' detected in roots [{joined_roots}] "
+        f"No unsupported token '{token}' detected in roots [{joined_roots}] "
         f"across {scanned_files} Swift files."
     )
     return 0
