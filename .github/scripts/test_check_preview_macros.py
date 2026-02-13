@@ -301,6 +301,18 @@ class PreviewMacroUtilityTests(unittest.TestCase):
         self.assertEqual(check_preview_macros.utf8_byte_length_or_none("🙂"), 4)
         self.assertIsNone(check_preview_macros.utf8_byte_length_or_none("\ud800"))
 
+    def test_formats_roots_for_diagnostics(self) -> None:
+        roots = [pathlib.Path("/tmp/a"), pathlib.Path("/tmp/b"), pathlib.Path("/tmp/c")]
+        self.assertEqual(
+            check_preview_macros.format_roots_for_diagnostics(roots),
+            "/tmp/a, /tmp/b, /tmp/c",
+        )
+        with mock.patch.object(check_preview_macros, "MAX_REPORTED_ROOTS_IN_SUMMARY", 2):
+            self.assertEqual(
+                check_preview_macros.format_roots_for_diagnostics(roots),
+                "/tmp/a, /tmp/b ... +1 more roots",
+            )
+
     def test_formats_line_numbers_for_diagnostics(self) -> None:
         self.assertEqual(
             check_preview_macros.format_line_numbers_for_diagnostics([1, 2, 3]),
@@ -541,6 +553,22 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("No Swift files were discovered", result.stdout)
 
+    def test_truncates_root_list_in_no_swift_failure_summary(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as root_a,
+            tempfile.TemporaryDirectory() as root_b,
+            tempfile.TemporaryDirectory() as root_c,
+            mock.patch.object(check_preview_macros, "MAX_REPORTED_ROOTS_IN_SUMMARY", 2),
+        ):
+            return_code, output = self.run_main_with_args(
+                roots=[root_a, root_b, root_c],
+                token="#Preview",
+            )
+            self.assertEqual(return_code, 1)
+            self.assertIn("No Swift files were discovered in configured roots", output)
+            self.assertIn("Roots: [", output)
+            self.assertIn("... +1 more roots]", output)
+
     def test_deduplicates_duplicate_root_arguments(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             result = self.run_script("--root", temp_dir, "--root", temp_dir)
@@ -568,6 +596,22 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             result = self.run_script("--root", temp_dir, "--allow-empty")
             self.assertEqual(result.returncode, 0)
             self.assertIn("No unsupported token '#Preview' detected", result.stdout)
+
+    def test_truncates_root_list_in_allow_empty_success_summary(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as root_a,
+            tempfile.TemporaryDirectory() as root_b,
+            tempfile.TemporaryDirectory() as root_c,
+            mock.patch.object(check_preview_macros, "MAX_REPORTED_ROOTS_IN_SUMMARY", 2),
+        ):
+            return_code, output = self.run_main_with_args(
+                roots=[root_a, root_b, root_c],
+                token="#Preview",
+                allow_empty=True,
+            )
+            self.assertEqual(return_code, 0)
+            self.assertIn("No unsupported token '#Preview' detected in roots [", output)
+            self.assertIn("... +1 more roots] across 0 Swift files.", output)
 
     def test_reports_detected_file_and_line_number(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

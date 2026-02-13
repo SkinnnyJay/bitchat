@@ -26,6 +26,7 @@ MAX_REPORTED_UNREADABLE_FILES = 200
 MAX_REPORTED_PARSE_ERROR_FILES = 200
 MAX_REPORTED_TOKEN_MATCH_FILES = 200
 MAX_REPORTED_LINE_NUMBERS_PER_FILE = 50
+MAX_REPORTED_ROOTS_IN_SUMMARY = 20
 DISALLOWED_CONTROL_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn"}
 
 
@@ -55,6 +56,16 @@ def format_line_numbers_for_diagnostics(line_numbers: list[int]) -> str:
     if omitted_line_numbers > 0:
         return f"{line_numbers_text} ... +{omitted_line_numbers} more"
     return line_numbers_text
+
+
+def format_roots_for_diagnostics(roots: list[Path]) -> str:
+    root_texts = [format_path_for_diagnostics(root) for root in roots]
+    reported_root_texts = root_texts[:MAX_REPORTED_ROOTS_IN_SUMMARY]
+    roots_text = ", ".join(reported_root_texts)
+    omitted_roots = len(root_texts) - MAX_REPORTED_ROOTS_IN_SUMMARY
+    if omitted_roots > 0:
+        return f"{roots_text} ... +{omitted_roots} more roots"
+    return roots_text
 
 
 def format_open_read_error(error: OSError) -> str:
@@ -532,7 +543,7 @@ def main() -> int:
 
     if scanned_files == 0 and not args.allow_empty and not unreadable_files:
         has_failure = True
-        joined_roots = ", ".join(format_path_for_diagnostics(root) for root in roots)
+        joined_roots = format_roots_for_diagnostics(roots)
         print(
             "No Swift files were discovered in configured roots; "
             f"failing to avoid false green checks. Roots: [{joined_roots}]"
@@ -559,7 +570,7 @@ def main() -> int:
         print(f"Scanned {scanned_files} Swift files before failure.")
         return 1
 
-    joined_roots = ", ".join(format_path_for_diagnostics(root) for root in roots)
+    joined_roots = format_roots_for_diagnostics(roots)
     print(
         f"No unsupported token '{token}' detected in roots [{joined_roots}] "
         f"across {scanned_files} Swift files."
