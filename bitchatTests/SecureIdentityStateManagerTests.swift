@@ -68,9 +68,19 @@ final class SecureIdentityStateManagerTests: XCTestCase {
         XCTAssertEqual(canonical, String(repeating: "ab", count: 32))
     }
 
+    func testCanonicalNostrPubkeyDecodesNpubInput() {
+        let hex = String(repeating: "11", count: 32)
+        let npub = try? Bech32.encode(hrp: "npub", data: Data(hexString: hex) ?? Data())
+
+        let canonical = SecureIdentityStateManager.canonicalNostrPubkey(npub ?? "")
+
+        XCTAssertEqual(canonical, hex)
+    }
+
     func testCanonicalNostrPubkeyRejectsInvalidInput() {
         XCTAssertNil(SecureIdentityStateManager.canonicalNostrPubkey("abc"))
         XCTAssertNil(SecureIdentityStateManager.canonicalNostrPubkey(String(repeating: "zz", count: 32)))
+        XCTAssertNil(SecureIdentityStateManager.canonicalNostrPubkey("npub123"))
     }
 
     func testApplyingFavoriteMutationSanitizesClaimedNicknameAndUpdatesFavorite() {
