@@ -2656,6 +2656,12 @@ final class MessageRouterRoutingTests: XCTestCase {
         let blockedData = try JSONSerialization.data(withJSONObject: blockedPayload, options: [])
         backend.simulateIncoming(blockedData, from: "peer-rate-reset")
 
+        let blockedSettle = expectation(description: "initial rate-limit events settle")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            blockedSettle.fulfill()
+        }
+        wait(for: [blockedSettle], timeout: 1.0)
+
         now = now.addingTimeInterval(TransportConfig.messageRouterInboundWiFiSenderRateWindowSeconds + 1)
 
         // After the window expires this should pass.

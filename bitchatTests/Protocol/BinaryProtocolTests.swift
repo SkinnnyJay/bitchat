@@ -289,8 +289,8 @@ final class BinaryProtocolTests: XCTestCase {
     }
     
     func testLargeMessageHandling() throws {
-        // Test maximum size handling
-        let largeContent = String(repeating: "X", count: 65535) // Max uint16
+        // Test configured maximum-size handling
+        let largeContent = String(repeating: "X", count: InputValidator.Limits.maxMessageLength)
         let message = TestHelpers.createTestMessage(content: largeContent)
         
         guard let payload = message.toBinaryPayload(),

@@ -77,7 +77,7 @@ final class PrivateMessagePacketTests: XCTestCase {
         let messageIDData = try XCTUnwrap(messageID.data(using: .utf8))
         let contentData = try XCTUnwrap(content.data(using: .utf8))
         XCTAssertLessThanOrEqual(messageIDData.count, 255)
-        XCTAssertLessThanOrEqual(contentData.count, TransportConfig.privateMessagePacketContentMaxBytes)
+        XCTAssertLessThanOrEqual(contentData.count, 255)
 
         data.append(0x00) // messageID TLV type
         data.append(UInt8(messageIDData.count))
