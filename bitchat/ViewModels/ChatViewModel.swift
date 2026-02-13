@@ -1382,6 +1382,13 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         return "nostr:" + canonicalSenderPubkey.prefix(TransportConfig.nostrShortKeyDisplayLength)
     }
 
+    static func nostrDisplaySuffix(from senderPubkey: String) -> String {
+        if let canonicalSenderPubkey = canonicalNostrPubkeyHex(senderPubkey) {
+            return String(canonicalSenderPubkey.suffix(4))
+        }
+        return String(senderPubkey.suffix(4))
+    }
+
     static func favoriteNotificationState(from content: String) -> Bool? {
         let normalized = content.trimmingCharacters(in: .whitespacesAndNewlines)
         if normalized.hasPrefix("[FAVORITED]") || normalized.hasPrefix("FAVORITED") {
@@ -2295,15 +2302,18 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
 
     private func displayNameForNostrPubkey(_ pubkeyHex: String) -> String {
-        let suffix = String(pubkeyHex.suffix(4))
+        let suffix = Self.nostrDisplaySuffix(from: pubkeyHex)
+        let canonicalPubkeyHex = Self.canonicalNostrPubkeyHex(pubkeyHex)
         // If this is our per-geohash identity, use our nickname
         if let gh = currentGeohash, let myGeoIdentity = try? NostrIdentityBridge.deriveIdentity(forGeohash: gh) {
-            if myGeoIdentity.publicKeyHex.lowercased() == pubkeyHex.lowercased() {
+            if let canonicalPubkeyHex, myGeoIdentity.publicKeyHex.lowercased() == canonicalPubkeyHex {
                 return nickname + "#" + suffix
             }
         }
         // If we have a known nickname tag for this pubkey, use it
-        if let nick = geoNicknames[pubkeyHex.lowercased()], !nick.isEmpty {
+        if let canonicalPubkeyHex,
+           let nick = geoNicknames[canonicalPubkeyHex],
+           !nick.isEmpty {
             return nick + "#" + suffix
         }
         // Otherwise, anonymous with collision-resistant suffix

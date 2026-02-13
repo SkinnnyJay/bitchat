@@ -230,4 +230,17 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
     func testGeohashShortMappingKeyRejectsInvalidInput() {
         XCTAssertNil(ChatViewModel.geohashShortMappingKey(for: "invalid"))
     }
+
+    func testNostrDisplaySuffixUsesCanonicalizedNostrKeyWhenAvailable() {
+        let hex = String(repeating: "ab", count: 32)
+        let npub = try? Bech32.encode(hrp: "npub", data: Data(hexString: hex) ?? Data())
+
+        let suffix = ChatViewModel.nostrDisplaySuffix(from: npub?.uppercased() ?? "")
+
+        XCTAssertEqual(suffix, String(hex.suffix(4)))
+    }
+
+    func testNostrDisplaySuffixFallsBackToRawInputWhenInvalid() {
+        XCTAssertEqual(ChatViewModel.nostrDisplaySuffix(from: "xyz"), "xyz")
+    }
 }
