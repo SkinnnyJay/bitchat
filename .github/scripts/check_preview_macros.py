@@ -237,7 +237,16 @@ def main() -> int:
 
     for root in roots:
         for swift_file in sorted(root.rglob("*.swift")):
-            resolved_file = swift_file.resolve()
+            try:
+                resolved_file = swift_file.resolve()
+            except (RuntimeError, OSError) as error:
+                unresolved_key = swift_file.absolute()
+                if unresolved_key in seen_files:
+                    continue
+                seen_files.add(unresolved_key)
+                scanned_files += 1
+                unreadable_files[swift_file] = f"cannot resolve path ({error})"
+                continue
             if resolved_file in seen_files:
                 continue
             seen_files.add(resolved_file)

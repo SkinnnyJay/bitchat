@@ -425,6 +425,23 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Corrupt.swift", result.stdout)
             self.assertIn("Scanned 1 Swift files before failure.", result.stdout)
 
+    def test_fails_closed_when_swift_file_path_cannot_be_resolved(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "Loop.swift"
+            try:
+                swift_file.symlink_to(swift_file)
+            except OSError as error:
+                self.skipTest(f"Symlink creation not supported in environment: {error}")
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.stderr, "")
+            self.assertIn("Could not read one or more Swift files", result.stdout)
+            self.assertIn("Loop.swift", result.stdout)
+            self.assertIn("cannot resolve path", result.stdout)
+            self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", result.stdout)
+
     def test_reports_unreadable_and_parse_errors_together(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)
