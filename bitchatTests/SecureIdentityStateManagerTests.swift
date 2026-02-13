@@ -96,6 +96,22 @@ final class SecureIdentityStateManagerTests: XCTestCase {
         XCTAssertNil(SecureIdentityStateManager.canonicalFingerprint(String(repeating: "zz", count: 32)))
     }
 
+    func testCanonicalShortPeerIDPrefixNormalizesCaseAndWhitespace() {
+        let canonical = SecureIdentityStateManager.canonicalShortPeerIDPrefix(
+            PeerID(str: "  MESH:ABCDEF0123456789  ")
+        )
+
+        XCTAssertEqual(canonical, "abcdef0123456789")
+    }
+
+    func testCanonicalShortPeerIDPrefixRejectsNonRoutablePeerID() {
+        XCTAssertNil(
+            SecureIdentityStateManager.canonicalShortPeerIDPrefix(
+                PeerID(str: "not-a-peer")
+            )
+        )
+    }
+
     func testApplyingFavoriteMutationSanitizesClaimedNicknameAndUpdatesFavorite() {
         let existing = SocialIdentity(
             fingerprint: "fp1",

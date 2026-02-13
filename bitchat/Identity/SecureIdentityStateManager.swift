@@ -172,6 +172,12 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
         return normalized
     }
 
+    static func canonicalShortPeerIDPrefix(_ peerID: PeerID) -> String? {
+        let canonical = PeerID(str: peerID.id.trimmingCharacters(in: .whitespacesAndNewlines)).toShort()
+        guard canonical.isShort else { return nil }
+        return canonical.bare.lowercased()
+    }
+
     static func updatedNicknameIndex(
         _ index: [String: Set<String>],
         fingerprint: String,
@@ -486,10 +492,9 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
 
     /// Find cryptographic identities whose fingerprint prefix matches a peerID (16-hex) short ID
     func getCryptoIdentitiesByPeerIDPrefix(_ peerID: PeerID) -> [CryptographicIdentity] {
+        guard let canonicalPrefix = Self.canonicalShortPeerIDPrefix(peerID) else { return [] }
         queue.sync {
-            // Defensive: ensure hex and correct length
-            guard peerID.isShort else { return [] }
-            return cryptographicIdentities.values.filter { $0.fingerprint.hasPrefix(peerID.id) }
+            return cryptographicIdentities.values.filter { $0.fingerprint.hasPrefix(canonicalPrefix) }
         }
     }
     
