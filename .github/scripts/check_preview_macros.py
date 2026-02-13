@@ -189,6 +189,8 @@ def format_roots_for_diagnostics(roots: list[Path]) -> str:
 def format_open_read_error(error: OSError) -> str:
     if error.errno == errno.ELOOP:
         return "symlinked Swift file not scanned"
+    if error.errno in {errno.EISDIR, errno.ENOTDIR}:
+        return "unsupported non-regular Swift path"
     if error.errno in {errno.EACCES, errno.EPERM}:
         return f"cannot open/read file (permission denied: {error})"
     if error.errno == errno.ENOENT:

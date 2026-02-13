@@ -691,6 +691,13 @@ class PreviewMacroUtilityTests(unittest.TestCase):
             "symlinked Swift file not scanned",
         )
 
+    def test_formats_open_error_for_non_regular_path(self) -> None:
+        error = OSError(errno.EISDIR, "is a directory")
+        self.assertEqual(
+            check_preview_macros.format_open_read_error(error),
+            "unsupported non-regular Swift path",
+        )
+
     def test_formats_open_error_for_permission_denied(self) -> None:
         error = OSError(errno.EACCES, "permission denied")
         self.assertIn(
@@ -1565,6 +1572,29 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(return_code, 1)
             self.assertIn("Could not read one or more Swift files:", output)
             self.assertIn("RRRRRRRR... +32 chars truncated", output)
+            self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
+
+    def test_fails_closed_when_open_reports_non_regular_swift_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "RaceDirectory.swift"
+            swift_file.write_text("struct RaceDirectory {}\n", encoding="utf-8")
+
+            with mock.patch.object(
+                check_preview_macros.os,
+                "open",
+                side_effect=OSError(errno.EISDIR, "is a directory"),
+            ):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not read one or more Swift files:", output)
+            self.assertIn("RaceDirectory.swift", output)
+            self.assertIn("unsupported non-regular Swift path", output)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
 
     def test_fails_closed_when_swift_file_is_not_utf8_decodable(self) -> None:
