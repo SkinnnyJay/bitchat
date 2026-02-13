@@ -1393,6 +1393,26 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         return nil
     }
 
+    enum FavoriteNotificationSource: Equatable {
+        case mesh(noiseKeyHex: String)
+        case nostr(nostrPubkeyHex: String)
+    }
+
+    static func resolveFavoriteNotificationSource(
+        content: String,
+        actualSenderNoiseKey: Data?,
+        senderPubkey: String
+    ) -> FavoriteNotificationSource? {
+        guard favoriteNotificationState(from: content) != nil else { return nil }
+        if let validatedNoiseKey = validatedNoisePublicKey(actualSenderNoiseKey) {
+            return .mesh(noiseKeyHex: validatedNoiseKey.hexEncodedString())
+        }
+        if let canonicalNostrPubkey = canonicalNostrPubkeyHex(senderPubkey) {
+            return .nostr(nostrPubkeyHex: canonicalNostrPubkey)
+        }
+        return nil
+    }
+
     static func resolvedFavoriteNotificationPeerID(from peerID: String, resolvedPeer: BitchatPeer?) -> PeerID? {
         let candidate = resolvedPeer?.peerID ?? PeerID(str: peerID.trimmingCharacters(in: .whitespacesAndNewlines))
         return candidate.isValid ? candidate : nil
@@ -5502,9 +5522,18 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         let messageContent = pm.content
 
         // Favorite/unfavorite notifications embedded as private messages
-        if messageContent.hasPrefix("[FAVORITED]") || messageContent.hasPrefix("[UNFAVORITED]") {
-            if let key = actualSenderNoiseKey {
-                handleFavoriteNotificationFromMesh(messageContent, from: key.hexEncodedString(), senderNickname: senderNickname)
+        if Self.favoriteNotificationState(from: messageContent) != nil {
+            if let source = Self.resolveFavoriteNotificationSource(
+                content: messageContent,
+                actualSenderNoiseKey: actualSenderNoiseKey,
+                senderPubkey: senderPubkey
+            ) {
+                switch source {
+                case .mesh(let noiseKeyHex):
+                    handleFavoriteNotificationFromMesh(messageContent, from: noiseKeyHex, senderNickname: senderNickname)
+                case .nostr(let nostrPubkeyHex):
+                    handleFavoriteNotification(content: messageContent, from: nostrPubkeyHex)
+                }
             }
             return
         }

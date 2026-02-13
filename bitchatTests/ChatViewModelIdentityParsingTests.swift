@@ -186,4 +186,36 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
     func testFavoriteNotificationStateRejectsUnknownContent() {
         XCTAssertNil(ChatViewModel.favoriteNotificationState(from: "hello"))
     }
+
+    func testResolveFavoriteNotificationSourcePrefersMeshWhenNoiseKeyAvailable() {
+        let source = ChatViewModel.resolveFavoriteNotificationSource(
+            content: "[FAVORITED]:npub...",
+            actualSenderNoiseKey: Data(repeating: 0x11, count: 32),
+            senderPubkey: String(repeating: "ab", count: 32)
+        )
+
+        XCTAssertEqual(source, .mesh(noiseKeyHex: String(repeating: "11", count: 32)))
+    }
+
+    func testResolveFavoriteNotificationSourceFallsBackToNostrPubkey() {
+        let hex = String(repeating: "ab", count: 32)
+
+        let source = ChatViewModel.resolveFavoriteNotificationSource(
+            content: "[UNFAVORITED]:npub...",
+            actualSenderNoiseKey: nil,
+            senderPubkey: hex.uppercased()
+        )
+
+        XCTAssertEqual(source, .nostr(nostrPubkeyHex: hex))
+    }
+
+    func testResolveFavoriteNotificationSourceRejectsNonNotificationContent() {
+        let source = ChatViewModel.resolveFavoriteNotificationSource(
+            content: "hello",
+            actualSenderNoiseKey: Data(repeating: 0x11, count: 32),
+            senderPubkey: String(repeating: "ab", count: 32)
+        )
+
+        XCTAssertNil(source)
+    }
 }
