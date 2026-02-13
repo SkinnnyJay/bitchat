@@ -141,6 +141,13 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
 
+    def test_does_not_match_connector_punctuation_suffixed_token(self) -> None:
+        content = """
+            #Preview‿ { Text("not target token") }
+            #Preview { Text("real preview") }
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
+
     def test_detects_backtick_wrapped_preview_token(self) -> None:
         content = """
             let marker = `#Preview`
@@ -542,6 +549,7 @@ class PreviewMacroUtilityTests(unittest.TestCase):
         self.assertTrue(check_preview_macros.is_swift_identifier_continuation_character("_"))
         self.assertTrue(check_preview_macros.is_swift_identifier_continuation_character("\u0301"))
         self.assertTrue(check_preview_macros.is_swift_identifier_continuation_character("\u200d"))
+        self.assertTrue(check_preview_macros.is_swift_identifier_continuation_character("‿"))
         self.assertFalse(check_preview_macros.is_swift_identifier_continuation_character("#"))
         self.assertFalse(check_preview_macros.is_swift_identifier_continuation_character(" "))
 
@@ -557,6 +565,14 @@ class PreviewMacroUtilityTests(unittest.TestCase):
         self.assertFalse(
             check_preview_macros.has_token_boundaries(
                 "#Preview\u200d",
+                0,
+                len("#Preview"),
+                requires_right_boundary=True,
+            )
+        )
+        self.assertFalse(
+            check_preview_macros.has_token_boundaries(
+                "#Preview‿",
                 0,
                 len("#Preview"),
                 requires_right_boundary=True,
@@ -1547,6 +1563,19 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             swift_file = temp_path / "JoinerSuffix.swift"
             swift_file.write_text(
                 "#Preview\u200d { Text(\"ignored\") }\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("No unsupported token '#Preview' detected", result.stdout)
+
+    def test_does_not_flag_connector_punctuation_suffixed_preview_token_in_script_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "ConnectorSuffix.swift"
+            swift_file.write_text(
+                "#Preview‿ { Text(\"ignored\") }\n",
                 encoding="utf-8",
             )
 

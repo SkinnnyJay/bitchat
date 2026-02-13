@@ -138,7 +138,7 @@ def is_swift_identifier_continuation_character(character: str) -> bool:
         return True
     if character in {"\u200c", "\u200d"}:
         return True
-    return unicodedata.category(character) in {"Mn", "Mc", "Me"}
+    return unicodedata.category(character) in {"Mn", "Mc", "Me", "Pc"}
 
 
 def has_token_boundaries(
