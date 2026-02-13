@@ -20,6 +20,7 @@ import unicodedata
 MAX_TOKEN_BYTES = 256
 MAX_SWIFT_FILE_BYTES = 5 * 1024 * 1024
 MAX_SCANNED_SWIFT_FILES = 100000
+MAX_TOTAL_SCANNED_SWIFT_BYTES = 512 * 1024 * 1024
 MAX_ROOT_BYTES = 4096
 MAX_ROOT_COUNT = 128
 MAX_REPORTED_INVALID_ROOTS = 200
@@ -462,8 +463,10 @@ def main() -> int:
     tracked_parse_error_files: dict[Path, str] = {}
     parse_error_file_paths: set[Path] = set()
     scan_limit_reached = False
+    scanned_bytes_limit_reached = False
     unreadable_limit_reached = False
     parse_error_limit_reached = False
+    scanned_swift_bytes = 0
 
     def report_path(path: Path) -> Path:
         try:
@@ -510,8 +513,23 @@ def main() -> int:
         scanned_files += 1
         return True
 
+    def try_record_scanned_bytes(byte_count: int) -> bool:
+        nonlocal scanned_swift_bytes, scanned_bytes_limit_reached
+        if byte_count <= 0:
+            return True
+        if scanned_swift_bytes > MAX_TOTAL_SCANNED_SWIFT_BYTES - byte_count:
+            scanned_bytes_limit_reached = True
+            return False
+        scanned_swift_bytes += byte_count
+        return True
+
     def should_abort_scan() -> bool:
-        return scan_limit_reached or unreadable_limit_reached or parse_error_limit_reached
+        return (
+            scan_limit_reached
+            or scanned_bytes_limit_reached
+            or unreadable_limit_reached
+            or parse_error_limit_reached
+        )
 
     for root in roots:
         def record_walk_error(error: OSError) -> None:
@@ -638,6 +656,8 @@ def main() -> int:
                         ):
                             break
                         continue
+                    if not try_record_scanned_bytes(file_size_bytes):
+                        break
                     with os.fdopen(descriptor, "rb") as file_handle:
                         descriptor = -1
                         raw_content = file_handle.read(MAX_SWIFT_FILE_BYTES + 1)
@@ -648,6 +668,9 @@ def main() -> int:
                 finally:
                     if descriptor >= 0:
                         os.close(descriptor)
+                if len(raw_content) > file_size_bytes:
+                    if not try_record_scanned_bytes(len(raw_content) - file_size_bytes):
+                        break
                 if len(raw_content) > MAX_SWIFT_FILE_BYTES:
                     if not record_unreadable(
                         swift_file,
@@ -747,6 +770,12 @@ def main() -> int:
             "Scan aborted after reaching maximum Swift file limit "
             f"({MAX_SCANNED_SWIFT_FILES})."
         )
+    if scanned_bytes_limit_reached:
+        has_failure = True
+        print(
+            "Scan aborted after reaching maximum total Swift byte-read limit "
+            f"({MAX_TOTAL_SCANNED_SWIFT_BYTES} bytes)."
+        )
     if unreadable_limit_reached:
         has_failure = True
         print(
@@ -768,12 +797,13 @@ def main() -> int:
             f"{token_match_count} token matches."
         )
         print(f"Scanned {scanned_files} Swift files before failure.")
+        print(f"Read {scanned_swift_bytes} Swift bytes before failure.")
         return 1
 
     joined_roots = format_roots_for_diagnostics(roots)
     print(
         f"No unsupported token '{token}' detected in roots [{joined_roots}] "
-        f"across {scanned_files} Swift files."
+        f"across {scanned_files} Swift files ({scanned_swift_bytes} bytes read)."
     )
     return 0
 
