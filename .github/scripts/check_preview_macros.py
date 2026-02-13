@@ -23,8 +23,10 @@ MAX_SCANNED_SWIFT_FILES = 100000
 MAX_ROOT_BYTES = 4096
 MAX_ROOT_COUNT = 128
 MAX_REPORTED_INVALID_ROOTS = 200
+MAX_UNREADABLE_FILE_PATHS = 100000
 MAX_TRACKED_UNREADABLE_FILES = 200
 MAX_REPORTED_UNREADABLE_FILES = 200
+MAX_PARSE_ERROR_FILE_PATHS = 100000
 MAX_TRACKED_PARSE_ERROR_FILES = 200
 MAX_REPORTED_PARSE_ERROR_FILES = 200
 MAX_TRACKED_TOKEN_MATCH_FILES = 200
@@ -402,6 +404,8 @@ def main() -> int:
     tracked_parse_error_files: dict[Path, str] = {}
     parse_error_file_paths: set[Path] = set()
     scan_limit_reached = False
+    unreadable_limit_reached = False
+    parse_error_limit_reached = False
 
     def report_path(path: Path) -> Path:
         try:
@@ -409,24 +413,34 @@ def main() -> int:
         except OSError:
             return path
 
-    def record_unreadable(path: Path, reason: str) -> None:
+    def record_unreadable(path: Path, reason: str) -> bool:
+        nonlocal unreadable_limit_reached
         reported_path = report_path(path)
         if reported_path in unreadable_file_paths:
             if reported_path in tracked_unreadable_files:
                 tracked_unreadable_files[reported_path] = reason
-            return
+            return True
+        if len(unreadable_file_paths) >= MAX_UNREADABLE_FILE_PATHS:
+            unreadable_limit_reached = True
+            return False
         unreadable_file_paths.add(reported_path)
         if len(tracked_unreadable_files) < MAX_TRACKED_UNREADABLE_FILES:
             tracked_unreadable_files[reported_path] = reason
+        return True
 
-    def record_parse_error(path: Path, reason: str) -> None:
+    def record_parse_error(path: Path, reason: str) -> bool:
+        nonlocal parse_error_limit_reached
         if path in parse_error_file_paths:
             if path in tracked_parse_error_files:
                 tracked_parse_error_files[path] = reason
-            return
+            return True
+        if len(parse_error_file_paths) >= MAX_PARSE_ERROR_FILE_PATHS:
+            parse_error_limit_reached = True
+            return False
         parse_error_file_paths.add(path)
         if len(tracked_parse_error_files) < MAX_TRACKED_PARSE_ERROR_FILES:
             tracked_parse_error_files[path] = reason
+        return True
 
     def try_increment_scanned_files() -> bool:
         nonlocal scanned_files, scan_limit_reached
@@ -436,12 +450,13 @@ def main() -> int:
         scanned_files += 1
         return True
 
-    for root in roots:
-        traversal_errors: dict[Path, str] = {}
+    def should_abort_scan() -> bool:
+        return scan_limit_reached or unreadable_limit_reached or parse_error_limit_reached
 
+    for root in roots:
         def record_walk_error(error: OSError) -> None:
             error_path = Path(error.filename) if error.filename is not None else root
-            traversal_errors[error_path] = str(error)
+            _ = record_unreadable(error_path, str(error))
 
         for directory, subdirectories, filenames in os.walk(
             root,
@@ -449,6 +464,8 @@ def main() -> int:
             onerror=record_walk_error,
             followlinks=False,
         ):
+            if should_abort_scan():
+                break
             symlinked_subdirectories: list[Path] = []
             for subdirectory in list(subdirectories):
                 subdirectory_path = Path(directory) / subdirectory
@@ -459,10 +476,14 @@ def main() -> int:
                     traversal_errors[subdirectory_path] = f"cannot inspect directory ({error})"
 
             for symlinked_subdirectory in sorted(symlinked_subdirectories):
-                traversal_errors[
-                    symlinked_subdirectory
-                ] = "symlinked directory not traversed (followlinks disabled)"
+                if not record_unreadable(
+                    symlinked_subdirectory,
+                    "symlinked directory not traversed (followlinks disabled)",
+                ):
+                    break
                 subdirectories.remove(symlinked_subdirectory.name)
+            if should_abort_scan():
+                break
 
             subdirectories.sort()
             filenames.sort()
@@ -479,7 +500,8 @@ def main() -> int:
                         seen_files.add(unresolved_key)
                         if not try_increment_scanned_files():
                             break
-                        record_unreadable(swift_file, "symlinked Swift file not scanned")
+                        if not record_unreadable(swift_file, "symlinked Swift file not scanned"):
+                            break
                         continue
                 except OSError as error:
                     if unresolved_key in seen_files:
@@ -487,7 +509,8 @@ def main() -> int:
                     seen_files.add(unresolved_key)
                     if not try_increment_scanned_files():
                         break
-                    record_unreadable(swift_file, f"cannot inspect file ({error})")
+                    if not record_unreadable(swift_file, f"cannot inspect file ({error})"):
+                        break
                     continue
                 try:
                     resolved_file = swift_file.resolve()
@@ -497,7 +520,8 @@ def main() -> int:
                     seen_files.add(unresolved_key)
                     if not try_increment_scanned_files():
                         break
-                    record_unreadable(swift_file, f"cannot resolve path ({error})")
+                    if not record_unreadable(swift_file, f"cannot resolve path ({error})"):
+                        break
                     continue
                 if resolved_file in seen_files:
                     continue
@@ -507,7 +531,8 @@ def main() -> int:
                 except OSError as error:
                     if not try_increment_scanned_files():
                         break
-                    record_unreadable(swift_file, f"cannot inspect file metadata ({error})")
+                    if not record_unreadable(swift_file, f"cannot inspect file metadata ({error})"):
+                        break
                     continue
                 file_identity = (resolved_stat.st_dev, resolved_stat.st_ino)
                 if file_identity in seen_file_identities:
@@ -527,50 +552,57 @@ def main() -> int:
                     try:
                         pre_open_stat = swift_file.lstat()
                     except OSError as error:
-                        record_unreadable(swift_file, f"cannot inspect file metadata ({error})")
+                        if not record_unreadable(swift_file, f"cannot inspect file metadata ({error})"):
+                            break
                         continue
                     if not stat.S_ISREG(pre_open_stat.st_mode):
-                        record_unreadable(swift_file, "unsupported non-regular Swift path")
+                        if not record_unreadable(swift_file, "unsupported non-regular Swift path"):
+                            break
                         continue
                 descriptor = -1
                 try:
                     descriptor = os.open(swift_file, open_flags)
                     descriptor_stat = os.fstat(descriptor)
                     if not stat.S_ISREG(descriptor_stat.st_mode):
-                        record_unreadable(swift_file, "unsupported non-regular Swift path")
+                        if not record_unreadable(swift_file, "unsupported non-regular Swift path"):
+                            break
                         continue
                     file_size_bytes = descriptor_stat.st_size
                     if file_size_bytes > MAX_SWIFT_FILE_BYTES:
-                        record_unreadable(
+                        if not record_unreadable(
                             swift_file,
                             (
                                 "file exceeds max supported size "
                                 f"({file_size_bytes} bytes > {MAX_SWIFT_FILE_BYTES} bytes)"
                             ),
-                        )
+                        ):
+                            break
                         continue
                     with os.fdopen(descriptor, "rb") as file_handle:
                         descriptor = -1
                         raw_content = file_handle.read(MAX_SWIFT_FILE_BYTES + 1)
                 except OSError as error:
-                    record_unreadable(swift_file, format_open_read_error(error))
+                    if not record_unreadable(swift_file, format_open_read_error(error)):
+                        break
                     continue
                 finally:
                     if descriptor >= 0:
                         os.close(descriptor)
                 if len(raw_content) > MAX_SWIFT_FILE_BYTES:
-                    record_unreadable(
+                    if not record_unreadable(
                         swift_file,
                         (
                             "file exceeds max supported size "
                             f"(>= {len(raw_content)} bytes > {MAX_SWIFT_FILE_BYTES} bytes)"
                         ),
-                    )
+                    ):
+                        break
                     continue
                 try:
                     content = raw_content.decode("utf-8")
                 except UnicodeDecodeError as error:
-                    record_unreadable(swift_file, str(error))
+                    if not record_unreadable(swift_file, str(error)):
+                        break
                     continue
                 line_numbers, line_number_count, parse_error = find_token_matches_with_state(
                     content,
@@ -579,7 +611,8 @@ def main() -> int:
                 )
                 reported_swift_file = report_path(swift_file)
                 if parse_error is not None:
-                    record_parse_error(reported_swift_file, parse_error)
+                    if not record_parse_error(reported_swift_file, parse_error):
+                        break
                     continue
                 if line_number_count > 0:
                     token_match_count += 1
@@ -587,13 +620,10 @@ def main() -> int:
                         tracked_matches.append(reported_swift_file)
                         matches_with_lines[reported_swift_file] = line_numbers
                         matches_with_line_counts[reported_swift_file] = line_number_count
-            if scan_limit_reached:
+            if should_abort_scan():
                 break
 
-        for error_path, error_message in traversal_errors.items():
-            record_unreadable(error_path, error_message)
-
-        if scan_limit_reached:
+        if should_abort_scan():
             break
 
     has_failure = False
@@ -656,6 +686,18 @@ def main() -> int:
         print(
             "Scan aborted after reaching maximum Swift file limit "
             f"({MAX_SCANNED_SWIFT_FILES})."
+        )
+    if unreadable_limit_reached:
+        has_failure = True
+        print(
+            "Scan aborted after reaching maximum unreadable-path tracking limit "
+            f"({MAX_UNREADABLE_FILE_PATHS})."
+        )
+    if parse_error_limit_reached:
+        has_failure = True
+        print(
+            "Scan aborted after reaching maximum parse-error tracking limit "
+            f"({MAX_PARSE_ERROR_FILE_PATHS})."
         )
 
     if has_failure:

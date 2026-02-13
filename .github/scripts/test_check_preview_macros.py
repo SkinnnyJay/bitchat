@@ -834,6 +834,35 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("... and 2 more unreadable files not shown.", output)
             self.assertIn("Failure summary: 3 unreadable, 0 parse errors, 0 token matches.", output)
 
+    def test_fails_closed_when_unreadable_tracking_limit_is_reached(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            with tempfile.TemporaryDirectory() as target_dir:
+                target_root = pathlib.Path(target_dir)
+                for index in range(2):
+                    real_swift = target_root / f"Real{index}.swift"
+                    real_swift.write_text("struct Real {}\n", encoding="utf-8")
+                    symlinked_swift = temp_path / f"Linked{index}.swift"
+                    try:
+                        symlinked_swift.symlink_to(real_swift)
+                    except (NotImplementedError, OSError) as error:
+                        self.skipTest(f"Symlink setup not supported in environment: {error}")
+
+                with mock.patch.object(check_preview_macros, "MAX_UNREADABLE_FILE_PATHS", 1):
+                    return_code, output = self.run_main_with_args(
+                        roots=[temp_dir],
+                        token="#Preview",
+                        allow_empty=True,
+                    )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn(
+                "Scan aborted after reaching maximum unreadable-path tracking limit (1).",
+                output,
+            )
+            self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
+            self.assertIn("Scanned 2 Swift files before failure.", output)
+
     def test_limits_reported_parse_error_files(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)
@@ -871,6 +900,31 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(output.count("unterminated single-line string literal"), 1)
             self.assertIn("... and 2 more parse-error files not shown.", output)
             self.assertIn("Failure summary: 0 unreadable, 3 parse errors, 0 token matches.", output)
+
+    def test_fails_closed_when_parse_error_tracking_limit_is_reached(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            for index in range(2):
+                malformed_swift = temp_path / f"Malformed{index}.swift"
+                malformed_swift.write_text(
+                    'let value = "unterminated\n',
+                    encoding="utf-8",
+                )
+
+            with mock.patch.object(check_preview_macros, "MAX_PARSE_ERROR_FILE_PATHS", 1):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn(
+                "Scan aborted after reaching maximum parse-error tracking limit (1).",
+                output,
+            )
+            self.assertIn("Failure summary: 0 unreadable, 1 parse errors, 0 token matches.", output)
+            self.assertIn("Scanned 2 Swift files before failure.", output)
 
     def test_reports_detected_file_with_absolute_path_for_relative_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
