@@ -29,6 +29,7 @@ MAX_REPORTED_UNREADABLE_FILES = 200
 MAX_PARSE_ERROR_FILE_PATHS = 100000
 MAX_TRACKED_PARSE_ERROR_FILES = 200
 MAX_REPORTED_PARSE_ERROR_FILES = 200
+MAX_STORED_ERROR_REASON_CHARS = 2048
 MAX_TRACKED_TOKEN_MATCH_FILES = 200
 MAX_REPORTED_TOKEN_MATCH_FILES = 200
 MAX_REPORTED_LINE_NUMBERS_PER_FILE = 50
@@ -93,6 +94,13 @@ def format_open_read_error(error: OSError) -> str:
     if error.errno == errno.ENOENT:
         return f"path disappeared during scan ({error})"
     return f"cannot open/read file ({error})"
+
+
+def truncate_error_reason_for_storage(reason: str) -> str:
+    if len(reason) <= MAX_STORED_ERROR_REASON_CHARS:
+        return reason
+    omitted_chars = len(reason) - MAX_STORED_ERROR_REASON_CHARS
+    return f"{reason[:MAX_STORED_ERROR_REASON_CHARS]}... +{omitted_chars} chars truncated"
 
 
 def parse_args() -> argparse.Namespace:
@@ -415,31 +423,33 @@ def main() -> int:
 
     def record_unreadable(path: Path, reason: str) -> bool:
         nonlocal unreadable_limit_reached
+        stored_reason = truncate_error_reason_for_storage(reason)
         reported_path = report_path(path)
         if reported_path in unreadable_file_paths:
             if reported_path in tracked_unreadable_files:
-                tracked_unreadable_files[reported_path] = reason
+                tracked_unreadable_files[reported_path] = stored_reason
             return True
         if len(unreadable_file_paths) >= MAX_UNREADABLE_FILE_PATHS:
             unreadable_limit_reached = True
             return False
         unreadable_file_paths.add(reported_path)
         if len(tracked_unreadable_files) < MAX_TRACKED_UNREADABLE_FILES:
-            tracked_unreadable_files[reported_path] = reason
+            tracked_unreadable_files[reported_path] = stored_reason
         return True
 
     def record_parse_error(path: Path, reason: str) -> bool:
         nonlocal parse_error_limit_reached
+        stored_reason = truncate_error_reason_for_storage(reason)
         if path in parse_error_file_paths:
             if path in tracked_parse_error_files:
-                tracked_parse_error_files[path] = reason
+                tracked_parse_error_files[path] = stored_reason
             return True
         if len(parse_error_file_paths) >= MAX_PARSE_ERROR_FILE_PATHS:
             parse_error_limit_reached = True
             return False
         parse_error_file_paths.add(path)
         if len(tracked_parse_error_files) < MAX_TRACKED_PARSE_ERROR_FILES:
-            tracked_parse_error_files[path] = reason
+            tracked_parse_error_files[path] = stored_reason
         return True
 
     def try_increment_scanned_files() -> bool:

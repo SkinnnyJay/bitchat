@@ -344,6 +344,17 @@ class PreviewMacroUtilityTests(unittest.TestCase):
         self.assertTrue(check_preview_macros.contains_disallowed_control_characters("a\x7fb"))
         self.assertFalse(check_preview_macros.contains_disallowed_control_characters("abc"))
 
+    def test_truncates_error_reason_for_storage(self) -> None:
+        with mock.patch.object(check_preview_macros, "MAX_STORED_ERROR_REASON_CHARS", 8):
+            self.assertEqual(
+                check_preview_macros.truncate_error_reason_for_storage("abcdefghijk"),
+                "abcdefgh... +3 chars truncated",
+            )
+            self.assertEqual(
+                check_preview_macros.truncate_error_reason_for_storage("abcd"),
+                "abcd",
+            )
+
     def test_formats_open_error_for_symlink_loop(self) -> None:
         error = OSError(errno.ELOOP, "too many levels of symbolic links")
         self.assertEqual(
@@ -882,6 +893,32 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("... and 1 more parse-error files not shown.", output)
             self.assertIn("Failure summary: 0 unreadable, 3 parse errors, 0 token matches.", output)
 
+    def test_truncates_stored_unreadable_error_reason(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            (temp_path / "Unreadable.swift").write_text("struct U {}\n", encoding="utf-8")
+            long_reason = "R" * 40
+
+            with (
+                mock.patch.object(check_preview_macros, "MAX_STORED_ERROR_REASON_CHARS", 8),
+                mock.patch.object(check_preview_macros, "format_open_read_error", return_value=long_reason),
+                mock.patch.object(
+                    check_preview_macros.os,
+                    "open",
+                    side_effect=OSError(errno.EIO, "simulated unreadable error"),
+                ),
+            ):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not read one or more Swift files:", output)
+            self.assertIn("RRRRRRRR... +32 chars truncated", output)
+            self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
+
     def test_preserves_parse_error_counts_when_internal_tracking_is_capped(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)
@@ -900,6 +937,31 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(output.count("unterminated single-line string literal"), 1)
             self.assertIn("... and 2 more parse-error files not shown.", output)
             self.assertIn("Failure summary: 0 unreadable, 3 parse errors, 0 token matches.", output)
+
+    def test_truncates_stored_parse_error_reason(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            (temp_path / "Parse.swift").write_text("struct P {}\n", encoding="utf-8")
+            long_reason = "P" * 40
+
+            with (
+                mock.patch.object(check_preview_macros, "MAX_STORED_ERROR_REASON_CHARS", 8),
+                mock.patch.object(
+                    check_preview_macros,
+                    "find_token_matches_with_state",
+                    return_value=([], 0, long_reason),
+                ),
+            ):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not reliably parse one or more Swift files:", output)
+            self.assertIn("PPPPPPPP... +32 chars truncated", output)
+            self.assertIn("Failure summary: 0 unreadable, 1 parse errors, 0 token matches.", output)
 
     def test_fails_closed_when_parse_error_tracking_limit_is_reached(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
