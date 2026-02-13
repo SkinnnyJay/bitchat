@@ -361,6 +361,38 @@ class PreviewMacroUtilityTests(unittest.TestCase):
         self.assertEqual(check_preview_macros.utf8_byte_length_or_none("🙂"), 4)
         self.assertIsNone(check_preview_macros.utf8_byte_length_or_none("\ud800"))
 
+    def test_reads_stat_timestamp_ns_from_nanosecond_field(self) -> None:
+        stats = type("StatLike", (), {"st_mtime_ns": 123, "st_mtime": 9.0})()
+        self.assertEqual(
+            check_preview_macros.stat_timestamp_ns_or_none(
+                stats,
+                "st_mtime_ns",
+                "st_mtime",
+            ),
+            123,
+        )
+
+    def test_reads_stat_timestamp_ns_from_seconds_fallback(self) -> None:
+        stats = type("StatLike", (), {"st_mtime": 1.25})()
+        self.assertEqual(
+            check_preview_macros.stat_timestamp_ns_or_none(
+                stats,
+                "st_mtime_ns",
+                "st_mtime",
+            ),
+            1_250_000_000,
+        )
+
+    def test_returns_none_when_stat_timestamp_fields_are_missing(self) -> None:
+        stats = type("StatLike", (), {})()
+        self.assertIsNone(
+            check_preview_macros.stat_timestamp_ns_or_none(
+                stats,
+                "st_mtime_ns",
+                "st_mtime",
+            )
+        )
+
     def test_formats_roots_for_diagnostics(self) -> None:
         roots = [pathlib.Path("/tmp/a"), pathlib.Path("/tmp/b"), pathlib.Path("/tmp/c")]
         self.assertEqual(

@@ -72,6 +72,16 @@ def utf8_byte_length_or_none(value: str) -> int | None:
         return None
 
 
+def stat_timestamp_ns_or_none(stats: object, nanoseconds_attr: str, seconds_attr: str) -> int | None:
+    nanoseconds_value = getattr(stats, nanoseconds_attr, None)
+    if isinstance(nanoseconds_value, int):
+        return nanoseconds_value
+    seconds_value = getattr(stats, seconds_attr, None)
+    if isinstance(seconds_value, (int, float)):
+        return int(seconds_value * 1_000_000_000)
+    return None
+
+
 def contains_disallowed_control_characters(value: str) -> bool:
     return any(unicodedata.category(character) in DISALLOWED_CONTROL_CATEGORIES for character in value)
 
@@ -817,8 +827,16 @@ def main() -> int:
                         continue
                     file_size_bytes = descriptor_stat.st_size
                     file_mode = descriptor_stat.st_mode
-                    file_mtime_ns = descriptor_stat.st_mtime_ns
-                    file_ctime_ns = descriptor_stat.st_ctime_ns
+                    file_mtime_ns = stat_timestamp_ns_or_none(
+                        descriptor_stat,
+                        "st_mtime_ns",
+                        "st_mtime",
+                    )
+                    file_ctime_ns = stat_timestamp_ns_or_none(
+                        descriptor_stat,
+                        "st_ctime_ns",
+                        "st_ctime",
+                    )
                     file_link_count = descriptor_stat.st_nlink
                     file_uid = getattr(descriptor_stat, "st_uid", None)
                     file_gid = getattr(descriptor_stat, "st_gid", None)
@@ -893,16 +911,32 @@ def main() -> int:
                     ):
                         break
                     continue
+                post_read_mtime_ns = stat_timestamp_ns_or_none(
+                    post_read_descriptor_stat,
+                    "st_mtime_ns",
+                    "st_mtime",
+                )
+                post_read_ctime_ns = stat_timestamp_ns_or_none(
+                    post_read_descriptor_stat,
+                    "st_ctime_ns",
+                    "st_ctime",
+                )
                 if (
-                    post_read_descriptor_stat.st_mtime_ns != file_mtime_ns
-                    or post_read_descriptor_stat.st_ctime_ns != file_ctime_ns
+                    file_mtime_ns is not None
+                    and file_ctime_ns is not None
+                    and post_read_mtime_ns is not None
+                    and post_read_ctime_ns is not None
+                    and (
+                        post_read_mtime_ns != file_mtime_ns
+                        or post_read_ctime_ns != file_ctime_ns
+                    )
                 ):
                     if not record_unreadable(
                         swift_file,
                         "file metadata changed during read "
                         "(possible race: "
-                        f"mtime {file_mtime_ns} -> {post_read_descriptor_stat.st_mtime_ns}, "
-                        f"ctime {file_ctime_ns} -> {post_read_descriptor_stat.st_ctime_ns})",
+                        f"mtime {file_mtime_ns} -> {post_read_mtime_ns}, "
+                        f"ctime {file_ctime_ns} -> {post_read_ctime_ns})",
                     ):
                         break
                     continue
