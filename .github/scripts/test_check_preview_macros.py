@@ -456,6 +456,19 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             result.stdout,
         )
 
+    def test_fails_when_scan_root_count_exceeds_max(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            args: list[str] = []
+            for _ in range(check_preview_macros.MAX_ROOT_COUNT + 1):
+                args.extend(["--root", temp_dir])
+            result = self.run_script(*args)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Too many scan roots configured", result.stdout)
+            self.assertIn(
+                f"{check_preview_macros.MAX_ROOT_COUNT} root arguments",
+                result.stdout,
+            )
+
     def test_fails_when_scan_root_contains_control_character(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             result = self.run_script("--root", f"{temp_dir}\x01")

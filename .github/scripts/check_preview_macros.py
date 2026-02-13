@@ -20,6 +20,7 @@ import unicodedata
 MAX_TOKEN_BYTES = 256
 MAX_SWIFT_FILE_BYTES = 5 * 1024 * 1024
 MAX_ROOT_BYTES = 4096
+MAX_ROOT_COUNT = 128
 DISALLOWED_CONTROL_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn"}
 
 
@@ -242,6 +243,13 @@ def main() -> int:
         return 1
 
     raw_roots = args.root or ["bitchat", "bitchatShareExtension"]
+    if len(raw_roots) > MAX_ROOT_COUNT:
+        print(
+            "Too many scan roots configured; "
+            f"provide at most {MAX_ROOT_COUNT} root arguments."
+        )
+        return 1
+
     roots: list[Path] = []
     seen_roots: set[Path] = set()
     invalid_roots: dict[str, str] = {}
