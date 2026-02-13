@@ -28,6 +28,7 @@ MAX_TOTAL_DIRECTORY_ENTRIES = 2_000_000
 MAX_SEEN_SWIFT_PATH_KEYS = 300_000
 MAX_SEEN_SWIFT_FILE_IDENTITIES = 300_000
 MAX_TOTAL_PARSED_SWIFT_LINES = 20_000_000
+MAX_STORED_PATH_BYTES = 4096
 MAX_ROOT_BYTES = 4096
 MAX_ROOT_COUNT = 128
 MAX_REPORTED_INVALID_ROOTS = 200
@@ -538,6 +539,9 @@ def main() -> int:
     total_directory_entries_limit_reached = False
     seen_path_keys_limit_reached = False
     seen_file_identities_limit_reached = False
+    path_key_limit_reached = False
+    path_key_limit_path: Path | None = None
+    path_key_limit_reason: str | None = None
     parsed_lines_limit_reached = False
     unreadable_limit_reached = False
     parse_error_limit_reached = False
@@ -552,10 +556,31 @@ def main() -> int:
         except OSError:
             return path
 
+    def try_accept_path_key(path: Path) -> bool:
+        nonlocal path_key_limit_reached, path_key_limit_path, path_key_limit_reason
+        try:
+            path_bytes = os.fsencode(str(path))
+        except (UnicodeError, ValueError):
+            path_key_limit_reached = True
+            path_key_limit_path = path
+            path_key_limit_reason = "cannot be encoded for filesystem operations"
+            return False
+        if len(path_bytes) > MAX_STORED_PATH_BYTES:
+            path_key_limit_reached = True
+            path_key_limit_path = path
+            path_key_limit_reason = (
+                "exceeds maximum path-key size "
+                f"({len(path_bytes)} bytes > {MAX_STORED_PATH_BYTES} bytes)"
+            )
+            return False
+        return True
+
     def record_unreadable(path: Path, reason: str) -> bool:
         nonlocal unreadable_limit_reached
         stored_reason = truncate_error_reason_for_storage(reason)
         reported_path = report_path(path)
+        if not try_accept_path_key(reported_path):
+            return False
         if reported_path in unreadable_file_paths:
             if reported_path in tracked_unreadable_files:
                 tracked_unreadable_files[reported_path] = stored_reason
@@ -571,6 +596,8 @@ def main() -> int:
     def record_parse_error(path: Path, reason: str) -> bool:
         nonlocal parse_error_limit_reached
         stored_reason = truncate_error_reason_for_storage(reason)
+        if not try_accept_path_key(path):
+            return False
         if path in parse_error_file_paths:
             if path in tracked_parse_error_files:
                 tracked_parse_error_files[path] = stored_reason
@@ -618,6 +645,7 @@ def main() -> int:
             or total_directory_entries_limit_reached
             or seen_path_keys_limit_reached
             or seen_file_identities_limit_reached
+            or path_key_limit_reached
             or parsed_lines_limit_reached
             or unreadable_limit_reached
             or parse_error_limit_reached
@@ -625,6 +653,8 @@ def main() -> int:
 
     def try_add_seen_file_key(path: Path) -> bool:
         nonlocal seen_path_keys_limit_reached
+        if not try_accept_path_key(path):
+            return False
         if path in seen_files:
             return True
         if len(seen_files) >= MAX_SEEN_SWIFT_PATH_KEYS:
@@ -858,6 +888,8 @@ def main() -> int:
                     parsed_lines_limit_reached = True
                     break
                 reported_swift_file = report_path(swift_file)
+                if not try_accept_path_key(reported_swift_file):
+                    break
                 if parse_error is not None:
                     if not record_parse_error(reported_swift_file, parse_error):
                         break
@@ -972,6 +1004,16 @@ def main() -> int:
             "Scan aborted after reaching maximum tracked Swift file-identity limit "
             f"({MAX_SEEN_SWIFT_FILE_IDENTITIES})."
         )
+    if path_key_limit_reached:
+        has_failure = True
+        if path_key_limit_path is None or path_key_limit_reason is None:
+            print("Scan aborted after encountering an unsupported Swift path key.")
+        else:
+            print(
+                "Scan aborted after encountering an unsupported Swift path key: "
+                f"{format_path_for_diagnostics(path_key_limit_path)} "
+                f"({escape_diagnostic_text(path_key_limit_reason)})."
+            )
     if parsed_lines_limit_reached:
         has_failure = True
         print(
