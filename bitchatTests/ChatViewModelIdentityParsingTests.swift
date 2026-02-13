@@ -135,4 +135,16 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
             "user"
         )
     }
+
+    func testSanitizedFavoriteNotificationSenderNicknameFallsBackToUser() {
+        XCTAssertEqual(ChatViewModel.sanitizedFavoriteNotificationSenderNickname("   "), "user")
+    }
+
+    func testSanitizedFavoriteNotificationNostrPubkeyTrimsAndRejectsBlank() {
+        XCTAssertEqual(
+            ChatViewModel.sanitizedFavoriteNotificationNostrPubkey("  npub123  "),
+            "npub123"
+        )
+        XCTAssertNil(ChatViewModel.sanitizedFavoriteNotificationNostrPubkey("   "))
+    }
 }

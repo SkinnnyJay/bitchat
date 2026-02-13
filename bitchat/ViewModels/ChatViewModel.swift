@@ -1359,6 +1359,16 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         return "user"
     }
 
+    static func sanitizedFavoriteNotificationSenderNickname(_ nickname: String) -> String {
+        InputValidator.validateNickname(nickname) ?? "user"
+    }
+
+    static func sanitizedFavoriteNotificationNostrPubkey(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     static func resolvedFavoriteNotificationPeerID(from peerID: String, resolvedPeer: BitchatPeer?) -> PeerID? {
         let candidate = resolvedPeer?.peerID ?? PeerID(str: peerID.trimmingCharacters(in: .whitespacesAndNewlines))
         return candidate.isValid ? candidate : nil
@@ -5745,11 +5755,12 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Parse the message format: "[FAVORITED]:npub..." or "[UNFAVORITED]:npub..."
         let isFavorite = content.hasPrefix("[FAVORITED]")
         let parts = content.split(separator: ":")
+        let sanitizedSenderNickname = Self.sanitizedFavoriteNotificationSenderNickname(senderNickname)
         
         // Extract Nostr public key if included
         var nostrPubkey: String? = nil
         if parts.count > 1 {
-            nostrPubkey = String(parts[1])
+            nostrPubkey = Self.sanitizedFavoriteNotificationNostrPubkey(String(parts[1]))
             SecureLogger.info("📝 Received Nostr npub in favorite notification: \(nostrPubkey ?? "none")", category: .session)
         }
         
@@ -5764,7 +5775,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             noiseKey = peer.noisePublicKey
         }
         
-        guard let finalNoiseKey = noiseKey else {
+        guard let finalNoiseKey = Self.validatedNoisePublicKey(noiseKey) else {
             SecureLogger.warning("⚠️ Cannot get Noise key for peer \(peerID)", category: .session)
             return
         }
@@ -5775,19 +5786,19 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         FavoritesPersistenceService.shared.updatePeerFavoritedUs(
             peerNoisePublicKey: finalNoiseKey,
             favorited: isFavorite,
-            peerNickname: senderNickname,
+            peerNickname: sanitizedSenderNickname,
             peerNostrPublicKey: nostrPubkey
         )
 
         // If they favorited us and provided their Nostr key, ensure it's stored (log only)
         if isFavorite && nostrPubkey != nil {
-            SecureLogger.info("💾 Storing Nostr key association for \(senderNickname): \(nostrPubkey!.prefix(16))...", category: .session)
+            SecureLogger.info("💾 Storing Nostr key association for \(sanitizedSenderNickname): \(nostrPubkey!.prefix(16))...", category: .session)
         }
 
         // Only show a system message when the state changes, and only in mesh
         if prior != isFavorite {
             let action = isFavorite ? "favorited" : "unfavorited"
-            addMeshOnlySystemMessage("\(senderNickname) \(action) you")
+            addMeshOnlySystemMessage("\(sanitizedSenderNickname) \(action) you")
         }
     }
     
