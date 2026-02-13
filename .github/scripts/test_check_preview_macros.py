@@ -198,11 +198,23 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("One or more scan roots are invalid", result.stdout)
             self.assertIn("is not a directory", result.stdout)
 
+    def test_fails_when_scan_root_is_blank_after_trimming(self) -> None:
+        result = self.run_script("--root", "   ")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("One or more scan roots are invalid", result.stdout)
+        self.assertIn("is empty after trimming", result.stdout)
+
     def test_fails_when_no_swift_files_found_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             result = self.run_script("--root", temp_dir)
             self.assertEqual(result.returncode, 1)
             self.assertIn("No Swift files were discovered", result.stdout)
+
+    def test_deduplicates_duplicate_root_arguments(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = self.run_script("--root", temp_dir, "--root", temp_dir)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(f"Roots: [{temp_dir}]", result.stdout)
 
     def test_allow_empty_succeeds_when_no_swift_files_found(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

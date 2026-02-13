@@ -176,13 +176,27 @@ def main() -> int:
         print("Configured token is empty after trimming; provide a non-empty token.")
         return 1
 
-    roots = [Path(raw) for raw in (args.root or ["bitchat", "bitchatShareExtension"])]
-    invalid_roots: dict[Path, str] = {}
-    for root in roots:
+    raw_roots = args.root or ["bitchat", "bitchatShareExtension"]
+    roots: list[Path] = []
+    seen_roots: set[Path] = set()
+    invalid_roots: dict[str, str] = {}
+    for raw_root in raw_roots:
+        trimmed_root = raw_root.strip()
+        if not trimmed_root:
+            invalid_roots[raw_root] = "is empty after trimming"
+            continue
+
+        root = Path(trimmed_root)
+        root_key = root.expanduser().resolve(strict=False)
+        if root_key in seen_roots:
+            continue
+        seen_roots.add(root_key)
+        roots.append(root)
+
         if not root.exists():
-            invalid_roots[root] = "does not exist"
+            invalid_roots[str(root)] = "does not exist"
         elif not root.is_dir():
-            invalid_roots[root] = "is not a directory"
+            invalid_roots[str(root)] = "is not a directory"
 
     if invalid_roots:
         print("One or more scan roots are invalid:")
