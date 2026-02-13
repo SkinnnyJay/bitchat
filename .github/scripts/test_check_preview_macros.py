@@ -629,6 +629,29 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("blocked", result.stdout)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", result.stdout)
 
+    def test_fails_closed_when_root_contains_symlinked_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            symlinked_directory = temp_path / "linked"
+            with tempfile.TemporaryDirectory() as target_dir:
+                target_path = pathlib.Path(target_dir)
+                (target_path / "Hidden.swift").write_text("struct Hidden {}\n", encoding="utf-8")
+                try:
+                    symlinked_directory.symlink_to(target_path, target_is_directory=True)
+                except (NotImplementedError, OSError) as error:
+                    self.skipTest(f"Symlink directory setup not supported in environment: {error}")
+
+                result = self.run_script("--root", temp_dir, "--allow-empty")
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(result.stderr, "")
+                self.assertIn("Could not read one or more Swift files", result.stdout)
+                self.assertIn("linked", result.stdout)
+                self.assertIn("symlinked directory not traversed", result.stdout)
+                self.assertIn(
+                    "Failure summary: 1 unreadable, 0 parse errors, 0 token matches.",
+                    result.stdout,
+                )
+
     def test_fails_closed_when_root_directory_is_unreadable(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)

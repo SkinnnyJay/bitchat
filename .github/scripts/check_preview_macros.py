@@ -259,6 +259,21 @@ def main() -> int:
             onerror=record_walk_error,
             followlinks=False,
         ):
+            symlinked_subdirectories: list[Path] = []
+            for subdirectory in list(subdirectories):
+                subdirectory_path = Path(directory) / subdirectory
+                try:
+                    if subdirectory_path.is_symlink():
+                        symlinked_subdirectories.append(subdirectory_path)
+                except OSError as error:
+                    traversal_errors[subdirectory_path] = f"cannot inspect directory ({error})"
+
+            for symlinked_subdirectory in sorted(symlinked_subdirectories):
+                traversal_errors[
+                    symlinked_subdirectory
+                ] = "symlinked directory not traversed (followlinks disabled)"
+                subdirectories.remove(symlinked_subdirectory.name)
+
             subdirectories.sort()
             filenames.sort()
             for filename in filenames:
