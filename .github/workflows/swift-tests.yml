@@ -29,7 +29,7 @@ jobs:
       - name: Set up Swift
         uses: swift-actions/setup-swift@v2
 
-      - name: Guard against #Preview macro regressions
+      - name: "Guard against #Preview macro regressions"
         run: python3 .github/scripts/check_preview_macros.py
 
       - name: Capture toolchain fingerprints
