@@ -200,8 +200,10 @@ def format_utf8_decode_error(error: UnicodeDecodeError) -> str:
     reason = error.reason if isinstance(error.reason, str) and error.reason else "decode failure"
     start = error.start if isinstance(error.start, int) and not isinstance(error.start, bool) else None
     end = error.end if isinstance(error.end, int) and not isinstance(error.end, bool) else None
-    if start is None:
+    if start is None or start < 0:
         return f"cannot decode file as UTF-8 ({reason})"
+    if end is not None and end < 0:
+        end = None
     if end is None or end <= start + 1:
         return f"cannot decode file as UTF-8 ({reason} at byte {start})"
     return f"cannot decode file as UTF-8 ({reason} at bytes {start}-{end - 1})"

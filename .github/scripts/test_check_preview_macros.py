@@ -726,6 +726,22 @@ class PreviewMacroUtilityTests(unittest.TestCase):
             "cannot decode file as UTF-8 (invalid continuation byte at bytes 0-2)",
         )
 
+    def test_formats_utf8_decode_error_with_negative_start_index(self) -> None:
+        error = UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+        error.start = -1
+        self.assertEqual(
+            check_preview_macros.format_utf8_decode_error(error),
+            "cannot decode file as UTF-8 (invalid start byte)",
+        )
+
+    def test_formats_utf8_decode_error_with_negative_end_index(self) -> None:
+        error = UnicodeDecodeError("utf-8", b"\xff", 2, 3, "invalid continuation byte")
+        error.end = -1
+        self.assertEqual(
+            check_preview_macros.format_utf8_decode_error(error),
+            "cannot decode file as UTF-8 (invalid continuation byte at byte 2)",
+        )
+
     def test_iter_content_lines_handles_mixed_newline_sequences(self) -> None:
         content = "a\r\nb\rc\n\n"
         self.assertEqual(
