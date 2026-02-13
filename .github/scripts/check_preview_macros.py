@@ -218,18 +218,6 @@ def main() -> int:
 
         root = Path(trimmed_root).expanduser()
         try:
-            root_key = root.resolve(strict=False)
-        except RuntimeError as error:
-            invalid_roots[str(root)] = f"cannot resolve path ({error})"
-            continue
-        except OSError:
-            root_key = root.absolute()
-        if root_key in seen_roots:
-            continue
-        seen_roots.add(root_key)
-        roots.append(root)
-
-        try:
             root_lstat = root.lstat()
         except FileNotFoundError:
             invalid_roots[str(root)] = "does not exist"
@@ -243,6 +231,19 @@ def main() -> int:
             continue
         if not stat.S_ISDIR(root_lstat.st_mode):
             invalid_roots[str(root)] = "is not a directory"
+            continue
+
+        try:
+            root_key = root.resolve(strict=False)
+        except RuntimeError as error:
+            invalid_roots[str(root)] = f"cannot resolve path ({error})"
+            continue
+        except OSError:
+            root_key = Path(os.path.abspath(root))
+        if root_key in seen_roots:
+            continue
+        seen_roots.add(root_key)
+        roots.append(root)
 
     if invalid_roots:
         print("One or more scan roots are invalid:")

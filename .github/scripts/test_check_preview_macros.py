@@ -359,6 +359,25 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("One or more scan roots are invalid", result.stdout)
             self.assertIn("is a symlinked directory", result.stdout)
 
+    def test_rejects_symlink_root_when_canonical_root_is_also_configured(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            real_root = temp_path / "real_root"
+            real_root.mkdir(parents=True, exist_ok=True)
+            (real_root / "Real.swift").write_text("struct Real {}\n", encoding="utf-8")
+
+            symlink_root = temp_path / "symlink_root"
+            try:
+                symlink_root.symlink_to(real_root, target_is_directory=True)
+            except (NotImplementedError, OSError) as error:
+                self.skipTest(f"Symlink creation not supported in environment: {error}")
+
+            result = self.run_script("--root", str(real_root), "--root", str(symlink_root))
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("One or more scan roots are invalid", result.stdout)
+            self.assertIn("symlink_root", result.stdout)
+            self.assertIn("is a symlinked directory", result.stdout)
+
     def test_fails_when_scan_root_has_symlink_loop(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)
