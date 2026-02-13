@@ -155,6 +155,10 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [2, 4])
 
+    def test_detects_preview_when_file_starts_with_utf8_bom(self) -> None:
+        content = "\ufeff#Preview { Text(\"one\") }\n"
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [1])
+
     def test_reports_parse_state_for_unterminated_single_line_string(self) -> None:
         content = """
             let value = "unterminated
@@ -271,6 +275,19 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             result = self.run_script("--root", temp_dir)
             self.assertEqual(result.returncode, 1)
             self.assertIn("Example.swift (lines: 4)", result.stdout)
+
+    def test_reports_detected_file_with_utf8_bom(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "BomExample.swift"
+            swift_file.write_text(
+                "\ufeff#Preview { Text(\"hi\") }\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("BomExample.swift (lines: 1)", result.stdout)
 
     def test_supports_custom_token_scans(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

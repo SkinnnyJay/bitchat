@@ -48,6 +48,9 @@ def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[i
     Return 1-based line numbers where `token` appears as an invocation-like
     directive at start-of-code (ignoring comments and leading whitespace).
     """
+    if content.startswith("\ufeff"):
+        content = content[1:]
+
     pattern = re.compile(rf"^\s*{re.escape(token)}\b")
     matches: list[int] = []
     block_comment_starts: list[int] = []
