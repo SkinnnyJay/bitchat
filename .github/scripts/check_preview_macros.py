@@ -45,6 +45,7 @@ MAX_RAW_STRING_DELIMITER_HASHES = 256
 MAX_REPORTED_ROOTS_IN_SUMMARY = 20
 MAX_DIAGNOSTIC_TEXT_CHARS = 512
 DISALLOWED_CONTROL_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn"}
+ADDITIONAL_LINE_SEPARATORS = {"\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"}
 
 
 def escape_diagnostic_text(text: str) -> str:
@@ -133,11 +134,17 @@ def iter_content_lines(content: str) -> Iterator[tuple[int, str]]:
 
     while cursor < content_length:
         character = content[cursor]
-        if character == "\n" or character == "\r":
+        if character == "\r":
             line_number += 1
             yield line_number, content[start:cursor]
-            if character == "\r" and cursor + 1 < content_length and content[cursor + 1] == "\n":
+            if cursor + 1 < content_length and content[cursor + 1] == "\n":
                 cursor += 1
+            cursor += 1
+            start = cursor
+            continue
+        if character == "\n" or character in ADDITIONAL_LINE_SEPARATORS:
+            line_number += 1
+            yield line_number, content[start:cursor]
             cursor += 1
             start = cursor
             continue

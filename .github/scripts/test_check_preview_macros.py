@@ -244,6 +244,10 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [2, 4])
 
+    def test_detects_preview_with_unicode_line_separator(self) -> None:
+        content = "let value = 1\u2028#Preview { Text(\"one\") }\n"
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [2])
+
     def test_detects_preview_when_file_starts_with_utf8_bom(self) -> None:
         content = "\ufeff#Preview { Text(\"one\") }\n"
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [1])
@@ -436,6 +440,23 @@ class PreviewMacroUtilityTests(unittest.TestCase):
         self.assertEqual(
             list(check_preview_macros.iter_content_lines(content)),
             [(1, "a"), (2, "b"), (3, "c"), (4, "")],
+        )
+
+    def test_iter_content_lines_handles_additional_line_separators(self) -> None:
+        content = "a\x0bb\x0cc\x1cd\x1de\x1ef\x85g\u2028h\u2029i"
+        self.assertEqual(
+            list(check_preview_macros.iter_content_lines(content)),
+            [
+                (1, "a"),
+                (2, "b"),
+                (3, "c"),
+                (4, "d"),
+                (5, "e"),
+                (6, "f"),
+                (7, "g"),
+                (8, "h"),
+                (9, "i"),
+            ],
         )
 
     def test_builds_error_path_from_bytes_filename(self) -> None:
