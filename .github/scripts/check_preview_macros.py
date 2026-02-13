@@ -292,19 +292,25 @@ def main() -> int:
                     continue
 
                 swift_file = Path(directory) / filename
+                unresolved_key = swift_file.absolute()
                 try:
                     if swift_file.is_symlink():
+                        if unresolved_key in seen_files:
+                            continue
+                        seen_files.add(unresolved_key)
                         scanned_files += 1
                         unreadable_files[swift_file] = "symlinked Swift file not scanned"
                         continue
                 except OSError as error:
+                    if unresolved_key in seen_files:
+                        continue
+                    seen_files.add(unresolved_key)
                     scanned_files += 1
                     unreadable_files[swift_file] = f"cannot inspect file ({error})"
                     continue
                 try:
                     resolved_file = swift_file.resolve()
                 except (RuntimeError, OSError) as error:
-                    unresolved_key = swift_file.absolute()
                     if unresolved_key in seen_files:
                         continue
                     seen_files.add(unresolved_key)

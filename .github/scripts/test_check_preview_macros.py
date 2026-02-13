@@ -720,6 +720,33 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
                     result.stdout,
                 )
 
+    def test_deduplicates_symlinked_swift_file_across_overlapping_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            nested_root = temp_path / "nested"
+            nested_root.mkdir(parents=True, exist_ok=True)
+            symlinked_swift = nested_root / "Linked.swift"
+
+            with tempfile.TemporaryDirectory() as target_dir:
+                target_file = pathlib.Path(target_dir) / "Real.swift"
+                target_file.write_text("struct Real {}\n", encoding="utf-8")
+                try:
+                    symlinked_swift.symlink_to(target_file)
+                except (NotImplementedError, OSError) as error:
+                    self.skipTest(f"Symlink file setup not supported in environment: {error}")
+
+                result = self.run_script("--root", temp_dir, "--root", str(nested_root))
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Could not read one or more Swift files", result.stdout)
+            self.assertIn("symlinked Swift file not scanned", result.stdout)
+            self.assertEqual(result.stdout.count("Linked.swift"), 1, msg=result.stdout)
+            self.assertIn(
+                "Failure summary: 1 unreadable, 0 parse errors, 0 token matches.",
+                result.stdout,
+            )
+            self.assertIn("Scanned 1 Swift files before failure.", result.stdout)
+
     def test_fails_closed_when_root_directory_is_unreadable(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)
