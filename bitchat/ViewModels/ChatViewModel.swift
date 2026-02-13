@@ -995,19 +995,21 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             }
         }
         
+        guard let canonicalSenderPubkey = Self.canonicalNostrPubkeyHex(event.pubkey),
+              let key16 = Self.geohashConversationKey(for: canonicalSenderPubkey),
+              let key8 = Self.geohashShortMappingKey(for: canonicalSenderPubkey) else { return }
+
         if let nickTag = event.tags.first(where: { $0.first == "n" }), nickTag.count >= 2 {
             let nick = nickTag[1].trimmingCharacters(in: .whitespacesAndNewlines)
-            geoNicknames[event.pubkey.lowercased()] = nick
+            geoNicknames[canonicalSenderPubkey] = nick
         }
         
         // Store mapping for geohash sender IDs used in messages (ensures consistent colors)
-        let key16 = "nostr_" + String(event.pubkey.prefix(TransportConfig.nostrConvKeyPrefixLength))
-        nostrKeyMapping[key16] = event.pubkey
-        let key8 = "nostr:" + String(event.pubkey.prefix(TransportConfig.nostrShortKeyDisplayLength))
-        nostrKeyMapping[key8] = event.pubkey
+        nostrKeyMapping[key16] = canonicalSenderPubkey
+        nostrKeyMapping[key8] = canonicalSenderPubkey
 
         // Update participants last-seen for this pubkey
-        recordGeoParticipant(pubkeyHex: event.pubkey)
+        recordGeoParticipant(pubkeyHex: canonicalSenderPubkey)
         
         // Track teleported tag (only our format ["t","teleport"]) for icon state
         let hasTeleportTag = event.tags.contains(where: { tag in
@@ -1015,7 +1017,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         })
         
         if hasTeleportTag {
-            let key = event.pubkey.lowercased()
+            let key = canonicalSenderPubkey
             // Do not mark our own key from historical events; rely on manager.teleported for self
             let isSelf: Bool = {
                 if let gh = currentGeohash, let my = try? NostrIdentityBridge.deriveIdentity(forGeohash: gh) {
@@ -1030,7 +1032,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             }
         }
         
-        let senderName = displayNameForNostrPubkey(event.pubkey)
+        let senderName = displayNameForNostrPubkey(canonicalSenderPubkey)
         let content = event.content.trimmingCharacters(in: .whitespacesAndNewlines)
         
         // Clamp future timestamps to now to avoid future-dated messages skewing order
@@ -1043,7 +1045,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             content: content,
             timestamp: timestamp,
             isRelay: false,
-            senderPeerID: PeerID(nostr: event.pubkey),
+            senderPeerID: PeerID(nostr: canonicalSenderPubkey),
             mentions: mentions.isEmpty ? nil : mentions
         )
         Task { @MainActor in
@@ -1069,7 +1071,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         let messageTimestamp = Date(timeIntervalSince1970: TimeInterval(rumorTs))
-        let convKey = "nostr_" + String(senderPubkey.prefix(TransportConfig.nostrConvKeyPrefixLength))
+        guard let convKey = Self.geohashConversationKey(for: senderPubkey) else { return }
         nostrKeyMapping[convKey] = senderPubkey
         
         switch noisePayload.type {
@@ -1369,6 +1371,16 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
     static func canonicalNostrPubkeyHex(_ value: String) -> String? {
         NostrKeyNormalizer.canonicalHex(value)
+    }
+
+    static func geohashConversationKey(for senderPubkey: String) -> String? {
+        guard let canonicalSenderPubkey = canonicalNostrPubkeyHex(senderPubkey) else { return nil }
+        return "nostr_" + canonicalSenderPubkey.prefix(TransportConfig.nostrConvKeyPrefixLength)
+    }
+
+    static func geohashShortMappingKey(for senderPubkey: String) -> String? {
+        guard let canonicalSenderPubkey = canonicalNostrPubkeyHex(senderPubkey) else { return nil }
+        return "nostr:" + canonicalSenderPubkey.prefix(TransportConfig.nostrShortKeyDisplayLength)
     }
 
     static func favoriteNotificationState(from content: String) -> Bool? {
@@ -1771,27 +1783,29 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             }
         }
         
+        guard let canonicalSenderPubkey = Self.canonicalNostrPubkeyHex(event.pubkey),
+              let key16 = Self.geohashConversationKey(for: canonicalSenderPubkey),
+              let key8 = Self.geohashShortMappingKey(for: canonicalSenderPubkey) else { return }
+
         // Cache nickname from tag if present
         if let nickTag = event.tags.first(where: { $0.first == "n" }), nickTag.count >= 2 {
             let nick = nickTag[1].trimmingCharacters(in: .whitespacesAndNewlines)
-            geoNicknames[event.pubkey.lowercased()] = nick
+            geoNicknames[canonicalSenderPubkey] = nick
         }
         
         // If this pubkey is blocked, skip mapping, participants, and timeline
-        if identityManager.isNostrBlocked(pubkeyHexLowercased: event.pubkey) {
+        if identityManager.isNostrBlocked(pubkeyHexLowercased: canonicalSenderPubkey) {
             return
         }
         
         // Store mapping for geohash DM initiation
-        let key16 = "nostr_" + String(event.pubkey.prefix(TransportConfig.nostrConvKeyPrefixLength))
-        nostrKeyMapping[key16] = event.pubkey
-        let key8 = "nostr:" + String(event.pubkey.prefix(TransportConfig.nostrShortKeyDisplayLength))
-        nostrKeyMapping[key8] = event.pubkey
+        nostrKeyMapping[key16] = canonicalSenderPubkey
+        nostrKeyMapping[key8] = canonicalSenderPubkey
         
         // Update participants last-seen for this pubkey
-        recordGeoParticipant(pubkeyHex: event.pubkey)
+        recordGeoParticipant(pubkeyHex: canonicalSenderPubkey)
         
-        let senderName = displayNameForNostrPubkey(event.pubkey)
+        let senderName = displayNameForNostrPubkey(canonicalSenderPubkey)
         let content = event.content
         
         // If this is a teleport presence event (no content), don't add to timeline
@@ -1809,7 +1823,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             content: content,
             timestamp: min(rawTs, Date()),
             isRelay: false,
-            senderPeerID: PeerID(nostr: event.pubkey),
+            senderPeerID: PeerID(nostr: canonicalSenderPubkey),
             mentions: mentions.isEmpty ? nil : mentions
         )
         
@@ -1844,7 +1858,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         recordProcessedEvent(giftWrap.id)
         
         // Decrypt with per-geohash identity
-        guard let (content, senderPubkey, rumorTs) = try? NostrProtocol.decryptPrivateMessage(giftWrap: giftWrap, recipientIdentity: id) else {
+        guard let (content, senderPubkeyRaw, rumorTs) = try? NostrProtocol.decryptPrivateMessage(giftWrap: giftWrap, recipientIdentity: id),
+              let senderPubkey = Self.canonicalNostrPubkeyHex(senderPubkeyRaw) else {
             SecureLogger.warning("GeoDM: failed decrypt giftWrap id=\(giftWrap.id.prefix(8))…", category: .session)
             return
         }
@@ -1860,7 +1875,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             return
         }
         
-        let convKey = "nostr_" + String(senderPubkey.prefix(16))
+        guard let convKey = Self.geohashConversationKey(for: senderPubkey) else { return }
         nostrKeyMapping[convKey] = senderPubkey
         
         switch payload.type {

@@ -218,4 +218,16 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
 
         XCTAssertNil(source)
     }
+
+    func testGeohashConversationKeyUsesCanonicalNostrPubkey() {
+        let hex = String(repeating: "ab", count: 32)
+
+        let key = ChatViewModel.geohashConversationKey(for: hex.uppercased())
+
+        XCTAssertEqual(key, "nostr_" + String(hex.prefix(TransportConfig.nostrConvKeyPrefixLength)))
+    }
+
+    func testGeohashShortMappingKeyRejectsInvalidInput() {
+        XCTAssertNil(ChatViewModel.geohashShortMappingKey(for: "invalid"))
+    }
 }
