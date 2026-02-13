@@ -21,6 +21,8 @@ MAX_TOKEN_BYTES = 256
 MAX_SWIFT_FILE_BYTES = 5 * 1024 * 1024
 MAX_ROOT_BYTES = 4096
 MAX_ROOT_COUNT = 128
+MAX_REPORTED_UNREADABLE_FILES = 200
+MAX_REPORTED_PARSE_ERROR_FILES = 200
 MAX_REPORTED_TOKEN_MATCH_FILES = 200
 DISALLOWED_CONTROL_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn"}
 
@@ -488,22 +490,30 @@ def main() -> int:
     if unreadable_files:
         has_failure = True
         print("Could not read one or more Swift files:")
-        for swift_file in sorted(unreadable_files):
+        sorted_unreadable_files = sorted(unreadable_files)
+        for swift_file in sorted_unreadable_files[:MAX_REPORTED_UNREADABLE_FILES]:
             print(
                 " - "
                 f"{format_path_for_diagnostics(swift_file)}: "
                 f"{escape_diagnostic_text(unreadable_files[swift_file])}"
             )
+        omitted_unreadable_count = len(sorted_unreadable_files) - MAX_REPORTED_UNREADABLE_FILES
+        if omitted_unreadable_count > 0:
+            print(f" ... and {omitted_unreadable_count} more unreadable files not shown.")
 
     if parse_error_files:
         has_failure = True
         print("Could not reliably parse one or more Swift files:")
-        for swift_file in sorted(parse_error_files):
+        sorted_parse_error_files = sorted(parse_error_files)
+        for swift_file in sorted_parse_error_files[:MAX_REPORTED_PARSE_ERROR_FILES]:
             print(
                 " - "
                 f"{format_path_for_diagnostics(swift_file)}: "
                 f"{escape_diagnostic_text(parse_error_files[swift_file])}"
             )
+        omitted_parse_error_count = len(sorted_parse_error_files) - MAX_REPORTED_PARSE_ERROR_FILES
+        if omitted_parse_error_count > 0:
+            print(f" ... and {omitted_parse_error_count} more parse-error files not shown.")
 
     if scanned_files == 0 and not args.allow_empty and not unreadable_files:
         has_failure = True
