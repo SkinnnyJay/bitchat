@@ -130,6 +130,8 @@ def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[i
 
             if next_pair == "//":
                 break
+            if next_pair == "*/":
+                return matches, f"unmatched block comment closer at line {line_number}"
             if next_pair == "/*":
                 block_comment_starts.append(line_number)
                 cursor += 2

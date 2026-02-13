@@ -169,6 +169,18 @@ class PreviewMacroDetectionTests(unittest.TestCase):
             "unterminated single-line string literal (opened at line 2)",
         )
 
+    def test_reports_parse_state_for_unmatched_block_comment_closer(self) -> None:
+        content = """
+            let value = 1
+            */
+            #Preview { Text("real preview") }
+        """
+        matches, parse_error = check_preview_macros.find_token_line_numbers_with_state(
+            content, "#Preview"
+        )
+        self.assertEqual(matches, [])
+        self.assertEqual(parse_error, "unmatched block comment closer at line 3")
+
 
 class PreviewMacroScriptBehaviorTests(unittest.TestCase):
     script_path = str(SCRIPT_DIR / "check_preview_macros.py")
@@ -407,6 +419,29 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not reliably parse one or more Swift files", result.stdout)
             self.assertIn("UnterminatedSingleLineString.swift", result.stdout)
             self.assertIn("unterminated single-line string literal", result.stdout)
+
+    def test_fails_closed_on_unmatched_block_comment_closer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "UnmatchedBlockCloser.swift"
+            swift_file.write_text(
+                textwrap.dedent(
+                    """
+                    let value = 1
+                    */
+                    #Preview {
+                        Text("not reliably parseable")
+                    }
+                    """
+                ).strip() + "\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Could not reliably parse one or more Swift files", result.stdout)
+            self.assertIn("UnmatchedBlockCloser.swift", result.stdout)
+            self.assertIn("unmatched block comment closer", result.stdout)
 
 
 if __name__ == "__main__":
