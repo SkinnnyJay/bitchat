@@ -8,10 +8,15 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Run Swift Tests
     runs-on: macos-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
