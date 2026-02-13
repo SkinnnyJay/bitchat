@@ -29,6 +29,9 @@ jobs:
       - name: Set up Swift
         uses: swift-actions/setup-swift@v2
 
+      - name: Validate preview guard unit tests
+        run: python3 .github/scripts/test_check_preview_macros.py
+
       - name: "Guard against #Preview macro regressions"
         run: python3 .github/scripts/check_preview_macros.py --root bitchat --root bitchatShareExtension
 
