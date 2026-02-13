@@ -318,6 +318,10 @@ class PreviewMacroUtilityTests(unittest.TestCase):
             check_preview_macros.format_line_numbers_for_diagnostics([1, 2, 3]),
             "1, 2, 3",
         )
+        self.assertEqual(
+            check_preview_macros.format_line_numbers_for_diagnostics([1, 2], total_line_number_count=5),
+            "1, 2 ... +3 more",
+        )
         with mock.patch.object(check_preview_macros, "MAX_REPORTED_LINE_NUMBERS_PER_FILE", 2):
             self.assertEqual(
                 check_preview_macros.format_line_numbers_for_diagnostics([1, 2, 3, 4]),
@@ -703,6 +707,33 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
 
             self.assertEqual(return_code, 1)
             self.assertIn("ManyPreviews.swift (lines: 1, 2, 3 ... +2 more)", output)
+            self.assertIn("Failure summary: 0 unreadable, 0 parse errors, 1 token matches.", output)
+
+    def test_preserves_total_line_match_counts_when_internal_tracking_is_capped(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "ManyPreviews.swift"
+            swift_file.write_text(
+                textwrap.dedent(
+                    """
+                    #Preview { Text("1") }
+                    #Preview { Text("2") }
+                    #Preview { Text("3") }
+                    #Preview { Text("4") }
+                    #Preview { Text("5") }
+                    """
+                ).strip() + "\n",
+                encoding="utf-8",
+            )
+
+            with (
+                mock.patch.object(check_preview_macros, "MAX_REPORTED_LINE_NUMBERS_PER_FILE", 2),
+                mock.patch.object(check_preview_macros, "MAX_TRACKED_LINE_NUMBERS_PER_FILE", 3),
+            ):
+                return_code, output = self.run_main_with_args(roots=[temp_dir], token="#Preview")
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("ManyPreviews.swift (lines: 1, 2 ... +3 more)", output)
             self.assertIn("Failure summary: 0 unreadable, 0 parse errors, 1 token matches.", output)
 
     def test_limits_reported_unreadable_files(self) -> None:

@@ -26,6 +26,7 @@ MAX_REPORTED_UNREADABLE_FILES = 200
 MAX_REPORTED_PARSE_ERROR_FILES = 200
 MAX_REPORTED_TOKEN_MATCH_FILES = 200
 MAX_REPORTED_LINE_NUMBERS_PER_FILE = 50
+MAX_TRACKED_LINE_NUMBERS_PER_FILE = 200
 MAX_REPORTED_ROOTS_IN_SUMMARY = 20
 MAX_DIAGNOSTIC_TEXT_CHARS = 512
 DISALLOWED_CONTROL_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn"}
@@ -54,10 +55,15 @@ def contains_disallowed_control_characters(value: str) -> bool:
     return any(unicodedata.category(character) in DISALLOWED_CONTROL_CATEGORIES for character in value)
 
 
-def format_line_numbers_for_diagnostics(line_numbers: list[int]) -> str:
+def format_line_numbers_for_diagnostics(
+    line_numbers: list[int],
+    total_line_number_count: int | None = None,
+) -> str:
+    if total_line_number_count is None:
+        total_line_number_count = len(line_numbers)
     reported_line_numbers = line_numbers[:MAX_REPORTED_LINE_NUMBERS_PER_FILE]
     line_numbers_text = ", ".join(str(line) for line in reported_line_numbers)
-    omitted_line_numbers = len(line_numbers) - MAX_REPORTED_LINE_NUMBERS_PER_FILE
+    omitted_line_numbers = total_line_number_count - len(reported_line_numbers)
     if omitted_line_numbers > 0:
         return f"{line_numbers_text} ... +{omitted_line_numbers} more"
     return line_numbers_text
@@ -112,10 +118,14 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[int], str | None]:
+def find_token_matches_with_state(
+    content: str,
+    token: str,
+    *,
+    max_tracked_line_numbers: int | None = None,
+) -> tuple[list[int], int, str | None]:
     """
-    Return 1-based line numbers where `token` appears as an invocation-like
-    directive at declaration boundaries (ignoring comments and string literals).
+    Return tracked 1-based line numbers, total match count, and parse state error.
     """
     if content.startswith("\ufeff"):
         content = content[1:]
@@ -123,6 +133,7 @@ def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[i
     right_boundary = r"(?!\w)" if (token[-1].isalnum() or token[-1] == "_") else ""
     pattern = re.compile(rf"(?<![\w#]){re.escape(token)}{right_boundary}")
     matches: list[int] = []
+    match_count = 0
     block_comment_starts: list[int] = []
     active_string_hashes: int | None = None
     active_string_is_multiline = False
@@ -217,7 +228,7 @@ def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[i
             if next_pair == "//":
                 break
             if next_pair == "*/":
-                return matches, f"unmatched block comment closer at line {line_number}"
+                return matches, match_count, f"unmatched block comment closer at line {line_number}"
             if next_pair == "/*":
                 block_comment_starts.append(line_number)
                 cursor += 2
@@ -237,19 +248,38 @@ def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[i
 
         if active_string_hashes is not None and not active_string_is_multiline:
             start_line = active_string_start_line or line_number
-            return matches, f"unterminated single-line string literal (opened at line {start_line})"
+            return (
+                matches,
+                match_count,
+                f"unterminated single-line string literal (opened at line {start_line})",
+            )
 
         code_segment = "".join(code_chars)
         if pattern.search(code_segment):
-            matches.append(line_number)
+            match_count += 1
+            if max_tracked_line_numbers is None or len(matches) < max_tracked_line_numbers:
+                matches.append(line_number)
 
     if block_comment_starts:
-        return matches, f"unterminated block comment (opened at line {block_comment_starts[0]})"
+        return (
+            matches,
+            match_count,
+            f"unterminated block comment (opened at line {block_comment_starts[0]})",
+        )
     if active_string_hashes is not None and active_string_is_multiline:
         start_line = active_string_start_line or 1
-        return matches, f"unterminated multiline string literal (opened at line {start_line})"
+        return (
+            matches,
+            match_count,
+            f"unterminated multiline string literal (opened at line {start_line})",
+        )
 
-    return matches, None
+    return matches, match_count, None
+
+
+def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[int], str | None]:
+    matches, _, parse_error = find_token_matches_with_state(content, token)
+    return matches, parse_error
 
 
 def find_token_line_numbers(content: str, token: str) -> list[int]:
@@ -358,6 +388,7 @@ def main() -> int:
 
     matches: list[Path] = []
     matches_with_lines: dict[Path, list[int]] = {}
+    matches_with_line_counts: dict[Path, int] = {}
     scanned_files = 0
     seen_files: set[Path] = set()
     seen_file_identities: set[tuple[int, int]] = set()
@@ -504,14 +535,19 @@ def main() -> int:
                 except UnicodeDecodeError as error:
                     record_unreadable(swift_file, str(error))
                     continue
-                line_numbers, parse_error = find_token_line_numbers_with_state(content, token)
+                line_numbers, line_number_count, parse_error = find_token_matches_with_state(
+                    content,
+                    token,
+                    max_tracked_line_numbers=MAX_TRACKED_LINE_NUMBERS_PER_FILE,
+                )
                 reported_swift_file = report_path(swift_file)
                 if parse_error is not None:
                     parse_error_files[reported_swift_file] = parse_error
                     continue
-                if line_numbers:
+                if line_number_count > 0:
                     matches.append(reported_swift_file)
                     matches_with_lines[reported_swift_file] = line_numbers
+                    matches_with_line_counts[reported_swift_file] = line_number_count
 
         for error_path, error_message in traversal_errors.items():
             record_unreadable(error_path, error_message)
@@ -559,7 +595,10 @@ def main() -> int:
         print(f"Found unsupported token '{token}' in Swift sources:")
         sorted_matches = sorted(matches)
         for match in sorted_matches[:MAX_REPORTED_TOKEN_MATCH_FILES]:
-            line_list = format_line_numbers_for_diagnostics(matches_with_lines.get(match, []))
+            line_list = format_line_numbers_for_diagnostics(
+                matches_with_lines.get(match, []),
+                matches_with_line_counts.get(match),
+            )
             print(f" - {format_path_for_diagnostics(match)} (lines: {line_list})")
         omitted_match_count = len(sorted_matches) - MAX_REPORTED_TOKEN_MATCH_FILES
         if omitted_match_count > 0:
