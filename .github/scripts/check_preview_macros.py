@@ -819,6 +819,8 @@ def main() -> int:
                     file_mtime_ns = descriptor_stat.st_mtime_ns
                     file_ctime_ns = descriptor_stat.st_ctime_ns
                     file_link_count = descriptor_stat.st_nlink
+                    file_uid = getattr(descriptor_stat, "st_uid", None)
+                    file_gid = getattr(descriptor_stat, "st_gid", None)
                     if file_size_bytes > MAX_SWIFT_FILE_BYTES:
                         if not record_unreadable(
                             swift_file,
@@ -854,6 +856,16 @@ def main() -> int:
                     if not record_unreadable(
                         swift_file,
                         "file link count changed during read (possible race)",
+                    ):
+                        break
+                    continue
+                if (
+                    getattr(post_read_descriptor_stat, "st_uid", None) != file_uid
+                    or getattr(post_read_descriptor_stat, "st_gid", None) != file_gid
+                ):
+                    if not record_unreadable(
+                        swift_file,
+                        "file ownership changed during read (possible race)",
                     ):
                         break
                     continue
