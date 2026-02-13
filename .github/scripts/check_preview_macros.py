@@ -285,7 +285,7 @@ def find_token_matches_with_state(
         content = content[1:]
 
     pattern = re.compile(re.escape(token))
-    token_requires_right_boundary = token[-1].isalnum() or token[-1] == "_"
+    token_requires_right_boundary = is_swift_identifier_continuation_character(token[-1])
     matches: list[int] = []
     match_count = 0
     processed_line_count = 0

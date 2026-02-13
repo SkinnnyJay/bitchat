@@ -75,6 +75,20 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#MyPreview("), [2])
 
+    def test_detects_custom_token_ending_with_combining_mark_with_boundary(self) -> None:
+        content = """
+            #MyPreview\u0301suffix
+            #MyPreview\u0301 { Text("real preview") }
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#MyPreview\u0301"), [3])
+
+    def test_detects_custom_token_ending_with_connector_punctuation_with_boundary(self) -> None:
+        content = """
+            #MyPreview‿suffix
+            #MyPreview‿ { Text("real preview") }
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#MyPreview‿"), [3])
+
     def test_ignores_nested_block_comment_preview_token(self) -> None:
         content = """
             /*
@@ -1666,6 +1680,36 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("Found unsupported token '#MyPreview('", result.stdout)
             self.assertIn("OtherPreviewCall.swift (lines: 4)", result.stdout)
+
+    def test_supports_custom_token_ending_with_combining_mark(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "CombiningToken.swift"
+            swift_file.write_text(
+                "#MyPreview\u0301suffix\n#MyPreview\u0301 { Text(\"flagged\") }\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir, "--token", "#MyPreview\u0301")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Found unsupported token '#MyPreview\u0301'", result.stdout)
+            self.assertIn("CombiningToken.swift (lines: 2)", result.stdout)
+            self.assertNotIn("lines: 1, 2", result.stdout)
+
+    def test_supports_custom_token_ending_with_connector_punctuation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "ConnectorToken.swift"
+            swift_file.write_text(
+                "#MyPreview‿suffix\n#MyPreview‿ { Text(\"flagged\") }\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir, "--token", "#MyPreview‿")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Found unsupported token '#MyPreview‿'", result.stdout)
+            self.assertIn("ConnectorToken.swift (lines: 2)", result.stdout)
+            self.assertNotIn("lines: 1, 2", result.stdout)
 
     def test_trims_custom_token_value_before_scanning(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
