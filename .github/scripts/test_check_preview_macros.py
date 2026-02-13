@@ -398,6 +398,33 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("BomExample.swift (lines: 1)", result.stdout)
 
+    def test_does_not_flag_double_hash_prefixed_preview_token_in_script_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "DoubleHash.swift"
+            swift_file.write_text(
+                "##Preview { Text(\"ignored\") }\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("No unsupported token '#Preview' detected", result.stdout)
+
+    def test_reports_only_canonical_preview_when_unicode_prefixed_variant_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "UnicodePrefix.swift"
+            swift_file.write_text(
+                "let value = α#Preview\n#Preview { Text(\"flagged\") }\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("UnicodePrefix.swift (lines: 2)", result.stdout)
+            self.assertNotIn("lines: 1, 2", result.stdout)
+
     def test_supports_custom_token_scans(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)
