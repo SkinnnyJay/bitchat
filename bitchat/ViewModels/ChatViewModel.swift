@@ -5980,15 +5980,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             SecureLogger.warning("⚠️ Invalid Nostr public key format", category: .session)
             return nil
         }
-        // Convert hex to npub if needed for comparison
-        guard let pubkeyData = Data(hexString: canonicalHex), pubkeyData.count == 32 else {
-            return nil
-        }
-        let npubToMatch: String
-        do {
-            npubToMatch = try Bech32.encode(hrp: "npub", data: pubkeyData)
-        } catch {
-            SecureLogger.warning("⚠️ Failed to convert hex to npub: \(error)", category: .session)
+        // Convert hex to npub for comparison
+        guard let npubToMatch = NostrKeyNormalizer.canonicalNpub(canonicalHex) else {
+            SecureLogger.warning("⚠️ Failed to canonicalize Nostr public key", category: .session)
             return nil
         }
         
