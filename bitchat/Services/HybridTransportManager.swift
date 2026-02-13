@@ -156,7 +156,10 @@ final class HybridTransportManager {
     }
 
     deinit {
-        stop()
+        if isRunning {
+            wifiTransport.stopDiscovery()
+            meshTransport.stopServices()
+        }
     }
 
     @discardableResult
