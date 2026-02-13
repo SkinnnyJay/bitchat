@@ -50,9 +50,10 @@ def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[i
     """
     pattern = re.compile(rf"^\s*{re.escape(token)}\b")
     matches: list[int] = []
-    block_comment_depth = 0
+    block_comment_starts: list[int] = []
     active_string_hashes: int | None = None
     active_string_is_multiline = False
+    active_string_start_line: int | None = None
 
     def parse_string_start(line: str, cursor: int) -> tuple[int, bool] | None:
         if cursor >= len(line):
@@ -98,6 +99,7 @@ def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[i
                         cursor += len(multiline_close)
                         active_string_hashes = None
                         active_string_is_multiline = False
+                        active_string_start_line = None
                         continue
                     cursor += 1
                     continue
@@ -106,6 +108,7 @@ def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[i
                 if line.startswith(singleline_close, cursor):
                     cursor += len(singleline_close)
                     active_string_hashes = None
+                    active_string_start_line = None
                     continue
                 if active_string_hashes == 0 and line[cursor] == "\\" and cursor + 1 < len(line):
                     cursor += 2
@@ -113,13 +116,13 @@ def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[i
                 cursor += 1
                 continue
 
-            if block_comment_depth > 0:
+            if block_comment_starts:
                 if next_pair == "/*":
-                    block_comment_depth += 1
+                    block_comment_starts.append(line_number)
                     cursor += 2
                     continue
                 if next_pair == "*/":
-                    block_comment_depth -= 1
+                    _ = block_comment_starts.pop()
                     cursor += 2
                     continue
                 cursor += 1
@@ -128,7 +131,7 @@ def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[i
             if next_pair == "//":
                 break
             if next_pair == "/*":
-                block_comment_depth += 1
+                block_comment_starts.append(line_number)
                 cursor += 2
                 continue
 
@@ -137,6 +140,7 @@ def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[i
                 consumed, is_multiline = string_start
                 active_string_hashes = consumed - (3 if is_multiline else 1)
                 active_string_is_multiline = is_multiline
+                active_string_start_line = line_number
                 cursor += consumed
                 continue
 
@@ -144,18 +148,18 @@ def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[i
             cursor += 1
 
         if active_string_hashes is not None and not active_string_is_multiline:
-            # Single-line strings can't legally span multiple lines in Swift.
-            # Reset here so malformed input does not suppress later detections.
-            active_string_hashes = None
+            start_line = active_string_start_line or line_number
+            return matches, f"unterminated single-line string literal (opened at line {start_line})"
 
         code_segment = "".join(code_chars)
         if pattern.search(code_segment):
             matches.append(line_number)
 
-    if block_comment_depth > 0:
-        return matches, "unterminated block comment"
+    if block_comment_starts:
+        return matches, f"unterminated block comment (opened at line {block_comment_starts[0]})"
     if active_string_hashes is not None and active_string_is_multiline:
-        return matches, "unterminated multiline string literal"
+        start_line = active_string_start_line or 1
+        return matches, f"unterminated multiline string literal (opened at line {start_line})"
 
     return matches, None
 

@@ -155,6 +155,20 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [2, 4])
 
+    def test_reports_parse_state_for_unterminated_single_line_string(self) -> None:
+        content = """
+            let value = "unterminated
+            #Preview { Text("real preview") }
+        """
+        matches, parse_error = check_preview_macros.find_token_line_numbers_with_state(
+            content, "#Preview"
+        )
+        self.assertEqual(matches, [])
+        self.assertEqual(
+            parse_error,
+            "unterminated single-line string literal (opened at line 2)",
+        )
+
 
 class PreviewMacroScriptBehaviorTests(unittest.TestCase):
     script_path = str(SCRIPT_DIR / "check_preview_macros.py")
@@ -343,6 +357,28 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not reliably parse one or more Swift files", result.stdout)
             self.assertIn("UnterminatedMultilineString.swift", result.stdout)
             self.assertIn("unterminated multiline string literal", result.stdout)
+
+    def test_fails_closed_on_unterminated_single_line_string(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "UnterminatedSingleLineString.swift"
+            swift_file.write_text(
+                textwrap.dedent(
+                    '''
+                    let value = "unterminated
+                    #Preview {
+                        Text("not reliably parseable")
+                    }
+                    '''
+                ).strip() + "\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Could not reliably parse one or more Swift files", result.stdout)
+            self.assertIn("UnterminatedSingleLineString.swift", result.stdout)
+            self.assertIn("unterminated single-line string literal", result.stdout)
 
 
 if __name__ == "__main__":
