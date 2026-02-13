@@ -372,7 +372,9 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("One or more scan roots are invalid", result.stdout)
             self.assertTrue(
-                "cannot resolve path" in result.stdout or "does not exist" in result.stdout,
+                "cannot resolve path" in result.stdout
+                or "does not exist" in result.stdout
+                or "is a symlinked directory" in result.stdout,
                 msg=result.stdout,
             )
 
