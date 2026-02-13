@@ -10,6 +10,10 @@ final class SecureIdentityStateManagerTests: XCTestCase {
         XCTAssertEqual(SecureIdentityStateManager.sanitizedClaimedNickname("   "), "user")
     }
 
+    func testSanitizedClaimedNicknameFallsBackToUserForNilValue() {
+        XCTAssertEqual(SecureIdentityStateManager.sanitizedClaimedNickname(nil), "user")
+    }
+
     func testUpdatedNicknameIndexMovesFingerprintBetweenNicknames() {
         let fingerprint = "fp123"
         let index: [String: Set<String>] = [

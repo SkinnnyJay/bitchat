@@ -408,13 +408,14 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
         queue.async(flags: .barrier) {
             if var identity = self.cache.socialIdentities[fingerprint] {
                 identity.isFavorite = isFavorite
+                identity.claimedNickname = Self.sanitizedClaimedNickname(identity.claimedNickname)
                 self.cache.socialIdentities[fingerprint] = identity
             } else {
                 // Create new social identity for this fingerprint
                 let newIdentity = SocialIdentity(
                     fingerprint: fingerprint,
                     localPetname: nil,
-                    claimedNickname: "Unknown",
+                    claimedNickname: Self.sanitizedClaimedNickname("Unknown"),
                     trustLevel: .unknown,
                     isFavorite: isFavorite,
                     isBlocked: false,
@@ -449,13 +450,14 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
                 if isBlocked {
                     identity.isFavorite = false  // Can't be both favorite and blocked
                 }
+                identity.claimedNickname = Self.sanitizedClaimedNickname(identity.claimedNickname)
                 self.cache.socialIdentities[fingerprint] = identity
             } else {
                 // Create new social identity for this fingerprint
                 let newIdentity = SocialIdentity(
                     fingerprint: fingerprint,
                     localPetname: nil,
-                    claimedNickname: "Unknown",
+                    claimedNickname: Self.sanitizedClaimedNickname("Unknown"),
                     trustLevel: .unknown,
                     isFavorite: false,
                     isBlocked: isBlocked,
