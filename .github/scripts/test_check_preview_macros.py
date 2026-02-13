@@ -505,6 +505,20 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_limits_reported_invalid_roots(self) -> None:
+        roots = ["   ", "\u2060", "\x01invalid"]
+        with mock.patch.object(check_preview_macros, "MAX_REPORTED_INVALID_ROOTS", 2):
+            return_code, output = self.run_main_with_args(
+                roots=roots,
+                token="#Preview",
+                allow_empty=True,
+            )
+
+        self.assertEqual(return_code, 1)
+        self.assertIn("One or more scan roots are invalid:", output)
+        self.assertEqual(output.count(" - "), 2)
+        self.assertIn("... and 1 more invalid roots not shown.", output)
+
     def test_fails_when_scan_root_contains_control_character(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             result = self.run_script("--root", f"{temp_dir}\x01")

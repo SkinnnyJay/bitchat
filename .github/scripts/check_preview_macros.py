@@ -21,6 +21,7 @@ MAX_TOKEN_BYTES = 256
 MAX_SWIFT_FILE_BYTES = 5 * 1024 * 1024
 MAX_ROOT_BYTES = 4096
 MAX_ROOT_COUNT = 128
+MAX_REPORTED_INVALID_ROOTS = 200
 MAX_REPORTED_UNREADABLE_FILES = 200
 MAX_REPORTED_PARSE_ERROR_FILES = 200
 MAX_REPORTED_TOKEN_MATCH_FILES = 200
@@ -327,12 +328,16 @@ def main() -> int:
 
     if invalid_roots:
         print("One or more scan roots are invalid:")
-        for root in sorted(invalid_roots):
+        sorted_invalid_roots = sorted(invalid_roots)
+        for root in sorted_invalid_roots[:MAX_REPORTED_INVALID_ROOTS]:
             print(
                 " - "
                 f"{format_path_for_diagnostics(root)} "
                 f"({escape_diagnostic_text(invalid_roots[root])})"
             )
+        omitted_invalid_roots = len(sorted_invalid_roots) - MAX_REPORTED_INVALID_ROOTS
+        if omitted_invalid_roots > 0:
+            print(f" ... and {omitted_invalid_roots} more invalid roots not shown.")
         return 1
 
     matches: list[Path] = []
