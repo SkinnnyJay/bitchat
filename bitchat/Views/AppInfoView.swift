@@ -276,16 +276,19 @@ struct FeatureRow: View {
     }
 }
 
-#Preview("Default") {
-    AppInfoView()
-}
+struct AppInfoView_Previews: PreviewProvider {
+    static var previews: some View {
+        Group {
+            AppInfoView()
+                .previewDisplayName("Default")
 
-#Preview("Dynamic Type XXL") {
-    AppInfoView()
-        .environment(\.sizeCategory, .accessibilityExtraExtraExtraLarge)
-}
+            AppInfoView()
+                .environment(\.sizeCategory, .accessibilityExtraExtraExtraLarge)
+                .previewDisplayName("Dynamic Type XXL")
 
-#Preview("Dynamic Type XS") {
-    AppInfoView()
-        .environment(\.sizeCategory, .extraSmall)
+            AppInfoView()
+                .environment(\.sizeCategory, .extraSmall)
+                .previewDisplayName("Dynamic Type XS")
+        }
+    }
 }

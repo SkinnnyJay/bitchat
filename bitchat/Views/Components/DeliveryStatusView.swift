@@ -110,35 +110,39 @@ struct DeliveryStatusView: View {
     }
 }
 
-#Preview {
-    let statuses: [DeliveryStatus] = [
-        .sending,
-        .sent,
-        .delivered(to: "John Doe", at: Date()),
-        .read(by: "Jane Doe", at: Date()),
-        .failed(reason: "Offline"),
-        .partiallyDelivered(reached: 2, total: 5)
-    ]
-    
-    List {
-        ForEach(statuses, id: \.self) { status in
-            HStack {
-                Text(status.displayText)
-                Spacer()
-                DeliveryStatusView(status: status)
-            }
-        }
-    }
-    .environment(\.colorScheme, .light)
+struct DeliveryStatusView_Previews: PreviewProvider {
+    static var previews: some View {
+        let statuses: [DeliveryStatus] = [
+            .sending,
+            .sent,
+            .delivered(to: "John Doe", at: Date()),
+            .read(by: "Jane Doe", at: Date()),
+            .failed(reason: "Offline"),
+            .partiallyDelivered(reached: 2, total: 5)
+        ]
 
-    List {
-        ForEach(statuses, id: \.self) { status in
-            HStack {
-                Text(status.displayText)
-                Spacer()
-                DeliveryStatusView(status: status)
+        return Group {
+            List {
+                ForEach(statuses, id: \.self) { status in
+                    HStack {
+                        Text(status.displayText)
+                        Spacer()
+                        DeliveryStatusView(status: status)
+                    }
+                }
             }
+            .environment(\.colorScheme, .light)
+
+            List {
+                ForEach(statuses, id: \.self) { status in
+                    HStack {
+                        Text(status.displayText)
+                        Spacer()
+                        DeliveryStatusView(status: status)
+                    }
+                }
+            }
+            .environment(\.colorScheme, .dark)
         }
     }
-    .environment(\.colorScheme, .dark)
 }
