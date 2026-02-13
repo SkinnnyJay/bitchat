@@ -1942,7 +1942,7 @@ extension BLEService {
         let canonicalPeerID = PeerID(str: peerID).toShort()
         guard canonicalPeerID.isShort else {
             collectionsQueue.sync(flags: .barrier) {
-                pendingMessagesAfterHandshake.removeValue(forKey: peerID)
+                _ = pendingMessagesAfterHandshake.removeValue(forKey: peerID)
             }
             SecureLogger.warning("Dropping pending PM queue for invalid peer ID", category: .session)
             return
@@ -3011,7 +3011,7 @@ extension BLEService {
         let canonicalPeerID = PeerID(str: peerID).toShort()
         guard canonicalPeerID.isShort else {
             collectionsQueue.sync(flags: .barrier) {
-                pendingNoisePayloadsAfterHandshake.removeValue(forKey: peerID)
+                _ = pendingNoisePayloadsAfterHandshake.removeValue(forKey: peerID)
             }
             SecureLogger.warning("Dropping pending noise payload queue for invalid peer ID", category: .session)
             return
