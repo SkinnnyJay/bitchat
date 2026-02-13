@@ -10,6 +10,14 @@ final class NostrTransportParsingTests: XCTestCase {
         XCTAssertEqual(canonical, String(repeating: "ab", count: 32))
     }
 
+    func testCanonicalRecipientHexTrimsWhitespace() {
+        let hex = String(repeating: "ab", count: 32)
+
+        let canonical = NostrTransport.canonicalRecipientHex(from: "  \(hex)  ")
+
+        XCTAssertEqual(canonical, hex)
+    }
+
     func testCanonicalRecipientHexDecodesNpubCaseInsensitively() {
         let hex = String(repeating: "11", count: 32)
         let npub = try? Bech32.encode(hrp: "npub", data: Data(hexString: hex) ?? Data())

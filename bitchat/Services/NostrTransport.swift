@@ -166,12 +166,12 @@ extension NostrTransport {
     // MARK: Geohash ACK helpers
     func sendDeliveryAckGeohash(for messageID: String, toRecipientHex recipientHex: String, from identity: NostrIdentity) {
         guard InputValidator.validateMessageID(messageID) != nil else { return }
-        guard Data(hexString: recipientHex)?.count == 32 else { return }
+        guard let canonicalRecipientHex = Self.canonicalRecipientHex(from: recipientHex) else { return }
         guard let senderRoutingPeerID = normalizedSenderPeerID() else { return }
         Task { @MainActor in
-            SecureLogger.debug("GeoDM: send DELIVERED -> recip=\(recipientHex.prefix(8))… mid=\(messageID.prefix(8))… from=\(identity.publicKeyHex.prefix(8))…", category: .session)
+            SecureLogger.debug("GeoDM: send DELIVERED -> recip=\(canonicalRecipientHex.prefix(8))… mid=\(messageID.prefix(8))… from=\(identity.publicKeyHex.prefix(8))…", category: .session)
             guard let embedded = NostrEmbeddedBitChat.encodeAckForNostrNoRecipient(type: .delivered, messageID: messageID, senderPeerID: senderRoutingPeerID.id) else { return }
-            guard let event = try? NostrProtocol.createPrivateMessage(content: embedded, recipientPubkey: recipientHex, senderIdentity: identity) else { return }
+            guard let event = try? NostrProtocol.createPrivateMessage(content: embedded, recipientPubkey: canonicalRecipientHex, senderIdentity: identity) else { return }
             NostrRelayManager.registerPendingGiftWrap(id: event.id)
             NostrRelayManager.shared.sendEvent(event)
         }
@@ -179,12 +179,12 @@ extension NostrTransport {
 
     func sendReadReceiptGeohash(_ messageID: String, toRecipientHex recipientHex: String, from identity: NostrIdentity) {
         guard InputValidator.validateMessageID(messageID) != nil else { return }
-        guard Data(hexString: recipientHex)?.count == 32 else { return }
+        guard let canonicalRecipientHex = Self.canonicalRecipientHex(from: recipientHex) else { return }
         guard let senderRoutingPeerID = normalizedSenderPeerID() else { return }
         Task { @MainActor in
-            SecureLogger.debug("GeoDM: send READ -> recip=\(recipientHex.prefix(8))… mid=\(messageID.prefix(8))… from=\(identity.publicKeyHex.prefix(8))…", category: .session)
+            SecureLogger.debug("GeoDM: send READ -> recip=\(canonicalRecipientHex.prefix(8))… mid=\(messageID.prefix(8))… from=\(identity.publicKeyHex.prefix(8))…", category: .session)
             guard let embedded = NostrEmbeddedBitChat.encodeAckForNostrNoRecipient(type: .readReceipt, messageID: messageID, senderPeerID: senderRoutingPeerID.id) else { return }
-            guard let event = try? NostrProtocol.createPrivateMessage(content: embedded, recipientPubkey: recipientHex, senderIdentity: identity) else { return }
+            guard let event = try? NostrProtocol.createPrivateMessage(content: embedded, recipientPubkey: canonicalRecipientHex, senderIdentity: identity) else { return }
             NostrRelayManager.registerPendingGiftWrap(id: event.id)
             NostrRelayManager.shared.sendEvent(event)
         }
@@ -192,20 +192,19 @@ extension NostrTransport {
 
     // MARK: Geohash DMs (per-geohash identity)
     func sendPrivateMessageGeohash(content: String, toRecipientHex recipientHex: String, from identity: NostrIdentity, messageID: String) {
-        guard !recipientHex.isEmpty else { return }
-        guard Data(hexString: recipientHex)?.count == 32 else { return }
+        guard let canonicalRecipientHex = Self.canonicalRecipientHex(from: recipientHex) else { return }
         guard content.utf8.count <= InputValidator.Limits.maxMessageLength else { return }
         guard content.utf8.count <= maxEmbeddedPayloadBytes else { return }
         guard InputValidator.validateMessageID(messageID) != nil else { return }
         guard let senderRoutingPeerID = normalizedSenderPeerID() else { return }
         Task { @MainActor in
-            SecureLogger.debug("GeoDM: send PM -> recip=\(recipientHex.prefix(8))… mid=\(messageID.prefix(8))… from=\(identity.publicKeyHex.prefix(8))…", category: .session)
+            SecureLogger.debug("GeoDM: send PM -> recip=\(canonicalRecipientHex.prefix(8))… mid=\(messageID.prefix(8))… from=\(identity.publicKeyHex.prefix(8))…", category: .session)
             // Build embedded BitChat packet without recipient peer ID
             guard let embedded = NostrEmbeddedBitChat.encodePMForNostrNoRecipient(content: content, messageID: messageID, senderPeerID: senderRoutingPeerID.id) else {
                 SecureLogger.error("NostrTransport: failed to embed geohash PM packet", category: .session)
                 return
             }
-            guard let event = try? NostrProtocol.createPrivateMessage(content: embedded, recipientPubkey: recipientHex, senderIdentity: identity) else {
+            guard let event = try? NostrProtocol.createPrivateMessage(content: embedded, recipientPubkey: canonicalRecipientHex, senderIdentity: identity) else {
                 SecureLogger.error("NostrTransport: failed to build Nostr event for geohash PM", category: .session)
                 return
             }
