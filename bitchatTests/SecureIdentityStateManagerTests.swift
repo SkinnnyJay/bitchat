@@ -133,6 +133,18 @@ final class SecureIdentityStateManagerTests: XCTestCase {
         XCTAssertEqual(updated.claimedNickname, "user")
     }
 
+    func testApplyingFavoriteMutationCreatesDefaultIdentityWithUserNickname() {
+        let updated = SecureIdentityStateManager.applyingFavoriteMutation(
+            existingIdentity: nil,
+            fingerprint: "fp1",
+            isFavorite: true
+        )
+
+        XCTAssertEqual(updated.claimedNickname, "user")
+        XCTAssertTrue(updated.isFavorite)
+        XCTAssertFalse(updated.isBlocked)
+    }
+
     func testApplyingBlockedMutationClearsFavoriteWhenBlocking() {
         let existing = SocialIdentity(
             fingerprint: "fp1",
@@ -150,6 +162,18 @@ final class SecureIdentityStateManagerTests: XCTestCase {
             isBlocked: true
         )
 
+        XCTAssertTrue(updated.isBlocked)
+        XCTAssertFalse(updated.isFavorite)
+    }
+
+    func testApplyingBlockedMutationCreatesDefaultIdentityWithUserNickname() {
+        let updated = SecureIdentityStateManager.applyingBlockedMutation(
+            existingIdentity: nil,
+            fingerprint: "fp1",
+            isBlocked: true
+        )
+
+        XCTAssertEqual(updated.claimedNickname, "user")
         XCTAssertTrue(updated.isBlocked)
         XCTAssertFalse(updated.isFavorite)
     }

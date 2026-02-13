@@ -332,7 +332,7 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
         return SocialIdentity(
             fingerprint: fingerprint,
             localPetname: nil,
-            claimedNickname: sanitizedClaimedNickname("Unknown"),
+            claimedNickname: sanitizedClaimedNickname(nil),
             trustLevel: .unknown,
             isFavorite: isFavorite,
             isBlocked: false,
@@ -356,7 +356,7 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
         return SocialIdentity(
             fingerprint: fingerprint,
             localPetname: nil,
-            claimedNickname: sanitizedClaimedNickname("Unknown"),
+            claimedNickname: sanitizedClaimedNickname(nil),
             trustLevel: .unknown,
             isFavorite: false,
             isBlocked: isBlocked,
