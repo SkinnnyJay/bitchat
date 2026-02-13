@@ -7,6 +7,10 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,7 +19,7 @@ concurrency:
 jobs:
   test:
     name: Run Swift Tests
-    runs-on: macos-latest
+    runs-on: macos-14
     timeout-minutes: 20
 
     steps:
