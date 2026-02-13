@@ -849,28 +849,34 @@ def main() -> int:
                 if post_read_descriptor_stat.st_size != file_size_bytes:
                     if not record_unreadable(
                         swift_file,
-                        "file size changed during read (possible race)",
+                        "file size changed during read "
+                        f"(possible race: {file_size_bytes} -> {post_read_descriptor_stat.st_size} bytes)",
                     ):
                         break
                     continue
                 if (post_read_descriptor_stat.st_dev, post_read_descriptor_stat.st_ino) != descriptor_identity:
                     if not record_unreadable(
                         swift_file,
-                        "file identity changed during read (possible race)",
+                        "file identity changed during read "
+                        "(possible race: "
+                        f"{descriptor_identity[0]}:{descriptor_identity[1]} -> "
+                        f"{post_read_descriptor_stat.st_dev}:{post_read_descriptor_stat.st_ino})",
                     ):
                         break
                     continue
                 if post_read_descriptor_stat.st_nlink != file_link_count:
                     if not record_unreadable(
                         swift_file,
-                        "file link count changed during read (possible race)",
+                        "file link count changed during read "
+                        f"(possible race: {file_link_count} -> {post_read_descriptor_stat.st_nlink})",
                     ):
                         break
                     continue
                 if post_read_descriptor_stat.st_mode != file_mode:
                     if not record_unreadable(
                         swift_file,
-                        "file mode changed during read (possible race)",
+                        "file mode changed during read "
+                        f"(possible race: {oct(file_mode)} -> {oct(post_read_descriptor_stat.st_mode)})",
                     ):
                         break
                     continue
@@ -880,7 +886,10 @@ def main() -> int:
                 ):
                     if not record_unreadable(
                         swift_file,
-                        "file ownership changed during read (possible race)",
+                        "file ownership changed during read "
+                        "(possible race: "
+                        f"uid {file_uid} -> {getattr(post_read_descriptor_stat, 'st_uid', None)}, "
+                        f"gid {file_gid} -> {getattr(post_read_descriptor_stat, 'st_gid', None)})",
                     ):
                         break
                     continue
@@ -890,7 +899,10 @@ def main() -> int:
                 ):
                     if not record_unreadable(
                         swift_file,
-                        "file metadata changed during read (possible race)",
+                        "file metadata changed during read "
+                        "(possible race: "
+                        f"mtime {file_mtime_ns} -> {post_read_descriptor_stat.st_mtime_ns}, "
+                        f"ctime {file_ctime_ns} -> {post_read_descriptor_stat.st_ctime_ns})",
                     ):
                         break
                     continue

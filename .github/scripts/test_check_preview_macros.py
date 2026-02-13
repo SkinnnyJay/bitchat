@@ -1688,7 +1688,7 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(return_code, 1)
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("RaceSize.swift", output)
-            self.assertIn("file size changed during read (possible race)", output)
+            self.assertIn("file size changed during read (possible race", output)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 1 Swift files before failure.", output)
 
@@ -1721,7 +1721,7 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(return_code, 1)
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("RaceIdentity.swift", output)
-            self.assertIn("file identity changed during read (possible race)", output)
+            self.assertIn("file identity changed during read (possible race", output)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 1 Swift files before failure.", output)
 
@@ -1754,7 +1754,7 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(return_code, 1)
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("RaceDevice.swift", output)
-            self.assertIn("file identity changed during read (possible race)", output)
+            self.assertIn("file identity changed during read (possible race", output)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 1 Swift files before failure.", output)
 
@@ -1787,7 +1787,7 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(return_code, 1)
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("RaceMetadata.swift", output)
-            self.assertIn("file metadata changed during read (possible race)", output)
+            self.assertIn("file metadata changed during read (possible race", output)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 1 Swift files before failure.", output)
 
@@ -1820,7 +1820,7 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(return_code, 1)
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("RaceLinks.swift", output)
-            self.assertIn("file link count changed during read (possible race)", output)
+            self.assertIn("file link count changed during read (possible race", output)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 1 Swift files before failure.", output)
 
@@ -1853,7 +1853,7 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(return_code, 1)
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("RaceOwnership.swift", output)
-            self.assertIn("file ownership changed during read (possible race)", output)
+            self.assertIn("file ownership changed during read (possible race", output)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 1 Swift files before failure.", output)
 
@@ -1886,7 +1886,7 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(return_code, 1)
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("RaceMode.swift", output)
-            self.assertIn("file mode changed during read (possible race)", output)
+            self.assertIn("file mode changed during read (possible race", output)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 1 Swift files before failure.", output)
 
