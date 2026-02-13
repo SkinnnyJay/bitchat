@@ -55,6 +55,12 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
 
+    def test_detects_preview_after_statement_semicolon_on_same_line(self) -> None:
+        content = """
+            let value = 1; #Preview { Text("real preview") }
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [2])
+
     def test_ignores_nested_block_comment_preview_token(self) -> None:
         content = """
             /*
@@ -78,6 +84,12 @@ class PreviewMacroDetectionTests(unittest.TestCase):
     def test_detects_preview_after_inline_nested_block_comment_closes(self) -> None:
         content = """
             /* outer /* inner */ still outer */ #Preview { Text("real preview") }
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [2])
+
+    def test_detects_preview_after_closing_brace_on_same_line(self) -> None:
+        content = """
+            if true {} #Preview { Text("real preview") }
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [2])
 
