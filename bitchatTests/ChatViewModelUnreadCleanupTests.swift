@@ -4,7 +4,7 @@ import XCTest
 final class ChatViewModelUnreadCleanupTests: XCTestCase {
     private func sampleMessage(senderPeerID: String?) -> BitchatMessage {
         let resolvedSenderPeerID = senderPeerID.map { PeerID(str: $0) }
-        BitchatMessage(
+        return BitchatMessage(
             id: UUID().uuidString,
             sender: "alice",
             content: "hello",
