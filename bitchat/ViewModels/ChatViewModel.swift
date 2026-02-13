@@ -1368,18 +1368,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
 
     static func canonicalNostrPubkeyHex(_ value: String) -> String? {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-
-        let lowercased = trimmed.lowercased()
-        if let data = Data(hexString: lowercased), data.count == 32 {
-            return lowercased
-        }
-
-        guard let (hrp, data) = try? Bech32.decode(lowercased), hrp == "npub", data.count == 32 else {
-            return nil
-        }
-        return data.hexEncodedString()
+        NostrKeyNormalizer.canonicalHex(value)
     }
 
     static func favoriteNotificationState(from content: String) -> Bool? {

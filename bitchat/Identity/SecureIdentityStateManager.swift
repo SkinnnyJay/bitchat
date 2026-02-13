@@ -163,13 +163,7 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
     }
 
     static func canonicalNostrPubkey(_ value: String) -> String? {
-        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !normalized.isEmpty else { return nil }
-        if normalized.count == 64, Data(hexString: normalized)?.count == 32 {
-            return normalized
-        }
-        guard let (hrp, data) = try? Bech32.decode(normalized), hrp == "npub", data.count == 32 else { return nil }
-        return data.hexEncodedString()
+        NostrKeyNormalizer.canonicalHex(value)
     }
 
     static func canonicalFingerprint(_ value: String) -> String? {

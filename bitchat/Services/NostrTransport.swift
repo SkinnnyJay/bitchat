@@ -220,25 +220,11 @@ extension NostrTransport {
 
 extension NostrTransport {
     static func canonicalRecipientHex(from recipientKey: String) -> String? {
-        let normalized = recipientKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalized.isEmpty else { return nil }
-
-        let lowercased = normalized.lowercased()
-        if let data = Data(hexString: lowercased), data.count == 32 {
-            return lowercased
-        }
-
-        guard let (hrp, data) = try? Bech32.decode(lowercased), hrp == "npub", data.count == 32 else {
-            return nil
-        }
-        return data.hexEncodedString()
+        NostrKeyNormalizer.canonicalHex(recipientKey)
     }
 
     static func canonicalRecipientNpub(from recipientKey: String) -> String? {
-        guard let canonicalHex = canonicalRecipientHex(from: recipientKey),
-              let data = Data(hexString: canonicalHex),
-              data.count == 32 else { return nil }
-        return try? Bech32.encode(hrp: "npub", data: data)
+        NostrKeyNormalizer.canonicalNpub(recipientKey)
     }
 
     private func processReadQueueIfNeeded() {
