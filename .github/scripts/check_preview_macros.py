@@ -302,7 +302,7 @@ def main() -> int:
                     continue
 
                 swift_file = Path(directory) / filename
-                unresolved_key = swift_file.absolute()
+                unresolved_key = report_path(swift_file)
                 try:
                     if swift_file.is_symlink():
                         if unresolved_key in seen_files:
