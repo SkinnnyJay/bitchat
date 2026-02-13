@@ -42,7 +42,18 @@ final class FavoritesPersistenceService: ObservableObject {
     static func sanitizedNostrPublicKey(_ peerNostrPublicKey: String?) -> String? {
         guard let peerNostrPublicKey else { return nil }
         let trimmed = peerNostrPublicKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+        guard !trimmed.isEmpty else { return nil }
+
+        if let (hrp, data) = try? Bech32.decode(trimmed), hrp == "npub", data.count == 32 {
+            return trimmed
+        }
+
+        let lowercased = trimmed.lowercased()
+        if Data(hexString: lowercased)?.count == 32 {
+            return lowercased
+        }
+
+        return nil
     }
 
     static func sanitizedPeerNickname(_ peerNickname: String?) -> String {

@@ -31,12 +31,27 @@ final class FavoritesPersistenceServiceTests: XCTestCase {
         XCTAssertEqual(FavoritesPersistenceService.sanitizedPeerNickname(nil), "user")
     }
 
-    func testSanitizedNostrPublicKeyTrimsAndRejectsBlankValues() {
+    func testSanitizedNostrPublicKeyAcceptsValidNpubAndRejectsBlankValues() {
+        let npub = try? Bech32.encode(hrp: "npub", data: Data(repeating: 0x11, count: 32))
         XCTAssertEqual(
-            FavoritesPersistenceService.sanitizedNostrPublicKey("  npub123  "),
-            "npub123"
+            FavoritesPersistenceService.sanitizedNostrPublicKey("  \(npub ?? "")  "),
+            npub
         )
         XCTAssertNil(FavoritesPersistenceService.sanitizedNostrPublicKey("   "))
+    }
+
+    func testSanitizedNostrPublicKeyAcceptsAndLowercasesHexValues() {
+        let uppercaseHex = String(repeating: "AB", count: 32)
+
+        XCTAssertEqual(
+            FavoritesPersistenceService.sanitizedNostrPublicKey(uppercaseHex),
+            String(repeating: "ab", count: 32)
+        )
+    }
+
+    func testSanitizedNostrPublicKeyRejectsMalformedValues() {
+        XCTAssertNil(FavoritesPersistenceService.sanitizedNostrPublicKey("npub123"))
+        XCTAssertNil(FavoritesPersistenceService.sanitizedNostrPublicKey(String(repeating: "zz", count: 32)))
     }
 
     func testSanitizedFavoriteRelationshipRejectsInvalidNoiseKeyLength() {
