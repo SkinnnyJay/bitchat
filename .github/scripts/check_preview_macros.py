@@ -821,7 +821,10 @@ def main() -> int:
                     if descriptor_identity != file_identity:
                         if not record_unreadable(
                             swift_file,
-                            "file identity changed during open/read (possible race)",
+                            "file identity changed during open/read "
+                            "(possible race: "
+                            f"{file_identity[0]}:{file_identity[1]} -> "
+                            f"{descriptor_identity[0]}:{descriptor_identity[1]})",
                         ):
                             break
                         continue
