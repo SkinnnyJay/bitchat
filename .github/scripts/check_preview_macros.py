@@ -105,6 +105,20 @@ def stat_identity_or_none(stats: object) -> tuple[int, int] | None:
     return device, inode
 
 
+def stat_nonnegative_integer_or_none(stats: object, attr: str) -> int | None:
+    value = stat_integer_or_none(stats, attr)
+    if value is None or value < 0:
+        return None
+    return value
+
+
+def stat_positive_integer_or_none(stats: object, attr: str) -> int | None:
+    value = stat_integer_or_none(stats, attr)
+    if value is None or value <= 0:
+        return None
+    return value
+
+
 def contains_disallowed_control_characters(value: str) -> bool:
     return any(unicodedata.category(character) in DISALLOWED_CONTROL_CATEGORIES for character in value)
 
@@ -867,8 +881,22 @@ def main() -> int:
                         ):
                             break
                         continue
-                    file_size_bytes = descriptor_stat.st_size
-                    file_mode = descriptor_stat.st_mode
+                    file_size_bytes = stat_nonnegative_integer_or_none(descriptor_stat, "st_size")
+                    if file_size_bytes is None:
+                        if not record_unreadable(
+                            swift_file,
+                            "cannot read file size metadata (non-integer/negative st_size)",
+                        ):
+                            break
+                        continue
+                    file_mode = stat_nonnegative_integer_or_none(descriptor_stat, "st_mode")
+                    if file_mode is None:
+                        if not record_unreadable(
+                            swift_file,
+                            "cannot read file mode metadata (non-integer/negative st_mode)",
+                        ):
+                            break
+                        continue
                     file_mtime_ns = stat_timestamp_ns_or_none(
                         descriptor_stat,
                         "st_mtime_ns",
@@ -879,7 +907,14 @@ def main() -> int:
                         "st_ctime_ns",
                         "st_ctime",
                     )
-                    file_link_count = descriptor_stat.st_nlink
+                    file_link_count = stat_positive_integer_or_none(descriptor_stat, "st_nlink")
+                    if file_link_count is None:
+                        if not record_unreadable(
+                            swift_file,
+                            "cannot read file link-count metadata (non-integer/non-positive st_nlink)",
+                        ):
+                            break
+                        continue
                     file_uid = getattr(descriptor_stat, "st_uid", None)
                     file_gid = getattr(descriptor_stat, "st_gid", None)
                     if file_size_bytes > MAX_SWIFT_FILE_BYTES:
@@ -906,11 +941,19 @@ def main() -> int:
                 finally:
                     if descriptor >= 0:
                         os.close(descriptor)
-                if post_read_descriptor_stat.st_size != file_size_bytes:
+                post_read_file_size = stat_nonnegative_integer_or_none(post_read_descriptor_stat, "st_size")
+                if post_read_file_size is None:
+                    if not record_unreadable(
+                        swift_file,
+                        "cannot read post-read file size metadata (non-integer/negative st_size)",
+                    ):
+                        break
+                    continue
+                if post_read_file_size != file_size_bytes:
                     if not record_unreadable(
                         swift_file,
                         "file size changed during read "
-                        f"(possible race: {file_size_bytes} -> {post_read_descriptor_stat.st_size} bytes)",
+                        f"(possible race: {file_size_bytes} -> {post_read_file_size} bytes)",
                     ):
                         break
                     continue
@@ -932,19 +975,35 @@ def main() -> int:
                     ):
                         break
                     continue
-                if post_read_descriptor_stat.st_nlink != file_link_count:
+                post_read_link_count = stat_positive_integer_or_none(post_read_descriptor_stat, "st_nlink")
+                if post_read_link_count is None:
                     if not record_unreadable(
                         swift_file,
-                        "file link count changed during read "
-                        f"(possible race: {file_link_count} -> {post_read_descriptor_stat.st_nlink})",
+                        "cannot read post-read file link-count metadata (non-integer/non-positive st_nlink)",
                     ):
                         break
                     continue
-                if post_read_descriptor_stat.st_mode != file_mode:
+                if post_read_link_count != file_link_count:
+                    if not record_unreadable(
+                        swift_file,
+                        "file link count changed during read "
+                        f"(possible race: {file_link_count} -> {post_read_link_count})",
+                    ):
+                        break
+                    continue
+                post_read_mode = stat_nonnegative_integer_or_none(post_read_descriptor_stat, "st_mode")
+                if post_read_mode is None:
+                    if not record_unreadable(
+                        swift_file,
+                        "cannot read post-read file mode metadata (non-integer/negative st_mode)",
+                    ):
+                        break
+                    continue
+                if post_read_mode != file_mode:
                     if not record_unreadable(
                         swift_file,
                         "file mode changed during read "
-                        f"(possible race: {oct(file_mode)} -> {oct(post_read_descriptor_stat.st_mode)})",
+                        f"(possible race: {oct(file_mode)} -> {oct(post_read_mode)})",
                     ):
                         break
                     continue
