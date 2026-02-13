@@ -4881,40 +4881,44 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             switch type {
             case .privateMessage:
                 guard let pm = PrivateMessagePacket.decode(from: payload) else { return }
-                let senderName = unifiedPeerService.getPeer(by: peerID)?.nickname ?? "Unknown"
-            let pmMentions = parseMentions(from: pm.content)
-            let msg = BitchatMessage(
-                id: pm.messageID,
-                sender: senderName,
-                content: pm.content,
-                timestamp: timestamp,
-                isRelay: false,
-                originalSender: nil,
-                isPrivate: true,
-                recipientNickname: nickname,
-                senderPeerID: PeerID(str: peerID),
-                mentions: pmMentions.isEmpty ? nil : pmMentions
-            )
+                let senderName = Self.sanitizedFavoriteNotificationSenderNickname(
+                    unifiedPeerService.getPeer(by: peerID)?.nickname ?? "user"
+                )
+                let pmMentions = parseMentions(from: pm.content)
+                let msg = BitchatMessage(
+                    id: pm.messageID,
+                    sender: senderName,
+                    content: pm.content,
+                    timestamp: timestamp,
+                    isRelay: false,
+                    originalSender: nil,
+                    isPrivate: true,
+                    recipientNickname: nickname,
+                    senderPeerID: PeerID(str: peerID),
+                    mentions: pmMentions.isEmpty ? nil : pmMentions
+                )
                 handlePrivateMessage(msg)
                 // Send delivery ACK back over BLE
                 meshService.sendDeliveryAck(for: pm.messageID, to: PeerID(str: peerID))
 
             case .delivered:
-                guard let messageID = String(data: payload, encoding: .utf8) else { return }
-                if let name = unifiedPeerService.getPeer(by: peerID)?.nickname {
-                    if let messages = privateChats[peerID], let idx = messages.firstIndex(where: { $0.id == messageID }) {
-                        privateChats[peerID]?[idx].deliveryStatus = .delivered(to: name, at: Date())
-                        objectWillChange.send()
-                    }
+                guard let messageID = Self.validatedMessageID(from: payload) else { return }
+                let name = Self.sanitizedFavoriteNotificationSenderNickname(
+                    unifiedPeerService.getPeer(by: peerID)?.nickname ?? "user"
+                )
+                if let messages = privateChats[peerID], let idx = messages.firstIndex(where: { $0.id == messageID }) {
+                    privateChats[peerID]?[idx].deliveryStatus = .delivered(to: name, at: Date())
+                    objectWillChange.send()
                 }
 
             case .readReceipt:
-                guard let messageID = String(data: payload, encoding: .utf8) else { return }
-                if let name = unifiedPeerService.getPeer(by: peerID)?.nickname {
-                    if let messages = privateChats[peerID], let idx = messages.firstIndex(where: { $0.id == messageID }) {
-                        privateChats[peerID]?[idx].deliveryStatus = .read(by: name, at: Date())
-                        objectWillChange.send()
-                    }
+                guard let messageID = Self.validatedMessageID(from: payload) else { return }
+                let name = Self.sanitizedFavoriteNotificationSenderNickname(
+                    unifiedPeerService.getPeer(by: peerID)?.nickname ?? "user"
+                )
+                if let messages = privateChats[peerID], let idx = messages.firstIndex(where: { $0.id == messageID }) {
+                    privateChats[peerID]?[idx].deliveryStatus = .read(by: name, at: Date())
+                    objectWillChange.send()
                 }
             case .verifyChallenge:
                 // Parse and respond
