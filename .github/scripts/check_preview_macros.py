@@ -82,6 +82,19 @@ def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[i
             cursor -= 1
         return run_length
 
+    def is_string_closer_escaped(
+        line: str,
+        index: int,
+        string_hashes: int,
+    ) -> bool:
+        if string_hashes == 0:
+            return backslash_run_length_before(line, index) % 2 == 1
+
+        escape_prefix = "\\" + ("#" * string_hashes)
+        if index < len(escape_prefix):
+            return False
+        return line[index - len(escape_prefix) : index] == escape_prefix
+
     for line_number, line in enumerate(content.splitlines(), start=1):
         cursor = 0
         code_chars: list[str] = []
@@ -93,10 +106,7 @@ def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[i
                 if active_string_is_multiline:
                     multiline_close = '"""' + ("#" * active_string_hashes)
                     if line.startswith(multiline_close, cursor):
-                        if (
-                            active_string_hashes == 0
-                            and backslash_run_length_before(line, cursor) % 2 == 1
-                        ):
+                        if is_string_closer_escaped(line, cursor, active_string_hashes):
                             cursor += 1
                             continue
                         cursor += len(multiline_close)
@@ -109,6 +119,9 @@ def find_token_line_numbers_with_state(content: str, token: str) -> tuple[list[i
 
                 singleline_close = '"' + ("#" * active_string_hashes)
                 if line.startswith(singleline_close, cursor):
+                    if is_string_closer_escaped(line, cursor, active_string_hashes):
+                        cursor += 1
+                        continue
                     cursor += len(singleline_close)
                     active_string_hashes = None
                     active_string_start_line = None
