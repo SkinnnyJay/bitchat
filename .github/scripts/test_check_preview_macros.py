@@ -719,6 +719,27 @@ class PreviewMacroUtilityTests(unittest.TestCase):
             check_preview_macros.format_open_read_error(error),
         )
 
+    def test_formats_walk_error_for_symlink_loop(self) -> None:
+        error = OSError(errno.ELOOP, "too many levels of symbolic links")
+        self.assertIn(
+            "cannot traverse directory (symlink loop:",
+            check_preview_macros.format_walk_error(error),
+        )
+
+    def test_formats_walk_error_for_permission_denied(self) -> None:
+        error = OSError(errno.EACCES, "permission denied")
+        self.assertIn(
+            "cannot traverse directory (permission denied:",
+            check_preview_macros.format_walk_error(error),
+        )
+
+    def test_formats_walk_error_for_disappeared_path(self) -> None:
+        error = OSError(errno.ENOENT, "no such file or directory")
+        self.assertIn(
+            "directory disappeared during scan",
+            check_preview_macros.format_walk_error(error),
+        )
+
     def test_formats_utf8_decode_error_for_single_byte_position(self) -> None:
         error = UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
         self.assertEqual(
@@ -2920,6 +2941,35 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(return_code, 1)
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("permission denied", output)
+            self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
+
+    def test_formats_symlink_loop_walk_errors_with_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            walk_error = OSError(errno.ELOOP, "too many levels of symbolic links", temp_dir)
+
+            def fake_walk(
+                _root: pathlib.Path,
+                *,
+                topdown: bool,
+                onerror: object,
+                followlinks: bool,
+            ) -> object:
+                _ = topdown
+                _ = followlinks
+                if onerror is not None:
+                    onerror(walk_error)
+                return iter(())
+
+            with mock.patch.object(check_preview_macros.os, "walk", side_effect=fake_walk):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not read one or more Swift files", output)
+            self.assertIn("cannot traverse directory (symlink loop:", output)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
 
     def test_fails_closed_when_root_contains_symlinked_directory(self) -> None:

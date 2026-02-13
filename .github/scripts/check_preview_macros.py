@@ -211,6 +211,16 @@ def format_utf8_decode_error(error: UnicodeDecodeError) -> str:
     return f"cannot decode file as UTF-8 ({reason} at bytes {start}-{end - 1})"
 
 
+def format_walk_error(error: OSError) -> str:
+    if error.errno == errno.ELOOP:
+        return f"cannot traverse directory (symlink loop: {error})"
+    if error.errno in {errno.EACCES, errno.EPERM}:
+        return f"cannot traverse directory (permission denied: {error})"
+    if error.errno == errno.ENOENT:
+        return f"directory disappeared during scan ({error})"
+    return f"cannot traverse directory ({error})"
+
+
 def path_from_error_filename(filename: object, fallback: Path) -> Path:
     if filename is None:
         return fallback
@@ -821,7 +831,7 @@ def main() -> int:
     for root in roots:
         def record_walk_error(error: OSError) -> None:
             error_path = path_from_error_filename(error.filename, root)
-            _ = record_unreadable(error_path, str(error))
+            _ = record_unreadable(error_path, format_walk_error(error))
 
         for directory, subdirectories, filenames in os.walk(
             root,
