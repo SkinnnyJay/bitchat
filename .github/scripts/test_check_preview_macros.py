@@ -839,6 +839,34 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Failure summary: 0 unreadable, 0 parse errors, 0 token matches.", output)
             self.assertIn("Scanned 0 Swift files before failure.", output)
 
+    def test_fails_closed_when_path_key_cannot_be_fsencoded(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            (temp_path / "A.swift").write_text("struct A {}\n", encoding="utf-8")
+
+            real_fsencode = check_preview_macros.os.fsencode
+
+            def fake_fsencode(value: str | bytes) -> bytes:
+                if isinstance(value, str) and value.endswith("A.swift"):
+                    raise UnicodeEncodeError("utf-8", value, 0, 1, "simulated failure")
+                return real_fsencode(value)
+
+            with mock.patch.object(check_preview_macros.os, "fsencode", side_effect=fake_fsencode):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn(
+                "Scan aborted after encountering an unsupported Swift path key:",
+                output,
+            )
+            self.assertIn("cannot be encoded for filesystem operations", output)
+            self.assertIn("Failure summary: 0 unreadable, 0 parse errors, 0 token matches.", output)
+            self.assertIn("Scanned 0 Swift files before failure.", output)
+
     def test_limits_reported_invalid_roots(self) -> None:
         roots = ["   ", "\u2060", "\x01invalid"]
         with mock.patch.object(check_preview_macros, "MAX_REPORTED_INVALID_ROOTS", 2):
