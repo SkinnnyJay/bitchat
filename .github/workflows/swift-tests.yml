@@ -29,15 +29,29 @@ jobs:
       - name: Set up Swift
         uses: swift-actions/setup-swift@v2
 
+      - name: Capture toolchain fingerprints
+        id: toolchain
+        run: |
+          swift_fingerprint="$(swift --version | shasum -a 256 | cut -d' ' -f1)"
+          xcode_fingerprint="$(xcodebuild -version | shasum -a 256 | cut -d' ' -f1)"
+          echo "swift_fingerprint=$swift_fingerprint" >> "$GITHUB_OUTPUT"
+          echo "xcode_fingerprint=$xcode_fingerprint" >> "$GITHUB_OUTPUT"
+
+      - name: Print toolchain versions
+        run: |
+          swift --version
+          xcodebuild -version
+
       - name: Cache SwiftPM build artifacts
         uses: actions/cache@v4
         with:
           path: |
             .build
             ~/.swiftpm
-          key: ${{ runner.os }}-swiftpm-${{ hashFiles('Package.swift', 'Package.resolved') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-swiftpm-${{ steps.toolchain.outputs.swift_fingerprint }}-${{ steps.toolchain.outputs.xcode_fingerprint }}-${{ hashFiles('Package.swift', 'Package.resolved') }}
           restore-keys: |
-            ${{ runner.os }}-swiftpm-
+            ${{ runner.os }}-${{ runner.arch }}-swiftpm-${{ steps.toolchain.outputs.swift_fingerprint }}-${{ steps.toolchain.outputs.xcode_fingerprint }}-
+            ${{ runner.os }}-${{ runner.arch }}-swiftpm-
 
       - name: Build the package
         run: |
