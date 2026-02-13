@@ -290,4 +290,44 @@ final class ChatViewModelIdentityParsingTests: XCTestCase {
         XCTAssertNil(ChatViewModel.validatedMessageID(from: Data("  msg ".utf8)))
         XCTAssertNil(ChatViewModel.validatedMessageID(from: Data([0xFF, 0xFE])))
     }
+
+    func testMatchesNostrSenderPubkeyAcceptsStoredCanonicalHex() {
+        let senderHex = String(repeating: "ab", count: 32)
+        XCTAssertTrue(
+            ChatViewModel.matchesNostrSenderPubkey(
+                storedNostrKey: senderHex.uppercased(),
+                senderCanonicalHex: senderHex
+            )
+        )
+    }
+
+    func testMatchesNostrSenderPubkeyAcceptsStoredNpub() {
+        let senderHex = String(repeating: "11", count: 32)
+        let npub = try? Bech32.encode(hrp: "npub", data: Data(hexString: senderHex) ?? Data())
+
+        XCTAssertTrue(
+            ChatViewModel.matchesNostrSenderPubkey(
+                storedNostrKey: npub,
+                senderCanonicalHex: senderHex
+            )
+        )
+    }
+
+    func testMatchesNostrSenderPubkeyRejectsInvalidOrMismatchedValues() {
+        let senderHex = String(repeating: "ab", count: 32)
+        let otherHex = String(repeating: "cd", count: 32)
+
+        XCTAssertFalse(
+            ChatViewModel.matchesNostrSenderPubkey(
+                storedNostrKey: "npub123",
+                senderCanonicalHex: senderHex
+            )
+        )
+        XCTAssertFalse(
+            ChatViewModel.matchesNostrSenderPubkey(
+                storedNostrKey: otherHex,
+                senderCanonicalHex: senderHex
+            )
+        )
+    }
 }

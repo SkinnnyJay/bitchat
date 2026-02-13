@@ -1401,6 +1401,12 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         return InputValidator.validateMessageID(rawMessageID)
     }
 
+    static func matchesNostrSenderPubkey(storedNostrKey: String?, senderCanonicalHex: String) -> Bool {
+        guard let storedNostrKey,
+              let storedCanonicalHex = canonicalNostrPubkeyHex(storedNostrKey) else { return false }
+        return storedCanonicalHex == senderCanonicalHex
+    }
+
     static func favoriteNotificationState(from content: String) -> Bool? {
         let normalized = content.trimmingCharacters(in: .whitespacesAndNewlines)
         if normalized.hasPrefix("[FAVORITED]") || normalized.hasPrefix("FAVORITED") {
@@ -6004,31 +6010,19 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             SecureLogger.warning("⚠️ Invalid Nostr public key format", category: .session)
             return nil
         }
-        // Convert hex to npub for comparison
-        guard let npubToMatch = NostrKeyNormalizer.canonicalNpub(canonicalHex) else {
-            SecureLogger.warning("⚠️ Failed to canonicalize Nostr public key", category: .session)
-            return nil
-        }
         
         // Search through favorites for matching Nostr pubkey
         for (noiseKey, relationship) in FavoritesPersistenceService.shared.favorites {
-            if let storedNostrKey = relationship.peerNostrPublicKey {
-                // Compare npub format
-                if storedNostrKey == npubToMatch {
-                    // SecureLogger.debug("✅ Found Noise key for Nostr sender (npub match)", category: .session)
-                    return noiseKey
-                }
-                
-                // Also try hex comparison if stored value is hex
-                if !storedNostrKey.hasPrefix("npub"),
-                   Self.canonicalNostrPubkeyHex(storedNostrKey) == canonicalHex {
-                    SecureLogger.debug("✅ Found Noise key for Nostr sender (hex match)", category: .session)
-                    return noiseKey
-                }
+            if Self.matchesNostrSenderPubkey(
+                storedNostrKey: relationship.peerNostrPublicKey,
+                senderCanonicalHex: canonicalHex
+            ) {
+                SecureLogger.debug("✅ Found Noise key for canonical Nostr sender key", category: .session)
+                return noiseKey
             }
         }
         
-        SecureLogger.debug("⚠️ No matching Noise key found for Nostr pubkey: \(canonicalHex.prefix(16))... (tried npub: \(npubToMatch.prefix(16))...)", category: .session)
+        SecureLogger.debug("⚠️ No matching Noise key found for canonical Nostr pubkey: \(canonicalHex.prefix(16))...", category: .session)
         return nil
     }
     
