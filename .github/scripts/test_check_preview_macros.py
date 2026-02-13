@@ -747,6 +747,13 @@ class PreviewMacroUtilityTests(unittest.TestCase):
             check_preview_macros.format_walk_error(error),
         )
 
+    def test_formats_directory_inspection_error_for_permission_denied(self) -> None:
+        error = OSError(errno.EACCES, "permission denied")
+        self.assertIn(
+            "cannot inspect directory (permission denied:",
+            check_preview_macros.format_directory_inspection_error(error),
+        )
+
     def test_formats_utf8_decode_error_for_single_byte_position(self) -> None:
         error = UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
         self.assertEqual(
@@ -2919,6 +2926,32 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("cannot inspect directory", output)
             self.assertNotIn("Found unsupported token '#Preview'", output)
             self.assertNotIn("NestedPreview.swift", output)
+            self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
+
+    def test_formats_permission_denied_symlink_inspection_errors_with_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            problematic_subdirectory = temp_path / "problematic"
+            problematic_subdirectory.mkdir(parents=True, exist_ok=True)
+
+            original_is_symlink = pathlib.Path.is_symlink
+
+            def raising_is_symlink(path: pathlib.Path) -> bool:
+                if path == problematic_subdirectory:
+                    raise OSError(errno.EACCES, "permission denied", str(problematic_subdirectory))
+                return original_is_symlink(path)
+
+            with mock.patch.object(pathlib.Path, "is_symlink", new=raising_is_symlink):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not read one or more Swift files", output)
+            self.assertIn("problematic", output)
+            self.assertIn("cannot inspect directory (permission denied:", output)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
 
     def test_handles_bytes_walk_error_filename_without_crashing(self) -> None:

@@ -223,6 +223,18 @@ def format_walk_error(error: OSError) -> str:
     return f"cannot traverse directory ({error})"
 
 
+def format_directory_inspection_error(error: OSError) -> str:
+    if error.errno == errno.ELOOP:
+        return f"cannot inspect directory (symlink loop: {error})"
+    if error.errno in {errno.ENOTDIR, errno.EISDIR}:
+        return f"cannot inspect directory (non-directory path: {error})"
+    if error.errno in {errno.EACCES, errno.EPERM}:
+        return f"cannot inspect directory (permission denied: {error})"
+    if error.errno == errno.ENOENT:
+        return f"cannot inspect directory (directory disappeared during scan: {error})"
+    return f"cannot inspect directory ({error})"
+
+
 def path_from_error_filename(filename: object, fallback: Path) -> Path:
     if filename is None:
         return fallback
@@ -862,7 +874,10 @@ def main() -> int:
                     if subdirectory_path.is_symlink():
                         symlinked_subdirectories.append(subdirectory_path)
                 except OSError as error:
-                    if not record_unreadable(subdirectory_path, f"cannot inspect directory ({error})"):
+                    if not record_unreadable(
+                        subdirectory_path,
+                        format_directory_inspection_error(error),
+                    ):
                         break
                     uninspectable_subdirectories.append(subdirectory_path)
 
