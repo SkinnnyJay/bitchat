@@ -514,6 +514,15 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_fails_when_token_contains_newline(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = self.run_script("--root", temp_dir, "--token", "#My\nPreview")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(
+                "Configured token must be single-line; newline characters are not allowed.",
+                result.stdout,
+            )
+
     def test_deduplicates_overlapping_roots(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)

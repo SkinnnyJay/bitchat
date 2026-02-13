@@ -195,6 +195,9 @@ def main() -> int:
     if not token:
         print("Configured token is empty after trimming; provide a non-empty token.")
         return 1
+    if "\n" in token or "\r" in token:
+        print("Configured token must be single-line; newline characters are not allowed.")
+        return 1
 
     raw_roots = args.root or ["bitchat", "bitchatShareExtension"]
     roots: list[Path] = []
