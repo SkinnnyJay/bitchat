@@ -221,7 +221,7 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
 
         for (fingerprint, identity) in cache.socialIdentities {
             sanitizedSocialIdentities[fingerprint] = SocialIdentity(
-                fingerprint: identity.fingerprint,
+                fingerprint: fingerprint,
                 localPetname: identity.localPetname,
                 claimedNickname: sanitizedClaimedNickname(identity.claimedNickname),
                 trustLevel: identity.trustLevel,

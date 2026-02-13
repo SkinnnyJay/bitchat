@@ -137,4 +137,23 @@ final class SecureIdentityStateManagerTests: XCTestCase {
         XCTAssertEqual(sanitized.nicknameIndex["user"], Set(["fp1"]))
         XCTAssertEqual(sanitized.blockedNostrPubkeys, [String(repeating: "ab", count: 32)])
     }
+
+    func testSanitizedIdentityCacheUsesDictionaryKeyAsCanonicalFingerprint() {
+        var cache = IdentityCache()
+        cache.socialIdentities = [
+            "fp1": SocialIdentity(
+                fingerprint: "other",
+                localPetname: nil,
+                claimedNickname: "alice",
+                trustLevel: .unknown,
+                isFavorite: false,
+                isBlocked: false,
+                notes: nil
+            )
+        ]
+
+        let sanitized = SecureIdentityStateManager.sanitizedIdentityCache(cache)
+
+        XCTAssertEqual(sanitized.socialIdentities["fp1"]?.fingerprint, "fp1")
+    }
 }
