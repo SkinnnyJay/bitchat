@@ -11,8 +11,9 @@ struct InputValidator {
         // BinaryProtocol caps payload length at UInt16.max (65_535). Leave headroom
         // for headers/padding by limiting user content to 60_000 bytes.
         static let maxMessageLength = 60_000
-        // Packet/message identifier fields are encoded as UInt8 length in several paths.
-        static let maxMessageIDLength = 255
+        // Packet/message identifier fields are encoded as UInt8 length in several
+        // paths. Keep a safety margin below 255 for cross-path compatibility.
+        static let maxMessageIDLength = 200
     }
     
     // MARK: - String Content Validation

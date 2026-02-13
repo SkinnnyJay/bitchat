@@ -138,7 +138,7 @@ extension PeerID {
         static let hexIDLength = 16 // 8 bytes = 16 hex chars
     }
     
-    /// Validates a peer ID from any source (short 16-hex, full 64-hex, or internal alnum/-/_ up to 64)
+    /// Validates a peer ID from any source (short 16-hex, full 64-hex, or internal alnum/-/_ IDs)
     var isValid: Bool {
         if prefix != .empty {
             return PeerID(str: bare).isValid
@@ -149,12 +149,12 @@ extension PeerID {
             return true
         }
         
-        // If length equals short or full but isn't valid hex, reject
-        if id.count == Constants.hexIDLength || id.count == Constants.maxIDLength {
+        // Reserve exact 64-byte unprefixed identifiers for full hex Noise keys.
+        if id.count == Constants.maxIDLength {
             return false
         }
         
-        // Internal format: alphanumeric + dash/underscore up to 63 (not 16 or 64)
+        // Internal format: alphanumeric + dash/underscore up to 63.
         let validCharset = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
         return !id.isEmpty &&
                 id.count < Constants.maxIDLength &&
