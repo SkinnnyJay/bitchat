@@ -853,6 +853,13 @@ def main() -> int:
                     ):
                         break
                     continue
+                if (post_read_descriptor_stat.st_dev, post_read_descriptor_stat.st_ino) != descriptor_identity:
+                    if not record_unreadable(
+                        swift_file,
+                        "file identity changed during read (possible race)",
+                    ):
+                        break
+                    continue
                 if post_read_descriptor_stat.st_nlink != file_link_count:
                     if not record_unreadable(
                         swift_file,
