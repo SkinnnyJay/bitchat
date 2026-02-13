@@ -51,6 +51,24 @@ def find_token_line_numbers(content: str, token: str) -> list[int]:
     pattern = re.compile(rf"^\s*{re.escape(token)}\b")
     matches: list[int] = []
     block_comment_depth = 0
+    active_string_hashes: int | None = None
+    active_string_is_multiline = False
+
+    def parse_string_start(line: str, cursor: int) -> tuple[int, bool] | None:
+        if cursor >= len(line):
+            return None
+
+        hashes = 0
+        while cursor + hashes < len(line) and line[cursor + hashes] == "#":
+            hashes += 1
+
+        quote_index = cursor + hashes
+        if quote_index >= len(line) or line[quote_index] != '"':
+            return None
+
+        is_multiline = line.startswith('"""', quote_index)
+        quote_width = 3 if is_multiline else 1
+        return hashes + quote_width, is_multiline
 
     for line_number, line in enumerate(content.splitlines(), start=1):
         cursor = 0
@@ -58,6 +76,28 @@ def find_token_line_numbers(content: str, token: str) -> list[int]:
 
         while cursor < len(line):
             next_pair = line[cursor : cursor + 2]
+
+            if active_string_hashes is not None:
+                if active_string_is_multiline:
+                    multiline_close = '"""' + ("#" * active_string_hashes)
+                    if line.startswith(multiline_close, cursor):
+                        cursor += len(multiline_close)
+                        active_string_hashes = None
+                        active_string_is_multiline = False
+                        continue
+                    cursor += 1
+                    continue
+
+                singleline_close = '"' + ("#" * active_string_hashes)
+                if line.startswith(singleline_close, cursor):
+                    cursor += len(singleline_close)
+                    active_string_hashes = None
+                    continue
+                if active_string_hashes == 0 and line[cursor] == "\\" and cursor + 1 < len(line):
+                    cursor += 2
+                    continue
+                cursor += 1
+                continue
 
             if block_comment_depth > 0:
                 if next_pair == "/*":
@@ -78,8 +118,21 @@ def find_token_line_numbers(content: str, token: str) -> list[int]:
                 cursor += 2
                 continue
 
+            string_start = parse_string_start(line, cursor)
+            if string_start is not None:
+                consumed, is_multiline = string_start
+                active_string_hashes = consumed - (3 if is_multiline else 1)
+                active_string_is_multiline = is_multiline
+                cursor += consumed
+                continue
+
             code_chars.append(line[cursor])
             cursor += 1
+
+        if active_string_hashes is not None and not active_string_is_multiline:
+            # Single-line strings can't legally span multiple lines in Swift.
+            # Reset here so malformed input does not suppress later detections.
+            active_string_hashes = None
 
         code_segment = "".join(code_chars)
         if pattern.search(code_segment):

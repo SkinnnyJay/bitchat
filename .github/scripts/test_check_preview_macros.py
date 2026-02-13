@@ -80,6 +80,20 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [2])
 
+    def test_detects_preview_after_string_with_comment_markers(self) -> None:
+        content = """
+            let tricky = "/* not a comment marker in a string */"
+            #Preview { Text("real preview") }
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
+
+    def test_detects_preview_after_unclosed_comment_marker_in_string_literal(self) -> None:
+        content = """
+            let tricky = "/*"
+            #Preview { Text("real preview") }
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
+
     def test_reports_multiple_line_numbers(self) -> None:
         content = """
             #Preview { Text("one") }
