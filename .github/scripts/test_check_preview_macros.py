@@ -151,6 +151,17 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0)
             self.assertIn("across 1 Swift files.", result.stdout)
 
+    def test_fails_closed_when_swift_file_is_not_utf8_decodable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "Corrupt.swift"
+            swift_file.write_bytes(b"\xff\xfe\xfa")
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Could not read one or more Swift files", result.stdout)
+            self.assertIn("Corrupt.swift", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -105,6 +105,7 @@ def main() -> int:
     matches_with_lines: dict[Path, list[int]] = {}
     scanned_files = 0
     seen_files: set[Path] = set()
+    unreadable_files: dict[Path, str] = {}
 
     for root in roots:
         for swift_file in root.rglob("*.swift"):
@@ -113,11 +114,21 @@ def main() -> int:
                 continue
             seen_files.add(resolved_file)
             scanned_files += 1
-            content = swift_file.read_text(encoding="utf-8", errors="ignore")
+            try:
+                content = swift_file.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError) as error:
+                unreadable_files[swift_file] = str(error)
+                continue
             line_numbers = find_token_line_numbers(content, args.token)
             if line_numbers:
                 matches.append(swift_file)
                 matches_with_lines[swift_file] = line_numbers
+
+    if unreadable_files:
+        print("Could not read one or more Swift files:")
+        for swift_file in sorted(unreadable_files):
+            print(f" - {swift_file}: {unreadable_files[swift_file]}")
+        return 1
 
     if scanned_files == 0 and not args.allow_empty:
         joined_roots = ", ".join(str(root) for root in roots)
