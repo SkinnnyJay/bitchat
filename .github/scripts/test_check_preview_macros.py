@@ -407,6 +407,24 @@ class PreviewMacroUtilityTests(unittest.TestCase):
             check_preview_macros.format_open_read_error(error),
         )
 
+    def test_builds_error_path_from_bytes_filename(self) -> None:
+        fallback = pathlib.Path("/tmp/fallback")
+        result = check_preview_macros.path_from_error_filename(b"/tmp/\xffbad", fallback)
+        self.assertIsInstance(result, pathlib.Path)
+        self.assertTrue(str(result).startswith("/tmp/"))
+
+    def test_falls_back_when_error_filename_is_not_pathlike_or_stringable(self) -> None:
+        class BadFilename:
+            def __fspath__(self) -> str:
+                raise TypeError("invalid path")
+
+            def __str__(self) -> str:
+                raise TypeError("not stringable")
+
+        fallback = pathlib.Path("/tmp/fallback")
+        result = check_preview_macros.path_from_error_filename(BadFilename(), fallback)
+        self.assertEqual(result, fallback)
+
 
 class PreviewMacroScriptBehaviorTests(unittest.TestCase):
     script_path = str(SCRIPT_DIR / "check_preview_macros.py")
@@ -1384,6 +1402,35 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not read one or more Swift files", result.stdout)
             self.assertIn("blocked", result.stdout)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", result.stdout)
+
+    def test_handles_bytes_walk_error_filename_without_crashing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            walk_error = OSError(errno.EACCES, "permission denied", b"/tmp/\xffbad")
+
+            def fake_walk(
+                _root: pathlib.Path,
+                *,
+                topdown: bool,
+                onerror: object,
+                followlinks: bool,
+            ) -> object:
+                _ = topdown
+                _ = followlinks
+                if onerror is not None:
+                    onerror(walk_error)
+                return iter(())
+
+            with mock.patch.object(check_preview_macros.os, "walk", side_effect=fake_walk):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not read one or more Swift files", output)
+            self.assertIn("permission denied", output)
+            self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
 
     def test_fails_closed_when_root_contains_symlinked_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

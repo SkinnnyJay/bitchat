@@ -98,6 +98,20 @@ def format_open_read_error(error: OSError) -> str:
     return f"cannot open/read file ({error})"
 
 
+def path_from_error_filename(filename: object, fallback: Path) -> Path:
+    if filename is None:
+        return fallback
+    try:
+        if isinstance(filename, bytes):
+            return Path(os.fsdecode(filename))
+        return Path(filename)
+    except (TypeError, ValueError):
+        try:
+            return Path(str(filename))
+        except (TypeError, ValueError):
+            return fallback
+
+
 def truncate_error_reason_for_storage(reason: str) -> str:
     if len(reason) <= MAX_STORED_ERROR_REASON_CHARS:
         return reason
@@ -501,7 +515,7 @@ def main() -> int:
 
     for root in roots:
         def record_walk_error(error: OSError) -> None:
-            error_path = Path(error.filename) if error.filename is not None else root
+            error_path = path_from_error_filename(error.filename, root)
             _ = record_unreadable(error_path, str(error))
 
         for directory, subdirectories, filenames in os.walk(
