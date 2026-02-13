@@ -816,6 +816,7 @@ def main() -> int:
                             break
                         continue
                     file_size_bytes = descriptor_stat.st_size
+                    file_mode = descriptor_stat.st_mode
                     file_mtime_ns = descriptor_stat.st_mtime_ns
                     file_ctime_ns = descriptor_stat.st_ctime_ns
                     file_link_count = descriptor_stat.st_nlink
@@ -856,6 +857,13 @@ def main() -> int:
                     if not record_unreadable(
                         swift_file,
                         "file link count changed during read (possible race)",
+                    ):
+                        break
+                    continue
+                if post_read_descriptor_stat.st_mode != file_mode:
+                    if not record_unreadable(
+                        swift_file,
+                        "file mode changed during read (possible race)",
                     ):
                         break
                     continue
