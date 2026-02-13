@@ -48,7 +48,8 @@ final class PrivateChatManagerTests: XCTestCase {
 
     func testMarkAsReadSkipsInvalidSenderPeerID() {
         let manager = PrivateChatManager()
-        manager.meshService = MockTransportForPrivateChatManager()
+        let transport = MockTransportForPrivateChatManager()
+        manager.meshService = transport
         let invalidPeerID = "invalid peer id"
         manager.privateChats[invalidPeerID] = [
             BitchatMessage(

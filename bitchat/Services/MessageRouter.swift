@@ -70,29 +70,31 @@ final class MessageRouter {
             forName: .favoriteStatusChanged,
             object: nil,
             queue: .main
-        ) { @MainActor [weak self] note in
-            guard let self = self else { return }
-            var peersToFlush = Set<PeerID>()
-            if let data = note.userInfo?["peerPublicKey"] as? Data {
-                peersToFlush.insert(PeerID(publicKey: data))
-            }
-            // Handle key updates
-            if let newKey = note.userInfo?["peerPublicKey"] as? Data,
-               let isKeyUpdate = note.userInfo?["isKeyUpdate"] as? Bool,
-               isKeyUpdate {
-                let peerID = PeerID(publicKey: newKey)
-                if let oldKey = note.userInfo?["oldPeerPublicKey"] as? Data {
-                    let oldPeerID = PeerID(publicKey: oldKey)
-                    self.migrateOutbox(from: oldPeerID, to: peerID)
+        ) { [weak self] note in
+            MainActor.assumeIsolated {
+                guard let self = self else { return }
+                var peersToFlush = Set<PeerID>()
+                if let data = note.userInfo?["peerPublicKey"] as? Data {
+                    peersToFlush.insert(PeerID(publicKey: data))
                 }
-                peersToFlush.insert(peerID)
-            }
-            if peersToFlush.isEmpty {
-                self.flushAllOutbox()
-                return
-            }
-            for peerID in peersToFlush {
-                self.flushOutbox(for: peerID)
+                // Handle key updates
+                if let newKey = note.userInfo?["peerPublicKey"] as? Data,
+                   let isKeyUpdate = note.userInfo?["isKeyUpdate"] as? Bool,
+                   isKeyUpdate {
+                    let peerID = PeerID(publicKey: newKey)
+                    if let oldKey = note.userInfo?["oldPeerPublicKey"] as? Data {
+                        let oldPeerID = PeerID(publicKey: oldKey)
+                        self.migrateOutbox(from: oldPeerID, to: peerID)
+                    }
+                    peersToFlush.insert(peerID)
+                }
+                if peersToFlush.isEmpty {
+                    self.flushAllOutbox()
+                    return
+                }
+                for peerID in peersToFlush {
+                    self.flushOutbox(for: peerID)
+                }
             }
         }
     }

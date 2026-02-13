@@ -124,11 +124,11 @@ enum TestError: Error {
 // MARK: - PeerID String Helpers
 
 /// Raw String can be passed as PeerID
-extension PeerID: @retroactive ExpressibleByStringLiteral {
+extension PeerID: ExpressibleByStringLiteral {
     public init(stringLiteral value: String) {
         self.init(str: value)
     }
 }
 
 /// Interpolated String can be passed as PeerID
-extension PeerID: @retroactive ExpressibleByStringInterpolation {}
+extension PeerID: ExpressibleByStringInterpolation {}
