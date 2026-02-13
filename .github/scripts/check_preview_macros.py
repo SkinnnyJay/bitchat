@@ -252,31 +252,37 @@ def main() -> int:
                 matches.append(swift_file)
                 matches_with_lines[swift_file] = line_numbers
 
-    if unreadable_files or parse_error_files:
-        if unreadable_files:
-            print("Could not read one or more Swift files:")
-            for swift_file in sorted(unreadable_files):
-                print(f" - {swift_file}: {unreadable_files[swift_file]}")
-        if parse_error_files:
-            print("Could not reliably parse one or more Swift files:")
-            for swift_file in sorted(parse_error_files):
-                print(f" - {swift_file}: {parse_error_files[swift_file]}")
-        print(f"Scanned {scanned_files} Swift files before failure.")
-        return 1
+    has_failure = False
+
+    if unreadable_files:
+        has_failure = True
+        print("Could not read one or more Swift files:")
+        for swift_file in sorted(unreadable_files):
+            print(f" - {swift_file}: {unreadable_files[swift_file]}")
+
+    if parse_error_files:
+        has_failure = True
+        print("Could not reliably parse one or more Swift files:")
+        for swift_file in sorted(parse_error_files):
+            print(f" - {swift_file}: {parse_error_files[swift_file]}")
 
     if scanned_files == 0 and not args.allow_empty:
+        has_failure = True
         joined_roots = ", ".join(str(root) for root in roots)
         print(
             "No Swift files were discovered in configured roots; "
             f"failing to avoid false green checks. Roots: [{joined_roots}]"
         )
-        return 1
 
     if matches:
+        has_failure = True
         print(f"Found unsupported token '{token}' in Swift sources:")
         for match in sorted(matches):
             line_list = ", ".join(str(line) for line in matches_with_lines.get(match, []))
             print(f" - {match} (lines: {line_list})")
+
+    if has_failure:
+        print(f"Scanned {scanned_files} Swift files before failure.")
         return 1
 
     joined_roots = ", ".join(str(root) for root in roots)

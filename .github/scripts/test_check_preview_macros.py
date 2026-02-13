@@ -425,6 +425,27 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Could not reliably parse one or more Swift files", result.stdout)
             self.assertIn("UnmatchedCloser.swift", result.stdout)
 
+    def test_reports_parse_errors_and_token_matches_together(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            parse_error_file = temp_path / "UnmatchedCloser.swift"
+            parse_error_file.write_text(
+                "let value = 1\n*/\n",
+                encoding="utf-8",
+            )
+            preview_file = temp_path / "HasPreview.swift"
+            preview_file.write_text(
+                "#Preview { Text(\"flagged\") }\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Could not reliably parse one or more Swift files", result.stdout)
+            self.assertIn("UnmatchedCloser.swift", result.stdout)
+            self.assertIn("Found unsupported token '#Preview' in Swift sources", result.stdout)
+            self.assertIn("HasPreview.swift (lines: 1)", result.stdout)
+
     def test_fails_closed_on_unterminated_block_comment(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)
