@@ -21,6 +21,7 @@ MAX_TOKEN_BYTES = 256
 MAX_SWIFT_FILE_BYTES = 5 * 1024 * 1024
 MAX_ROOT_BYTES = 4096
 MAX_ROOT_COUNT = 128
+MAX_REPORTED_TOKEN_MATCH_FILES = 200
 DISALLOWED_CONTROL_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn"}
 
 
@@ -515,9 +516,13 @@ def main() -> int:
     if matches:
         has_failure = True
         print(f"Found unsupported token '{token}' in Swift sources:")
-        for match in sorted(matches):
+        sorted_matches = sorted(matches)
+        for match in sorted_matches[:MAX_REPORTED_TOKEN_MATCH_FILES]:
             line_list = ", ".join(str(line) for line in matches_with_lines.get(match, []))
             print(f" - {format_path_for_diagnostics(match)} (lines: {line_list})")
+        omitted_match_count = len(sorted_matches) - MAX_REPORTED_TOKEN_MATCH_FILES
+        if omitted_match_count > 0:
+            print(f" ... and {omitted_match_count} more files not shown.")
 
     if has_failure:
         print(
