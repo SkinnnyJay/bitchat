@@ -1283,7 +1283,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     
                     let finalNickname = Self.favoriteNicknameForPersistence(
                         preferredNickname: nickname,
-                        fallbackNickname: "Unknown"
+                        fallbackNickname: "user"
                     )
                     let nostrKey = currentStatus?.peerNostrPublicKey ?? NostrIdentityBridge.getNostrPublicKey(for: noisePublicKey)
                     
@@ -5947,7 +5947,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         let shouldMarkAsUnread = !wasReadBefore && !isViewingThisChat && (isRecentMessage || !isStartupPhase)
         
         // Use provided nickname or try to extract from previous messages
-        var finalSenderNickname = InputValidator.validateNickname(senderNickname ?? "") ?? "Unknown"
+        var finalSenderNickname = InputValidator.validateNickname(senderNickname ?? "") ?? "user"
         
         // If no nickname provided, check if we have any previous messages from this Nostr key
         if senderNickname == nil {
