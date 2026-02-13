@@ -154,6 +154,13 @@ class PreviewMacroDetectionTests(unittest.TestCase):
         """
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
 
+    def test_detects_preview_after_raw_single_line_string_with_two_hashes_escaped_closer(self) -> None:
+        content = """
+            let raw = ##"before \\##"## still in string"##
+            #Preview { Text("real preview") }
+        """
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [3])
+
     def test_detects_preview_after_raw_multiline_string_with_escaped_closer(self) -> None:
         content = '''
             let raw = #"""
@@ -161,6 +168,17 @@ class PreviewMacroDetectionTests(unittest.TestCase):
             \\#"""#
             still content
             """#
+            #Preview { Text("real preview") }
+        '''
+        self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [7])
+
+    def test_detects_preview_after_raw_multiline_string_with_two_hashes_escaped_closer(self) -> None:
+        content = '''
+            let raw = ##"""
+            before
+            \\##"""##
+            still content
+            """##
             #Preview { Text("real preview") }
         '''
         self.assertEqual(check_preview_macros.find_token_line_numbers(content, "#Preview"), [7])
