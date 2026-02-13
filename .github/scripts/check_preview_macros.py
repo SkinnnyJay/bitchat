@@ -32,6 +32,14 @@ def parse_args() -> argparse.Namespace:
         default="#Preview",
         help="Token to flag as unsupported (default: #Preview).",
     )
+    parser.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help=(
+            "Allow success when no Swift files are discovered in scan roots. "
+            "By default this is treated as a configuration error."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -105,6 +113,14 @@ def main() -> int:
             if line_numbers:
                 matches.append(swift_file)
                 matches_with_lines[swift_file] = line_numbers
+
+    if scanned_files == 0 and not args.allow_empty:
+        joined_roots = ", ".join(str(root) for root in roots)
+        print(
+            "No Swift files were discovered in configured roots; "
+            f"failing to avoid false green checks. Roots: [{joined_roots}]"
+        )
+        return 1
 
     if matches:
         print(f"Found unsupported token '{args.token}' in Swift sources:")
