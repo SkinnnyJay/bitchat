@@ -223,13 +223,50 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
         return index
     }
 
+    static func shouldPreferSocialIdentity(_ candidate: SocialIdentity, over existing: SocialIdentity) -> Bool {
+        func trustRank(_ level: TrustLevel) -> Int {
+            switch level {
+            case .unknown: return 0
+            case .casual: return 1
+            case .trusted: return 2
+            case .verified: return 3
+            }
+        }
+
+        let candidateHasPetname = candidate.localPetname?.isEmpty == false
+        let existingHasPetname = existing.localPetname?.isEmpty == false
+        if candidateHasPetname != existingHasPetname {
+            return candidateHasPetname
+        }
+
+        if trustRank(candidate.trustLevel) != trustRank(existing.trustLevel) {
+            return trustRank(candidate.trustLevel) > trustRank(existing.trustLevel)
+        }
+
+        if candidate.isFavorite != existing.isFavorite {
+            return candidate.isFavorite
+        }
+
+        if candidate.isBlocked != existing.isBlocked {
+            return candidate.isBlocked
+        }
+
+        let candidateHasNotes = candidate.notes?.isEmpty == false
+        let existingHasNotes = existing.notes?.isEmpty == false
+        if candidateHasNotes != existingHasNotes {
+            return candidateHasNotes
+        }
+
+        return candidate.claimedNickname < existing.claimedNickname
+    }
+
     static func sanitizedIdentityCache(_ cache: IdentityCache) -> IdentityCache {
         var sanitized = cache
         var sanitizedSocialIdentities: [String: SocialIdentity] = [:]
 
         for (fingerprint, identity) in cache.socialIdentities {
             guard let canonicalFingerprint = canonicalFingerprint(fingerprint) else { continue }
-            sanitizedSocialIdentities[canonicalFingerprint] = SocialIdentity(
+            let sanitizedIdentity = SocialIdentity(
                 fingerprint: canonicalFingerprint,
                 localPetname: identity.localPetname,
                 claimedNickname: sanitizedClaimedNickname(identity.claimedNickname),
@@ -238,6 +275,13 @@ final class SecureIdentityStateManager: SecureIdentityStateManagerProtocol {
                 isBlocked: identity.isBlocked,
                 notes: identity.notes
             )
+            if let existing = sanitizedSocialIdentities[canonicalFingerprint] {
+                if shouldPreferSocialIdentity(sanitizedIdentity, over: existing) {
+                    sanitizedSocialIdentities[canonicalFingerprint] = sanitizedIdentity
+                }
+            } else {
+                sanitizedSocialIdentities[canonicalFingerprint] = sanitizedIdentity
+            }
         }
 
         sanitized.socialIdentities = sanitizedSocialIdentities

@@ -241,6 +241,39 @@ final class SecureIdentityStateManagerTests: XCTestCase {
         XCTAssertEqual(index["alice"], Set(["fp1", "fp2"]))
     }
 
+    func testShouldPreferSocialIdentityPrefersPetnameThenTrust() {
+        let existing = SocialIdentity(
+            fingerprint: "fp",
+            localPetname: nil,
+            claimedNickname: "alice",
+            trustLevel: .casual,
+            isFavorite: false,
+            isBlocked: false,
+            notes: nil
+        )
+        let withPetname = SocialIdentity(
+            fingerprint: "fp",
+            localPetname: "Alice",
+            claimedNickname: "alice",
+            trustLevel: .casual,
+            isFavorite: false,
+            isBlocked: false,
+            notes: nil
+        )
+        let higherTrust = SocialIdentity(
+            fingerprint: "fp",
+            localPetname: nil,
+            claimedNickname: "alice",
+            trustLevel: .verified,
+            isFavorite: false,
+            isBlocked: false,
+            notes: nil
+        )
+
+        XCTAssertTrue(SecureIdentityStateManager.shouldPreferSocialIdentity(withPetname, over: existing))
+        XCTAssertTrue(SecureIdentityStateManager.shouldPreferSocialIdentity(higherTrust, over: existing))
+    }
+
     func testSanitizedIdentityCacheNormalizesSocialNicknamesAndBlockedNostrKeys() {
         let rawNostrKey = String(repeating: "AB", count: 32)
         let fingerprint = String(repeating: "cd", count: 32)
@@ -271,6 +304,38 @@ final class SecureIdentityStateManagerTests: XCTestCase {
         XCTAssertEqual(sanitized.verifiedFingerprints, [fingerprint])
         XCTAssertEqual(sanitized.lastInteractions[fingerprint], Date(timeIntervalSince1970: 200))
         XCTAssertEqual(sanitized.blockedNostrPubkeys, [String(repeating: "ab", count: 32)])
+    }
+
+    func testSanitizedIdentityCachePrefersStrongerIdentityForCanonicalFingerprintCollisions() {
+        let fingerprint = String(repeating: "ab", count: 32)
+        var cache = IdentityCache()
+        cache.socialIdentities = [
+            fingerprint: SocialIdentity(
+                fingerprint: fingerprint,
+                localPetname: nil,
+                claimedNickname: "alice",
+                trustLevel: .casual,
+                isFavorite: false,
+                isBlocked: false,
+                notes: nil
+            ),
+            fingerprint.uppercased(): SocialIdentity(
+                fingerprint: fingerprint.uppercased(),
+                localPetname: "Alice",
+                claimedNickname: "alice",
+                trustLevel: .verified,
+                isFavorite: true,
+                isBlocked: false,
+                notes: "note"
+            )
+        ]
+
+        let sanitized = SecureIdentityStateManager.sanitizedIdentityCache(cache)
+        let resolved = sanitized.socialIdentities[fingerprint]
+
+        XCTAssertEqual(resolved?.localPetname, "Alice")
+        XCTAssertEqual(resolved?.trustLevel, .verified)
+        XCTAssertEqual(resolved?.isFavorite, true)
     }
 
     func testSanitizedIdentityCacheUsesDictionaryKeyAsCanonicalFingerprint() {
