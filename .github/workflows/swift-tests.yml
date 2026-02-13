@@ -25,8 +25,32 @@ jobs:
       - name: Set up Swift
         uses: swift-actions/setup-swift@v2
 
+      - name: Cache SwiftPM build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/.swiftpm
+          key: ${{ runner.os }}-swiftpm-${{ hashFiles('Package.swift', 'Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-
+
       - name: Build the package
-        run: swift build -Xswiftc -warnings-as-errors
+        run: |
+          set -o pipefail
+          swift build -Xswiftc -warnings-as-errors 2>&1 | tee build.log
 
       - name: Run Tests
-        run: swift test --parallel --disable-swift-testing -Xswiftc -warnings-as-errors  # so it only runs xctests: https://github.com/swiftlang/swift-package-manager/issues/8529#issuecomment-2815711345
+        run: |
+          set -o pipefail
+          swift test --parallel --disable-swift-testing -Xswiftc -warnings-as-errors 2>&1 | tee test.log  # so it only runs xctests: https://github.com/swiftlang/swift-package-manager/issues/8529#issuecomment-2815711345
+
+      - name: Upload Swift build/test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-build-test-logs
+          path: |
+            build.log
+            test.log
+          if-no-files-found: ignore
