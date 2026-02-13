@@ -826,6 +826,7 @@ def main() -> int:
                 break
             processed_directory_entries += directory_entry_count
             symlinked_subdirectories: list[Path] = []
+            uninspectable_subdirectories: list[Path] = []
             for subdirectory in list(subdirectories):
                 subdirectory_path = Path(directory) / subdirectory
                 try:
@@ -834,9 +835,14 @@ def main() -> int:
                 except OSError as error:
                     if not record_unreadable(subdirectory_path, f"cannot inspect directory ({error})"):
                         break
+                    uninspectable_subdirectories.append(subdirectory_path)
 
             if should_abort_scan():
                 break
+
+            for uninspectable_subdirectory in sorted(uninspectable_subdirectories):
+                if uninspectable_subdirectory.name in subdirectories:
+                    subdirectories.remove(uninspectable_subdirectory.name)
 
             for symlinked_subdirectory in sorted(symlinked_subdirectories):
                 if not record_unreadable(
