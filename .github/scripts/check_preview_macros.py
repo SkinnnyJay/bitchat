@@ -341,22 +341,33 @@ def main() -> int:
                 seen_files.add(resolved_file)
                 scanned_files += 1
                 try:
-                    file_size_bytes = swift_file.stat().st_size
+                    with swift_file.open("rb") as file_handle:
+                        file_size_bytes = os.fstat(file_handle.fileno()).st_size
+                        if file_size_bytes > MAX_SWIFT_FILE_BYTES:
+                            record_unreadable(
+                                swift_file,
+                                (
+                                    "file exceeds max supported size "
+                                    f"({file_size_bytes} bytes > {MAX_SWIFT_FILE_BYTES} bytes)"
+                                ),
+                            )
+                            continue
+                        raw_content = file_handle.read(MAX_SWIFT_FILE_BYTES + 1)
                 except OSError as error:
-                    record_unreadable(swift_file, f"cannot inspect file size ({error})")
+                    record_unreadable(swift_file, str(error))
                     continue
-                if file_size_bytes > MAX_SWIFT_FILE_BYTES:
+                if len(raw_content) > MAX_SWIFT_FILE_BYTES:
                     record_unreadable(
                         swift_file,
                         (
                             "file exceeds max supported size "
-                            f"({file_size_bytes} bytes > {MAX_SWIFT_FILE_BYTES} bytes)"
+                            f"(>= {len(raw_content)} bytes > {MAX_SWIFT_FILE_BYTES} bytes)"
                         ),
                     )
                     continue
                 try:
-                    content = swift_file.read_text(encoding="utf-8")
-                except (OSError, UnicodeDecodeError) as error:
+                    content = raw_content.decode("utf-8")
+                except UnicodeDecodeError as error:
                     record_unreadable(swift_file, str(error))
                     continue
                 line_numbers, parse_error = find_token_line_numbers_with_state(content, token)
