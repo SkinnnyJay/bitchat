@@ -726,6 +726,13 @@ class PreviewMacroUtilityTests(unittest.TestCase):
             check_preview_macros.format_walk_error(error),
         )
 
+    def test_formats_walk_error_for_non_directory_path(self) -> None:
+        error = OSError(errno.ENOTDIR, "not a directory")
+        self.assertIn(
+            "cannot traverse directory (non-directory path:",
+            check_preview_macros.format_walk_error(error),
+        )
+
     def test_formats_walk_error_for_permission_denied(self) -> None:
         error = OSError(errno.EACCES, "permission denied")
         self.assertIn(
@@ -2970,6 +2977,35 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(return_code, 1)
             self.assertIn("Could not read one or more Swift files", output)
             self.assertIn("cannot traverse directory (symlink loop:", output)
+            self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
+
+    def test_formats_non_directory_walk_errors_with_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            walk_error = OSError(errno.ENOTDIR, "not a directory", temp_dir)
+
+            def fake_walk(
+                _root: pathlib.Path,
+                *,
+                topdown: bool,
+                onerror: object,
+                followlinks: bool,
+            ) -> object:
+                _ = topdown
+                _ = followlinks
+                if onerror is not None:
+                    onerror(walk_error)
+                return iter(())
+
+            with mock.patch.object(check_preview_macros.os, "walk", side_effect=fake_walk):
+                return_code, output = self.run_main_with_args(
+                    roots=[temp_dir],
+                    token="#Preview",
+                    allow_empty=True,
+                )
+
+            self.assertEqual(return_code, 1)
+            self.assertIn("Could not read one or more Swift files", output)
+            self.assertIn("cannot traverse directory (non-directory path:", output)
             self.assertIn("Failure summary: 1 unreadable, 0 parse errors, 0 token matches.", output)
 
     def test_fails_closed_when_root_contains_symlinked_directory(self) -> None:

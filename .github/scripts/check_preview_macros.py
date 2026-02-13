@@ -214,6 +214,8 @@ def format_utf8_decode_error(error: UnicodeDecodeError) -> str:
 def format_walk_error(error: OSError) -> str:
     if error.errno == errno.ELOOP:
         return f"cannot traverse directory (symlink loop: {error})"
+    if error.errno in {errno.ENOTDIR, errno.EISDIR}:
+        return f"cannot traverse directory (non-directory path: {error})"
     if error.errno in {errno.EACCES, errno.EPERM}:
         return f"cannot traverse directory (permission denied: {error})"
     if error.errno == errno.ENOENT:
