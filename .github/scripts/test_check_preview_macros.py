@@ -654,6 +654,24 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             self.assertIn("Corrupt.swift", result.stdout)
             self.assertIn("Scanned 1 Swift files before failure.", result.stdout)
 
+    def test_fails_closed_when_swift_file_exceeds_max_supported_size(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            swift_file = temp_path / "Oversized.swift"
+            oversized_payload = b"a" * (check_preview_macros.MAX_SWIFT_FILE_BYTES + 1)
+            swift_file.write_bytes(oversized_payload)
+
+            result = self.run_script("--root", temp_dir)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Could not read one or more Swift files", result.stdout)
+            self.assertIn("Oversized.swift", result.stdout)
+            self.assertIn("file exceeds max supported size", result.stdout)
+            self.assertIn(
+                f"{check_preview_macros.MAX_SWIFT_FILE_BYTES} bytes",
+                result.stdout,
+            )
+            self.assertIn("Scanned 1 Swift files before failure.", result.stdout)
+
     def test_fails_closed_when_swift_file_path_cannot_be_resolved(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = pathlib.Path(temp_dir)

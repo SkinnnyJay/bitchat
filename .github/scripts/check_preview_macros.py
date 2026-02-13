@@ -16,6 +16,7 @@ import stat
 import sys
 
 MAX_TOKEN_BYTES = 256
+MAX_SWIFT_FILE_BYTES = 5 * 1024 * 1024
 
 
 def parse_args() -> argparse.Namespace:
@@ -339,6 +340,20 @@ def main() -> int:
                     continue
                 seen_files.add(resolved_file)
                 scanned_files += 1
+                try:
+                    file_size_bytes = swift_file.stat().st_size
+                except OSError as error:
+                    record_unreadable(swift_file, f"cannot inspect file size ({error})")
+                    continue
+                if file_size_bytes > MAX_SWIFT_FILE_BYTES:
+                    record_unreadable(
+                        swift_file,
+                        (
+                            "file exceeds max supported size "
+                            f"({file_size_bytes} bytes > {MAX_SWIFT_FILE_BYTES} bytes)"
+                        ),
+                    )
+                    continue
                 try:
                     content = swift_file.read_text(encoding="utf-8")
                 except (OSError, UnicodeDecodeError) as error:
