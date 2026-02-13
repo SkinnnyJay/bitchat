@@ -5,7 +5,10 @@ Unit tests for preview guard token detection behavior.
 
 from __future__ import annotations
 
+import argparse
+import contextlib
 import errno
+import io
 import os
 import pathlib
 import random
@@ -15,6 +18,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+from unittest import mock
 
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
@@ -292,6 +296,11 @@ class PreviewMacroDetectionTests(unittest.TestCase):
 
 
 class PreviewMacroUtilityTests(unittest.TestCase):
+    def test_reports_utf8_byte_length_or_none(self) -> None:
+        self.assertEqual(check_preview_macros.utf8_byte_length_or_none("abc"), 3)
+        self.assertEqual(check_preview_macros.utf8_byte_length_or_none("🙂"), 4)
+        self.assertIsNone(check_preview_macros.utf8_byte_length_or_none("\ud800"))
+
     def test_escapes_control_characters_for_diagnostics(self) -> None:
         self.assertEqual(
             check_preview_macros.escape_diagnostic_text("line1\nline2\t\x01"),
@@ -342,6 +351,22 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
             text=True,
             capture_output=True,
         )
+
+    def run_main_with_args(
+        self,
+        *,
+        roots: list[str] | None,
+        token: str,
+        allow_empty: bool = False,
+    ) -> tuple[int, str]:
+        namespace = argparse.Namespace(root=roots, token=token, allow_empty=allow_empty)
+        output = io.StringIO()
+        with (
+            contextlib.redirect_stdout(output),
+            mock.patch.object(check_preview_macros, "parse_args", return_value=namespace),
+        ):
+            return_code = check_preview_macros.main()
+        return return_code, output.getvalue()
 
     def test_fails_when_scan_root_missing(self) -> None:
         result = self.run_script("--root", "this/path/does/not/exist")
@@ -729,6 +754,28 @@ class PreviewMacroScriptBehaviorTests(unittest.TestCase):
                 "Configured token must not contain control characters.",
                 result.stdout,
             )
+
+    def test_fails_when_token_is_not_utf8_encodable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            return_code, output = self.run_main_with_args(
+                roots=[temp_dir],
+                token="#My\ud800Preview",
+                allow_empty=True,
+            )
+            self.assertEqual(return_code, 1)
+            self.assertIn("Configured token must be valid UTF-8 text.", output)
+
+    def test_fails_when_scan_root_is_not_utf8_encodable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            return_code, output = self.run_main_with_args(
+                roots=[f"{temp_dir}\ud800"],
+                token="#Preview",
+                allow_empty=True,
+            )
+            self.assertEqual(return_code, 1)
+            self.assertIn("One or more scan roots are invalid", output)
+            self.assertIn("is not valid UTF-8 text", output)
+            self.assertIn("\\ud800", output)
 
     def test_fails_when_token_exceeds_max_utf8_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -32,6 +32,13 @@ def format_path_for_diagnostics(path: Path | str) -> str:
     return escape_diagnostic_text(str(path))
 
 
+def utf8_byte_length_or_none(value: str) -> int | None:
+    try:
+        return len(value.encode("utf-8"))
+    except UnicodeEncodeError:
+        return None
+
+
 def contains_disallowed_control_characters(value: str) -> bool:
     return any(unicodedata.category(character) in DISALLOWED_CONTROL_CATEGORIES for character in value)
 
@@ -232,10 +239,14 @@ def main() -> int:
     if any(character.isspace() for character in token):
         print("Configured token must not contain whitespace characters.")
         return 1
+    token_utf8_bytes = utf8_byte_length_or_none(token)
+    if token_utf8_bytes is None:
+        print("Configured token must be valid UTF-8 text.")
+        return 1
     if contains_disallowed_control_characters(token):
         print("Configured token must not contain control characters.")
         return 1
-    if len(token.encode("utf-8")) > MAX_TOKEN_BYTES:
+    if token_utf8_bytes > MAX_TOKEN_BYTES:
         print(
             "Configured token is too long; "
             f"must be at most {MAX_TOKEN_BYTES} UTF-8 bytes."
@@ -258,7 +269,11 @@ def main() -> int:
         if not trimmed_root:
             invalid_roots[raw_root] = "is empty after trimming"
             continue
-        if len(trimmed_root.encode("utf-8")) > MAX_ROOT_BYTES:
+        root_utf8_bytes = utf8_byte_length_or_none(trimmed_root)
+        if root_utf8_bytes is None:
+            invalid_roots[raw_root] = "is not valid UTF-8 text"
+            continue
+        if root_utf8_bytes > MAX_ROOT_BYTES:
             invalid_roots[raw_root] = (
                 "is too long; "
                 f"must be at most {MAX_ROOT_BYTES} UTF-8 bytes"
