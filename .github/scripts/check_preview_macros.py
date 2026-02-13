@@ -22,6 +22,7 @@ MAX_SWIFT_FILE_BYTES = 5 * 1024 * 1024
 MAX_SCANNED_SWIFT_FILES = 100000
 MAX_TOTAL_SCANNED_SWIFT_BYTES = 512 * 1024 * 1024
 MAX_VISITED_DIRECTORIES = 200000
+MAX_DIRECTORY_ENTRIES_PER_DIRECTORY = 200000
 MAX_ROOT_BYTES = 4096
 MAX_ROOT_COUNT = 128
 MAX_REPORTED_INVALID_ROOTS = 200
@@ -466,6 +467,8 @@ def main() -> int:
     scan_limit_reached = False
     scanned_bytes_limit_reached = False
     directory_limit_reached = False
+    directory_entries_limit_reached = False
+    directory_entries_limit_path: Path | None = None
     unreadable_limit_reached = False
     parse_error_limit_reached = False
     scanned_swift_bytes = 0
@@ -539,6 +542,7 @@ def main() -> int:
             scan_limit_reached
             or scanned_bytes_limit_reached
             or directory_limit_reached
+            or directory_entries_limit_reached
             or unreadable_limit_reached
             or parse_error_limit_reached
         )
@@ -557,6 +561,11 @@ def main() -> int:
             if should_abort_scan():
                 break
             if not try_increment_visited_directories():
+                break
+            directory_entry_count = len(subdirectories) + len(filenames)
+            if directory_entry_count > MAX_DIRECTORY_ENTRIES_PER_DIRECTORY:
+                directory_entries_limit_reached = True
+                directory_entries_limit_path = Path(directory)
                 break
             symlinked_subdirectories: list[Path] = []
             for subdirectory in list(subdirectories):
@@ -790,6 +799,19 @@ def main() -> int:
             "Scan aborted after reaching maximum directory-visit limit "
             f"({MAX_VISITED_DIRECTORIES})."
         )
+    if directory_entries_limit_reached:
+        has_failure = True
+        if directory_entries_limit_path is None:
+            print(
+                "Scan aborted after reaching maximum entries-per-directory limit "
+                f"({MAX_DIRECTORY_ENTRIES_PER_DIRECTORY})."
+            )
+        else:
+            print(
+                "Scan aborted after reaching maximum entries-per-directory limit "
+                f"({MAX_DIRECTORY_ENTRIES_PER_DIRECTORY}) at "
+                f"{format_path_for_diagnostics(directory_entries_limit_path)}."
+            )
     if scanned_bytes_limit_reached:
         has_failure = True
         print(
